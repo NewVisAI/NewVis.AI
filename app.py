@@ -78,6 +78,8 @@ class CameraRuntime:
     max_reconnect_attempts: int = 5
     is_live_stream: bool = False
     trace_annotator: sv.TraceAnnotator = field(default_factory=sv.TraceAnnotator)
+    prev_gray_frame: Optional[np.ndarray] = None
+    last_tracked_objects: List[Tuple] = field(default_factory=list)
 
     def close(self) -> None:
         self.cap.release()
@@ -87,6 +89,8 @@ class CameraRuntime:
         self.track_type_locks = {}
         self.display_frame = None
         self.trace_annotator = sv.TraceAnnotator()
+        self.prev_gray_frame = None
+        self.last_tracked_objects = []
 
 
 def _prompt_non_empty(prompt_text):
@@ -364,8 +368,26 @@ def _process_camera_frame(
 
     video_time = camera_state.current_frame_number / camera_state.fps if camera_state.fps else camera_state.current_frame_number / DEFAULT_FPS
 
-    detections = detector.detect(frame)
-    tracked_objects = camera_state.tracker.update(frame, detections)
+    # Motion Detection / Smart Frame Skipping
+    is_static = False
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray_resized = cv2.resize(gray, (320, 240))
+    
+    if camera_state.prev_gray_frame is not None:
+        diff = cv2.absdiff(camera_state.prev_gray_frame, gray_resized)
+        _, thresh = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY)
+        non_zero_ratio = np.count_nonzero(thresh) / thresh.size
+        if non_zero_ratio < 0.003:
+            is_static = True
+            
+    camera_state.prev_gray_frame = gray_resized
+
+    if is_static and camera_state.last_tracked_objects:
+        tracked_objects = camera_state.last_tracked_objects
+    else:
+        detections = detector.detect(frame)
+        tracked_objects = camera_state.tracker.update(frame, detections)
+        camera_state.last_tracked_objects = tracked_objects
 
     active_tracked_objects = []
     custom_labels = []
