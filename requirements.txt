@@ -15,3 +15,4 @@ tiktoken
 fastapi
 uvicorn
 supervision
+psycopg2-binary

@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import Dict, Hashable, List, Optional, Tuple
 
-from db_schema import connect_db, get_db_path
+from db_schema import connect_db, get_db_path, adapt_query, get_db_type
 
 DB_PATH = get_db_path()
 
@@ -127,9 +127,12 @@ def clear_event_logs() -> None:
     tracking_write_buffer.clear()
     conn = _connect()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM events")
-    cursor.execute("DELETE FROM tracking_data")
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('events', 'tracking_data')")
+    if get_db_type() == "postgres":
+        cursor.execute("TRUNCATE events, tracking_data RESTART IDENTITY CASCADE")
+    else:
+        cursor.execute("DELETE FROM events")
+        cursor.execute("DELETE FROM tracking_data")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('events', 'tracking_data')")
     conn.commit()
     conn.close()
 

@@ -2,7 +2,8 @@ import json
 import re
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
-from db_schema import get_db_path
+from db_schema import get_db_path, connect_db, adapt_query
+
 
 
 class QueryEngine:
@@ -32,10 +33,11 @@ class QueryEngine:
         if not filters and user_query:
             filters = self._build_keyword_filters(user_query)
 
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_db(validate_schema=False)
         cursor = conn.cursor()
         self._ensure_event_columns(cursor)
-        conn.commit()
+        if hasattr(conn, "commit"):
+            conn.commit()
         display_mode = self._resolve_display_mode(filters)
         session_mode = self._normalize_session_mode(session_mode or filters.get("session_mode"))
 
@@ -97,7 +99,7 @@ class QueryEngine:
 
         sql += " ORDER BY COALESCE(exit_time, entry_time, timestamp) DESC"
 
-        cursor.execute(sql, params)
+        cursor.execute(adapt_query(sql), params)
         rows = cursor.fetchall()
         conn.close()
 
@@ -255,7 +257,7 @@ class QueryEngine:
         return clause, [start_hour, end_hour]
 
     def generate_security_report(self) -> str:
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_db(validate_schema=False)
         cursor = conn.cursor()
         
         report = []
@@ -310,7 +312,7 @@ class QueryEngine:
         Queries database to build a chronological timeline of zone transitions
         and camera sightings for a specific global_id.
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_db(validate_schema=False)
         cursor = conn.cursor()
         
         sql = """
@@ -319,7 +321,7 @@ class QueryEngine:
             WHERE global_id = ? AND entry_time IS NOT NULL
             ORDER BY entry_time ASC
         """
-        cursor.execute(sql, (global_id,))
+        cursor.execute(adapt_query(sql), (global_id,))
         rows = cursor.fetchall()
         conn.close()
         
