@@ -354,17 +354,22 @@ def update_session_event(
     video_path: str,
     frame_number: int,
     event_mode: str = "single",
+    assigned_zone_id: Optional[int] = None,
 ) -> Optional[str]:
     global_id = _require_global_id(global_id)
     event_mode = normalize_event_mode(event_mode)
     _finalize_expired_sessions(video_time)
-    centroid = _calculate_centroid(bbox)
     object_type = normalize_object_type(object_type)
 
     current_session_key = _session_key(event_mode, camera_id, global_id)
     session = sessions.get(current_session_key)
     preferred_zone_id = int(session["zone_id"]) if session is not None else None
-    matched_zone = _find_matching_zone(centroid, zones, preferred_zone_id)
+    
+    if assigned_zone_id is not None:
+        matched_zone = _find_zone_by_id(zones, assigned_zone_id)
+    else:
+        centroid = _calculate_centroid(bbox)
+        matched_zone = _find_matching_zone(centroid, zones, preferred_zone_id)
 
     if session is None and matched_zone is not None:
         zone_id = int(matched_zone.get("id", 1))

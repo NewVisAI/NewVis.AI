@@ -80,6 +80,7 @@ class CameraRuntime:
     trace_annotator: sv.TraceAnnotator = field(default_factory=sv.TraceAnnotator)
     prev_gray_frame: Optional[np.ndarray] = None
     last_tracked_objects: List[Tuple] = field(default_factory=list)
+    sv_zones: Optional[Dict[int, sv.PolygonZone]] = None
 
     def close(self) -> None:
         self.cap.release()
@@ -91,6 +92,7 @@ class CameraRuntime:
         self.trace_annotator = sv.TraceAnnotator()
         self.prev_gray_frame = None
         self.last_tracked_objects = []
+        self.sv_zones = None
 
 
 def _prompt_non_empty(prompt_text):
@@ -365,6 +367,14 @@ def _process_camera_frame(
             print(f"⚠️ Saved zones for {camera_state.name} could not be rendered.")
             camera_state.finished = True
             return
+            
+        camera_state.sv_zones = {}
+        for zone in camera_state.pixel_zones:
+            polygon_np = np.array(zone["polygon"], dtype=np.int32)
+            camera_state.sv_zones[zone["id"]] = sv.PolygonZone(
+                polygon=polygon_np,
+                frame_resolution_wh=(frame.shape[1], frame.shape[0])
+            )
 
     video_time = camera_state.current_frame_number / camera_state.fps if camera_state.fps else camera_state.current_frame_number / DEFAULT_FPS
 
@@ -388,6 +398,28 @@ def _process_camera_frame(
         detections = detector.detect(frame)
         tracked_objects = camera_state.tracker.update(frame, detections)
         camera_state.last_tracked_objects = tracked_objects
+
+    # Vectorized zone containment check using sv.PolygonZone
+    track_to_zone_id = {}
+    if tracked_objects and camera_state.sv_zones:
+        xyxy = np.array([[obj[0], obj[1], obj[2], obj[3]] for obj in tracked_objects], dtype=np.float32)
+        tracker_ids = np.array([obj[4] for obj in tracked_objects], dtype=np.int32)
+        class_ids = np.array([obj[5] for obj in tracked_objects], dtype=np.int32)
+        
+        sv_detections = sv.Detections(
+            xyxy=xyxy,
+            tracker_id=tracker_ids,
+            class_id=class_ids
+        )
+        
+        for zone in camera_state.pixel_zones:
+            zone_id = zone["id"]
+            sv_zone = camera_state.sv_zones.get(zone_id)
+            if sv_zone:
+                is_inside = sv_zone.trigger(sv_detections)
+                for idx, inside in enumerate(is_inside):
+                    if inside:
+                        track_to_zone_id[tracker_ids[idx]] = zone_id
 
     active_tracked_objects = []
     custom_labels = []
@@ -426,6 +458,8 @@ def _process_camera_frame(
             camera_state.source,
         )
 
+        assigned_zone_id = track_to_zone_id.get(track_id)
+
         update_session_event(
             track_id=track_id,
             global_id=global_id,
@@ -437,6 +471,7 @@ def _process_camera_frame(
             video_path=camera_state.source,
             frame_number=camera_state.current_frame_number,
             event_mode=session_mode,
+            assigned_zone_id=assigned_zone_id,
         )
 
         # Update Incident Risk
