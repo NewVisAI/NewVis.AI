@@ -24,6 +24,11 @@ OBJECT_TYPE_ALIASES = {
     "bicycle": "motorcycle",
 }
 tracking_write_buffer: List[Tuple[object, ...]] = []
+EVENT_CALLBACKS = []
+
+
+def register_event_callback(callback) -> None:
+    EVENT_CALLBACKS.append(callback)
 
 
 def reset_runtime_state() -> None:
@@ -36,12 +41,12 @@ def normalize_object_type(object_type: Optional[str]) -> str:
 
 
 def normalize_event_mode(event_mode: Optional[str]) -> str:
-    normalized = (event_mode or "multi").strip().lower().replace("_", "-")
+    normalized = (event_mode or "single").strip().lower().replace("_", "-")
     if normalized in {"single", "single-camera", "single camera"}:
         return "single"
     if normalized in {"multi", "multi-camera", "multi camera"}:
         return "multi"
-    return "multi"
+    return "single"
 
 
 def _session_key(event_mode: str, camera_id: Optional[int], global_id: int) -> Hashable:
@@ -289,6 +294,24 @@ def _write_session_event(
     conn.commit()
     conn.close()
 
+    # Trigger custom event callbacks
+    for cb in EVENT_CALLBACKS:
+        try:
+            # Pass details in JSON-serializable structure
+            cb({
+                "track_id": session.get("track_id"),
+                "global_id": session.get("global_id"),
+                "object_type": session.get("object_type"),
+                "zone_id": session.get("zone_id"),
+                "camera_id": session.get("camera_id"),
+                "entry_time": session.get("entry_time"),
+                "exit_time": exit_time,
+                "duration": duration,
+                "stayed": bool(stayed)
+            })
+        except Exception:
+            pass
+
 
 def _finalize_session(session_key: Hashable, session: Dict[str, object]) -> None:
     duration = _calculate_duration(session.get("entry_video_time"), float(session.get("last_video_time", 0.0)))
@@ -328,7 +351,7 @@ def update_session_event(
     camera_id: Optional[int],
     video_path: str,
     frame_number: int,
-    event_mode: str = "multi",
+    event_mode: str = "single",
 ) -> Optional[str]:
     global_id = _require_global_id(global_id)
     event_mode = normalize_event_mode(event_mode)

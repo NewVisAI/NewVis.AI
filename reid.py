@@ -141,71 +141,110 @@ def cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
     return float(np.dot(left, right))
 
 
-class FastReIDEmbedder:
+class NeuralReIDEmbedder:
     def __init__(self):
-        self._predictor = None
         self.backend_name = "fallback"
         self.embedding_size = 84
+        self._model = None
+        self._device = "cpu"
+        self._preprocess = None
         self._build_backend()
 
     def _build_backend(self) -> None:
+        # 1. Attempt FastReID first (if config and weights exist)
         config_path = os.getenv("FASTREID_CONFIG")
         weights_path = os.getenv("FASTREID_WEIGHTS")
-        if not config_path or not weights_path:
-            return
-        if not os.path.exists(config_path) or not os.path.exists(weights_path):
-            return
-
-        try:
-            from fastreid.config import get_cfg
-            from fastreid.engine.defaults import DefaultPredictor
-        except ImportError:
-            return
-
-        device = os.getenv("FASTREID_DEVICE")
-        if not device:
-            device = "cpu"
+        if config_path and weights_path and os.path.exists(config_path) and os.path.exists(weights_path):
             try:
+                from fastreid.config import get_cfg
+                from fastreid.engine.defaults import DefaultPredictor
                 import torch
+                
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                cfg = get_cfg()
+                cfg.merge_from_file(config_path)
+                cfg.MODEL.WEIGHTS = weights_path
+                if hasattr(cfg.MODEL, "DEVICE"):
+                    cfg.MODEL.DEVICE = device
+                self._model = DefaultPredictor(cfg)
+                self.backend_name = "fastreid"
+                self.embedding_size = 2048 # typical for FastReID ResNet50
+                print("[NeuralReIDEmbedder] Successfully initialized FastReID backend.")
+                return
+            except Exception as e:
+                print(f"[NeuralReIDEmbedder] Failed to initialize FastReID: {e}. Falling back to PyTorch ResNet50.")
 
-                if torch.cuda.is_available():
-                    device = "cuda"
-            except ImportError:
-                device = "cpu"
+        # 2. Attempt PyTorch ResNet50 next
+        try:
+            import torch
+            import torchvision.models as models
+            import torchvision.transforms as T
+            from torchvision.models import ResNet50_Weights
 
-        cfg = get_cfg()
-        cfg.merge_from_file(config_path)
-        cfg.MODEL.WEIGHTS = weights_path
-        if hasattr(cfg.MODEL, "DEVICE"):
-            cfg.MODEL.DEVICE = device
+            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"[NeuralReIDEmbedder] Loading pre-trained ResNet50 on {self._device.upper()}...")
+            
+            # Load resnet50 and strip classifier
+            model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
+            model.fc = torch.nn.Identity()
+            model.to(self._device)
+            model.eval()
+            self._model = model
 
-        self._predictor = DefaultPredictor(cfg)
-        self.backend_name = "fastreid"
+            self._preprocess = T.Compose([
+                T.ToPILImage(),
+                T.Resize((128, 64)),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+
+            self.backend_name = "resnet50"
+            self.embedding_size = 2048
+            print("[NeuralReIDEmbedder] ResNet50 Neural ReID initialized successfully.")
+        except Exception as e:
+            self.backend_name = "fallback"
+            self.embedding_size = 84
+            print(f"[NeuralReIDEmbedder] Failed to initialize ResNet50: {e}. Using fallback histogram embeddings.")
 
     def extract(self, frame, bbox: Tuple[int, int, int, int]) -> np.ndarray:
-        if self._predictor is None:
-            return _extract_fallback_embedding(frame, bbox)
-
         x1, y1, x2, y2 = _clip_bbox(frame.shape, bbox)
         crop = frame[y1:y2, x1:x2]
         if crop.size == 0:
             return _extract_fallback_embedding(frame, bbox)
 
-        try:
-            features = self._predictor(crop)
-            if hasattr(features, "detach"):
-                features = features.detach()
-            if hasattr(features, "cpu"):
-                features = features.cpu()
-            vector = np.asarray(features, dtype=np.float32).reshape(-1)
-            if vector.size == 0:
-                return _extract_fallback_embedding(frame, bbox)
-            self.embedding_size = int(vector.size)
-            return _normalize_embedding(vector)
-        except Exception:
-            self._predictor = None
-            self.backend_name = "fallback"
-            return _extract_fallback_embedding(frame, bbox)
+        if self.backend_name == "fastreid" and self._model is not None:
+            try:
+                features = self._model(crop)
+                if hasattr(features, "detach"):
+                    features = features.detach()
+                if hasattr(features, "cpu"):
+                    features = features.cpu()
+                vector = np.asarray(features, dtype=np.float32).reshape(-1)
+                if vector.size > 0:
+                    self.embedding_size = int(vector.size)
+                    return _normalize_embedding(vector)
+            except Exception:
+                pass
+
+        elif self.backend_name == "resnet50" and self._model is not None:
+            try:
+                import torch
+                # BGR to RGB
+                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                input_tensor = self._preprocess(rgb_crop).unsqueeze(0).to(self._device)
+                
+                with torch.no_grad():
+                    features = self._model(input_tensor)
+                
+                vector = features.squeeze().cpu().numpy()
+                if vector.size > 0:
+                    return _normalize_embedding(vector)
+            except Exception as e:
+                print(f"[NeuralReIDEmbedder] ResNet50 inference error: {e}")
+                pass
+
+        # Fallback to local histograms/geometry
+        return _extract_fallback_embedding(frame, bbox)
 
 
 @dataclass
@@ -257,7 +296,8 @@ class GlobalIdentityManager:
         self.identity_store: Dict[int, IdentityRecord] = {}
         self.camera_time_assignments: Dict[Tuple[int, float], Set[int]] = {}
         self.embedding_cache: Dict[Tuple[int, int], EmbeddingCacheRecord] = {}
-        self.embedder = FastReIDEmbedder()
+        self.track_frame_counters: Dict[Tuple[int, int], int] = {}
+        self.embedder = NeuralReIDEmbedder()
         self.embedding_size = self.embedder.embedding_size
 
     def _color_similarity(
@@ -331,7 +371,28 @@ class GlobalIdentityManager:
     ) -> int:
         local_key = (camera_id, track_id)
         object_type = normalize_object_type(object_type)
-        embedding = self._get_embedding(camera_id, track_id, frame, bbox, current_time)
+        
+        # Track frame counters for lazy ReID extraction
+        count = self.track_frame_counters.get(local_key, 0)
+        self.track_frame_counters[local_key] = count + 1
+        
+        existing_global_id = self.track_id_to_global_id.get(local_key)
+        
+        # Lazy ReID embedding: only run model if track is new or every 15 frames
+        need_embedding = (existing_global_id is None) or (count % 15 == 0)
+        
+        if not need_embedding:
+            cached = self.embedding_cache.get(local_key)
+            if cached is not None:
+                embedding = cached.embedding
+                # Keep cache fresh
+                cached.bbox = bbox
+                cached.last_seen_time = float(current_time)
+            else:
+                embedding = self._get_embedding(camera_id, track_id, frame, bbox, current_time)
+        else:
+            embedding = self._get_embedding(camera_id, track_id, frame, bbox, current_time)
+            
         shirt_color = extract_shirt_color(frame, bbox)
         self._prune_runtime_caches(current_time)
 
@@ -553,11 +614,13 @@ class GlobalIdentityManager:
             self.track_id_to_global_id.clear()
             self.camera_time_assignments.clear()
             self.embedding_cache.clear()
+            self.track_frame_counters.clear()
             return
 
         stale_track_keys = [key for key in self.track_id_to_global_id if key[0] == camera_id]
         for key in stale_track_keys:
             self.track_id_to_global_id.pop(key, None)
+            self.track_frame_counters.pop(key, None)
 
         stale_assignment_keys = [key for key in self.camera_time_assignments if key[0] == camera_id]
         for key in stale_assignment_keys:

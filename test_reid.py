@@ -399,6 +399,7 @@ class PlaybackSessionTests(unittest.TestCase):
             camera_id=1,
             video_path="cam1.mp4",
             frame_number=0,
+            event_mode="multi",
         )
         update_session_event(
             track_id=5,
@@ -410,6 +411,7 @@ class PlaybackSessionTests(unittest.TestCase):
             camera_id=2,
             video_path="cam2.mp4",
             frame_number=15,
+            event_mode="multi",
         )
         finalize_camera_sessions(camera_id=2, video_path="cam2.mp4")
 

@@ -1,12 +1,12 @@
-from deep_sort_realtime.deepsort_tracker import DeepSort
+import numpy as np
+import supervision as sv
 
 
 class PersonTracker:
     def __init__(self):
-        self.tracker = DeepSort(
-            max_age=50,
-            n_init=3,
-            max_cosine_distance=0.3
+        self.tracker = sv.ByteTrack(
+            track_activation_threshold=0.25,
+            lost_track_buffer=50
         )
 
     def update(self, frame, detections):
@@ -14,55 +14,48 @@ class PersonTracker:
         detections format:
         [(x1, y1, x2, y2, conf, cls_id)]
         """
-
         print("\n================ FRAME START ================")
         print(f"[INFO] Total detections: {len(detections)}")
 
-        ds_detections = []
+        if not detections:
+            xyxy = np.empty((0, 4), dtype=np.float32)
+            confidence = np.empty((0,), dtype=np.float32)
+            class_id = np.empty((0,), dtype=np.int32)
+        else:
+            xyxy = np.array([[d[0], d[1], d[2], d[3]] for d in detections], dtype=np.float32)
+            confidence = np.array([d[4] for d in detections], dtype=np.float32)
+            class_id = np.array([d[5] for d in detections], dtype=np.int32)
 
-        for i, (x1, y1, x2, y2, conf, cls_id) in enumerate(detections):
-            w = x2 - x1
-            h = y2 - y1
-
-            print(f"[DETECTION {i}] "
-                  f"BBOX=({x1},{y1},{x2},{y2}) "
-                  f"CONF={conf:.2f} CLASS={cls_id}")
-
-            ds_detections.append((
-                [x1, y1, w, h],
-                conf,
-                cls_id
-            ))
+        sv_detections = sv.Detections(
+            xyxy=xyxy,
+            confidence=confidence,
+            class_id=class_id
+        )
 
         # Update tracker
-        tracks = self.tracker.update_tracks(ds_detections, frame=frame)
-
-        print(f"[INFO] Tracks returned: {len(tracks)}")
+        tracked_detections = self.tracker.update_with_detections(sv_detections)
+        print(f"[INFO] Tracks returned: {len(tracked_detections)}")
 
         results = []
+        if tracked_detections.tracker_id is not None:
+            for i in range(len(tracked_detections)):
+                box = tracked_detections.xyxy[i]
+                track_id = tracked_detections.tracker_id[i]
+                cls_id = tracked_detections.class_id[i]
 
-        for track in tracks:
-            if not track.is_confirmed():
-                print(f"[TRACK {track.track_id}] Not confirmed → skipped")
-                continue
+                print(f"[TRACK CONFIRMED] "
+                      f"Track ID: {track_id} "
+                      f"BBOX: ({int(box[0])}, {int(box[1])}, {int(box[2])}, {int(box[3])}) "
+                      f"Class: {cls_id}")
 
-            l, t, r, b = track.to_ltrb()
-
-            print(f"""
-[TRACK CONFIRMED]
-Track ID: {track.track_id}
-BBOX: ({int(l)}, {int(t)}, {int(r)}, {int(b)})
-Class: {track.det_class}
-""")
-
-            results.append((
-                int(l),
-                int(t),
-                int(r),
-                int(b),
-                int(track.track_id),
-                track.det_class
-            ))
+                results.append((
+                    int(box[0]),
+                    int(box[1]),
+                    int(box[2]),
+                    int(box[3]),
+                    int(track_id),
+                    int(cls_id)
+                ))
 
         print("[INFO] Final tracked objects:", len(results))
         print("================ FRAME END ==================\n")

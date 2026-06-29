@@ -9,25 +9,7 @@ print("AI CCTV Search Console")
 print("Type 'exit' to quit")
 
 
-def ask_session_mode_once():
-    print("\nSelect search mode:")
-    print("1. Single Camera Events")
-    print("2. Multi Camera Events")
-
-    while True:
-        choice = input("Enter choice (1/2): ").strip().lower()
-        if choice in {"1", "single", "single camera"}:
-            return "single"
-        if choice in {"2", "multi", "multi camera"}:
-            return "multi"
-        if choice == "exit":
-            return None
-        print("Invalid choice. Please enter 1, 2, or exit.")
-
-
-session_mode = ask_session_mode_once()
-if session_mode is None:
-    raise SystemExit(0)
+session_mode = "single"
 
 while True:
 

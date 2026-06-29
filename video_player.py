@@ -9,7 +9,6 @@ from event import (
     get_playback_segments,
     get_tracking_data,
 )
-from multi_view import compose_multiview
 from zone_manager import build_pixel_zones, get_camera_zones
 
 TARGET_PLAYBACK_FPS = 20
@@ -95,13 +94,12 @@ def _draw_status(
     total_duration_seconds: float,
     target_label: str,
     paused: bool,
-    view_label: str,
 ):
-    status = f"Playback | {target_label} | {playback_seconds:.1f}s / {total_duration_seconds:.1f}s | {view_label}"
+    status = f"Playback | {target_label} | {playback_seconds:.1f}s / {total_duration_seconds:.1f}s"
     if paused:
         status += " | PAUSED"
 
-    controls = "M multi | 1-3 select | N/B next/prev | SPACE pause | LEFT/RIGHT seek | Q quit"
+    controls = "SPACE: pause | LEFT/RIGHT: seek | Q: quit"
     cv2.rectangle(frame, (0, 0), (frame.shape[1], 58), (0, 0, 0), cv2.FILLED)
     cv2.putText(
         frame,
@@ -335,32 +333,15 @@ def play_event(
     window_name = "Sentinel AI - Event Playback"
     paused = False
     playback_offset_sec = 0.0
-    fullscreen_camera_id: Optional[int] = None
-    camera_ids = sorted([f.camera_id for f in feeds if f.camera_id is not None])
+    feed = feeds[0]
 
     try:
         while True:
-            rendered_feeds = []
-            for feed in feeds:
-                frame, has_highlight = _read_feed_frame(feed, session_start_time, playback_offset_sec)
-                rendered_feeds.append(
-                    {
-                        "camera_id": feed.camera_id,
-                        "frame": frame,
-                        "title": feed.title,
-                        "subtitle": f"Frame {feed.current_frame} | CAM {feed.camera_id}",
-                        "highlight": has_highlight,
-                    }
-                )
-
-            view_label = (
-                f"Camera {fullscreen_camera_id}"
-                if fullscreen_camera_id is not None
-                else "Multi-view"
-            )
-            canvas = compose_multiview(rendered_feeds, fullscreen_camera_id=fullscreen_camera_id)
-            _draw_status(canvas, playback_offset_sec, session_duration_sec, target_label, paused, view_label)
-            cv2.imshow(window_name, canvas)
+            frame, has_highlight = _read_feed_frame(feed, session_start_time, playback_offset_sec)
+            if frame is not None:
+                canvas = frame.copy()
+                _draw_status(canvas, playback_offset_sec, session_duration_sec, target_label, paused)
+                cv2.imshow(window_name, canvas)
 
             key = cv2.waitKeyEx(30 if paused else max(1, int(1000 / TARGET_PLAYBACK_FPS)))
             key_cmd = key & 0xFF
@@ -369,42 +350,6 @@ def play_event(
 
             if key_cmd == ord(" "):
                 paused = not paused
-                continue
-
-            if key_cmd in (ord("m"), ord("M")):
-                fullscreen_camera_id = None
-                continue
-
-            # Fullscreen select 1-9
-            if ord("1") <= key_cmd <= ord("9"):
-                selected_camera_id = key_cmd - ord("0")
-                if any(f.camera_id == selected_camera_id for f in feeds):
-                    fullscreen_camera_id = selected_camera_id
-                continue
-
-            # Cycle Next (N) / Previous (B)
-            if key_cmd in (ord("n"), ord("N")):
-                if camera_ids:
-                    if fullscreen_camera_id is None:
-                        fullscreen_camera_id = camera_ids[0]
-                    else:
-                        try:
-                            idx = camera_ids.index(fullscreen_camera_id)
-                            fullscreen_camera_id = camera_ids[(idx + 1) % len(camera_ids)]
-                        except ValueError:
-                            fullscreen_camera_id = camera_ids[0]
-                continue
-
-            if key_cmd in (ord("b"), ord("B")):
-                if camera_ids:
-                    if fullscreen_camera_id is None:
-                        fullscreen_camera_id = camera_ids[-1]
-                    else:
-                        try:
-                            idx = camera_ids.index(fullscreen_camera_id)
-                            fullscreen_camera_id = camera_ids[(idx - 1) % len(camera_ids)]
-                        except ValueError:
-                            fullscreen_camera_id = camera_ids[-1]
                 continue
 
             if _is_left_arrow(key) or _is_right_arrow(key):
@@ -418,7 +363,7 @@ def play_event(
                     playback_offset_sec = session_duration_sec
                     paused = True
     finally:
-        for feed in feeds:
-            feed.close()
+        for f in feeds:
+            f.close()
         cv2.destroyWindow(window_name)
 

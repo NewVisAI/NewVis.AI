@@ -12,3 +12,6 @@ langchain
 langchain-community
 langchain-core
 tiktoken
+fastapi
+uvicorn
+supervision

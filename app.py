@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import cv2
+import numpy as np
+import supervision as sv
 
 from detector import HumanDetector
 from incident_manager import IncidentManager
@@ -35,12 +37,14 @@ def _draw_corner_rect(img, pt1, pt2, color, thickness, r, d):
     cv2.line(img, (x2, y2), (x2 - r, y2), color, thickness)
     cv2.line(img, (x2, y2), (x2, y2 - r), color, thickness)
 from intent_manager import IntentManager
-from multi_view import compose_multiview
 from query_engine import QueryEngine
 from reid import GlobalIdentityManager
 from tracker import PersonTracker
 from video_player import play_event
 from zone_manager import build_pixel_zones, draw_camera_zones, get_camera_zones, overwrite_zones
+
+box_annotator = sv.BoxAnnotator(thickness=2)
+label_annotator = sv.LabelAnnotator(text_scale=0.5, text_thickness=1)
 
 TRACKED_CLASSES = {"person", "bicycle", "car", "motorcycle", "bus", "truck"}
 DEFAULT_FPS = 25.0
@@ -69,6 +73,10 @@ class CameraRuntime:
     display_frame: Optional[object] = None
     current_frame_number: int = 0
     finished: bool = False
+    consecutive_failures: int = 0
+    max_reconnect_attempts: int = 5
+    is_live_stream: bool = False
+    trace_annotator: sv.TraceAnnotator = field(default_factory=sv.TraceAnnotator)
 
     def close(self) -> None:
         self.cap.release()
@@ -77,6 +85,7 @@ class CameraRuntime:
         self.tracker = PersonTracker()
         self.track_type_locks = {}
         self.display_frame = None
+        self.trace_annotator = sv.TraceAnnotator()
 
 
 def _prompt_non_empty(prompt_text):
@@ -88,48 +97,17 @@ def _prompt_non_empty(prompt_text):
 
 
 def prompt_camera_configs():
-    print("\nSelect Input Flow:")
-    print("1. Single Camera")
-    print("2. Multi Camera")
-
-    while True:
-        mode_choice = input("Enter choice (1/2): ").strip()
-        if mode_choice in {"1", "2"}:
-            break
-        print("Invalid choice. Please enter 1 or 2.")
-
-    if mode_choice == "1":
-        source = _prompt_non_empty("Enter video path for camera 1: ")
-        return (
-            [
-                {
-                    "camera_id": 1,
-                    "name": "Camera 1",
-                    "source": source,
-                }
-            ],
-            "single",
-        )
-
-    while True:
-        total_cameras = input("Enter number of cameras: ").strip()
-        if total_cameras.isdigit() and int(total_cameras) > 0:
-            total_cameras = int(total_cameras)
-            break
-        print("Please enter a positive number.")
-
-    camera_configs = []
-    for camera_idx in range(1, total_cameras + 1):
-        source = _prompt_non_empty(f"Enter video path for camera {camera_idx}: ")
-        camera_configs.append(
+    source = _prompt_non_empty("Enter video path for camera: ")
+    return (
+        [
             {
-                "camera_id": camera_idx,
-                "name": f"Camera {camera_idx}",
+                "camera_id": 1,
+                "name": "Camera 1",
                 "source": source,
             }
-        )
-
-    return camera_configs, "multi"
+        ],
+        "single",
+    )
 
 
 def resolve_capture_source(source):
@@ -160,8 +138,8 @@ def draw_zone_overlays(frame, zones_list):
         )
 
 
-def _draw_global_status(frame, paused: bool, view_label: str, active_cameras: int, incident_manager: IncidentManager = None):
-    status = f"SENTINEL AI | {view_label} | ACTIVE: {active_cameras}"
+def _draw_global_status(frame, paused: bool, view_label: str, incident_manager: IncidentManager = None):
+    status = f"SENTINEL AI | {view_label}"
     if paused:
         status += " | PAUSED"
 
@@ -171,9 +149,9 @@ def _draw_global_status(frame, paused: bool, view_label: str, active_cameras: in
     
     cv2.putText(frame, status, (20, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
     
-    controls = "1-9: Zoom | M: Multi | SPACE: Pause | LEFT/RIGHT: Seek | Q: Quit"
-    cv2.putText(frame, controls, (frame.shape[1] - 500, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
-    
+    controls = "SPACE: Pause | LEFT/RIGHT: Seek | Q: Quit"
+    cv2.putText(frame, controls, (frame.shape[1] - 350, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+
     # Draw Incident Log (Right Side)
     if incident_manager:
         incidents = incident_manager.get_recent_incidents(5)
@@ -321,6 +299,15 @@ def _create_camera_runtime(camera_config: Dict[str, object]) -> Optional[CameraR
         cap.release()
         return None
 
+    is_live = False
+    source_val = camera_config["source"]
+    if isinstance(source_val, int) or str(source_val).isdigit():
+        is_live = True
+    elif isinstance(source_val, str):
+        s_lower = source_val.lower().strip()
+        if s_lower.startswith(("rtsp://", "rtmp://", "http://", "https://")) or s_lower.isdigit():
+            is_live = True
+
     return CameraRuntime(
         camera_id=int(camera_config["camera_id"]),
         name=str(camera_config["name"]),
@@ -331,6 +318,7 @@ def _create_camera_runtime(camera_config: Dict[str, object]) -> Optional[CameraR
         jump_frames=_frame_delta_for_seconds(fps, PLAYBACK_JUMP_SECONDS),
         total_frames=total_frames,
         zone_defs=zone_defs,
+        is_live_stream=is_live,
     )
 
 
@@ -346,11 +334,24 @@ def _process_camera_frame(
 
     ret, frame = camera_state.cap.read()
     if not ret or frame is None:
+        if camera_state.is_live_stream and camera_state.consecutive_failures < camera_state.max_reconnect_attempts:
+            camera_state.consecutive_failures += 1
+            print(f"[RECONNECT] Camera '{camera_state.name}' frame capture failed. "
+                  f"Attempting reconnection {camera_state.consecutive_failures}/{camera_state.max_reconnect_attempts}...")
+            camera_state.cap.release()
+            import time
+            time.sleep(1.5)
+            resolved_src = resolve_capture_source(camera_state.source)
+            camera_state.cap = cv2.VideoCapture(resolved_src)
+            return
+
         camera_state.finished = True
         finalize_camera_sessions(camera_state.camera_id, camera_state.source)
         flush_tracking_data()
         print(f"✅ Finished processing {camera_state.name}.")
         return
+
+    camera_state.consecutive_failures = 0
 
     camera_state.current_frame_number = max(0, int(camera_state.cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1)
     if camera_state.pixel_zones is None:
@@ -364,6 +365,9 @@ def _process_camera_frame(
 
     detections = detector.detect(frame)
     tracked_objects = camera_state.tracker.update(frame, detections)
+
+    active_tracked_objects = []
+    custom_labels = []
 
     for (x1, y1, x2, y2, track_id, cls_id) in tracked_objects:
         object_type = detector.model.names[cls_id]
@@ -431,26 +435,32 @@ def _process_camera_frame(
                 "zone_name": zone_name
             })
 
-        # Visuals
-        color = (0, 255, 0) # Green
-        if risk_data["level"] == "MEDIUM": color = (0, 255, 255) # Yellow
-        if risk_data["level"] == "HIGH": color = (0, 0, 255) # Red
-        
-        _draw_corner_rect(frame, (x1, y1), (x2, y2), color, 2, 15, 5)
+        active_tracked_objects.append((x1, y1, x2, y2, track_id, cls_id))
         
         label = f"{locked_type} GID {global_id}"
         if risk_data["score"] > 0:
             label += f" | RISK: {risk_data['score']}"
+        custom_labels.append(label)
+
+    if active_tracked_objects:
+        xyxy = np.array([[obj[0], obj[1], obj[2], obj[3]] for obj in active_tracked_objects], dtype=np.float32)
+        tracker_ids = np.array([obj[4] for obj in active_tracked_objects], dtype=np.int32)
+        class_ids = np.array([obj[5] for obj in active_tracked_objects], dtype=np.int32)
         
-        cv2.putText(
-            frame,
-            label,
-            (x1, max(16, y1 - 10)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            color,
-            2,
+        sv_detections = sv.Detections(
+            xyxy=xyxy,
+            tracker_id=tracker_ids,
+            class_id=class_ids
         )
+        
+        # 1. Draw trails
+        frame = camera_state.trace_annotator.annotate(scene=frame, detections=sv_detections)
+        
+        # 2. Draw boxes
+        frame = box_annotator.annotate(scene=frame, detections=sv_detections)
+        
+        # 3. Draw labels
+        frame = label_annotator.annotate(scene=frame, detections=sv_detections, labels=custom_labels)
 
     draw_zone_overlays(frame, camera_state.pixel_zones)
     camera_state.display_frame = frame
@@ -483,59 +493,46 @@ def _advance_cameras(camera_states: List[CameraRuntime]) -> None:
 
 
 def run_surveillance_mode(camera_configs, detector, identity_manager, incident_manager, session_mode: str):
-    camera_states = []
-    for camera_config in camera_configs:
-        camera_state = _create_camera_runtime(camera_config)
-        if camera_state is not None:
-            identity_manager.clear_camera_track_mappings(camera_state.camera_id)
-            camera_states.append(camera_state)
-
-    if not camera_states:
-        print("❌ No camera streams are available for surveillance mode.")
+    if not camera_configs:
+        print("❌ No camera configuration available.")
         return True
 
-    print(f"\n▶ Monitoring all configured cameras ({session_mode} event mode)")
-    print("   Controls: 1-9 fullscreen, M multi-view, SPACE pause/play, LEFT/RIGHT seek, Q/Esc exit.")
+    camera_state = _create_camera_runtime(camera_configs[0])
+    if camera_state is None:
+        print("❌ Could not open camera stream.")
+        return True
+
+    identity_manager.clear_camera_track_mappings(camera_state.camera_id)
+    print(f"\n▶ Monitoring {camera_state.name} ({session_mode} event mode)")
+    print("   Controls: SPACE pause/play, LEFT/RIGHT seek, Q/Esc exit.")
 
     reset_runtime_state()
     paused = False
-    fullscreen_camera_id: Optional[int] = None
     window_name = "CCTV - Surveillance"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     try:
-        while True:
-            active_cameras = sum(1 for state in camera_states if not state.finished)
-            if active_cameras == 0:
-                break
+        while not camera_state.finished:
+            if not paused or camera_state.display_frame is None:
+                import time
+                t_start = time.time()
+                _process_camera_frame(camera_state, detector, identity_manager, incident_manager, session_mode)
+                t_duration = time.time() - t_start
+                
+                # Adaptive Frame Skipping based on actual processing time
+                target_frame_time = 1.0 / camera_state.fps if camera_state.fps else 0.04
+                if t_duration > target_frame_time:
+                    camera_state.frame_skip = min(15, camera_state.frame_skip + 1)
+                else:
+                    base_skip = _frame_stride_for_fps(camera_state.fps)
+                    camera_state.frame_skip = max(base_skip, camera_state.frame_skip - 1)
 
-            if not paused or any(state.display_frame is None for state in camera_states if not state.finished):
-                for camera_state in camera_states:
-                    if not paused or camera_state.display_frame is None:
-                        _process_camera_frame(camera_state, detector, identity_manager, incident_manager, session_mode)
-
-            feed_views = []
-            for camera_state in camera_states:
-                subtitle = f"Frame {camera_state.current_frame_number}"
-                if camera_state.finished:
-                    subtitle += " | Ended"
-                feed_views.append(
-                    {
-                        "camera_id": camera_state.camera_id,
-                        "frame": camera_state.display_frame,
-                        "title": camera_state.name,
-                        "subtitle": subtitle,
-                    }
-                )
-
-            view_label = (
-                f"Camera {fullscreen_camera_id}"
-                if fullscreen_camera_id is not None
-                else "Multi-view"
-            )
-            canvas = compose_multiview(feed_views, fullscreen_camera_id=fullscreen_camera_id)
-            _draw_global_status(canvas, paused, view_label, active_cameras, incident_manager)
-            cv2.imshow(window_name, canvas)
+            # Draw the global HUD directly on the frame copy
+            canvas = camera_state.display_frame.copy() if camera_state.display_frame is not None else None
+            if canvas is not None:
+                view_label = f"Frame {camera_state.current_frame_number}"
+                _draw_global_status(canvas, paused, view_label, incident_manager)
+                cv2.imshow(window_name, canvas)
 
             key = cv2.waitKeyEx(30 if paused else max(1, int(1000 / TARGET_PROCESS_FPS)))
 
@@ -546,32 +543,20 @@ def run_surveillance_mode(camera_configs, detector, identity_manager, incident_m
                 paused = not paused
                 continue
 
-            if key in (ord("m"), ord("M")):
-                fullscreen_camera_id = None
-                continue
-
-            if ord("1") <= key <= ord("9"):
-                selected_camera_id = key - ord("0")
-                if any(state.camera_id == selected_camera_id for state in camera_states):
-                    fullscreen_camera_id = selected_camera_id
-                continue
-
             if _is_left_arrow(key):
-                _seek_all_cameras(camera_states, identity_manager, -1)
+                _seek_all_cameras([camera_state], identity_manager, -1)
                 continue
 
             if _is_right_arrow(key):
-                _seek_all_cameras(camera_states, identity_manager, 1)
+                _seek_all_cameras([camera_state], identity_manager, 1)
                 continue
 
             if not paused:
-                _advance_cameras(camera_states)
+                _advance_cameras([camera_state])
     finally:
-        for camera_state in camera_states:
-            finalize_camera_sessions(camera_state.camera_id, camera_state.source)
+        finalize_camera_sessions(camera_state.camera_id, camera_state.source)
         flush_tracking_data()
-        for camera_state in camera_states:
-            camera_state.close()
+        camera_state.close()
         cv2.destroyWindow(window_name)
 
     return True
@@ -581,7 +566,16 @@ def main():
     camera_configs, session_mode = prompt_camera_configs()
     init_db()
     clear_event_logs()
-    detector = HumanDetector()
+    
+    print("\nSelect Detection Model:")
+    print("1. YOLOv8 Nano (Default - CPU & Edge optimized)")
+    print("2. RT-DETR Large (Transformer-based - High Accuracy, GPU recommended)")
+    model_choice = input("Enter choice (1/2, default 1): ").strip()
+    if model_choice == "2":
+        detector = HumanDetector(model_type="rtdetr", weights="rtdetr-l.pt")
+    else:
+        detector = HumanDetector(model_type="yolo", weights="yolov8n.pt")
+        
     identity_manager = GlobalIdentityManager()
     incident_manager = IncidentManager()
     intent_manager = IntentManager()
@@ -605,16 +599,17 @@ def main():
             run_query_mode(query_engine, intent_manager, session_mode)
         elif choice == "3":
             print("\nGenerating AI Security Report...")
+            stats_report = query_engine.generate_security_report()
+            print("\n" + stats_report)
             if intent_manager.llm_parser:
                 summary = intent_manager.llm_parser.summarize_incidents(incident_manager.incidents)
                 print("\n" + "="*50)
-                print("SENTINEL AI - SECURITY DEBRIEF")
+                print("SENTINEL AI - SECURITY DEBRIEF (LLM)")
                 print("="*50)
                 print(summary)
                 print("="*50)
             else:
-                print("\n[!] LLM Parser not configured (GROQ_API_KEY missing).")
-                print("Recent Incidents:")
+                print("\nRecent Incidents (InMemory):")
                 for inc in incident_manager.get_recent_incidents(10):
                     print(f"- [{inc['timestamp']}] GID {inc['global_id']}: {inc['type']} - {inc['description']}")
         elif choice == "q":
