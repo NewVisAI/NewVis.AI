@@ -8,6 +8,7 @@ import supervision as sv
 from detector import HumanDetector
 from incident_manager import IncidentManager
 from event import (
+    check_occupancy_alerts,
     clear_event_logs,
     finalize_camera_sessions,
     flush_tracking_data,
@@ -463,6 +464,13 @@ def _process_camera_frame(
         frame = label_annotator.annotate(scene=frame, detections=sv_detections, labels=custom_labels)
 
     draw_zone_overlays(frame, camera_state.pixel_zones)
+    check_occupancy_alerts(
+        camera_id=camera_state.camera_id,
+        pixel_zones=camera_state.pixel_zones,
+        frame_number=camera_state.current_frame_number,
+        video_time=video_time,
+        video_path=camera_state.source
+    )
     camera_state.display_frame = frame
 
 

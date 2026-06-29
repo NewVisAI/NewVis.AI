@@ -25,6 +25,7 @@ OBJECT_TYPE_ALIASES = {
 }
 tracking_write_buffer: List[Tuple[object, ...]] = []
 EVENT_CALLBACKS = []
+active_occupancy_alerts = set()
 
 
 def register_event_callback(callback) -> None:
@@ -33,6 +34,7 @@ def register_event_callback(callback) -> None:
 
 def reset_runtime_state() -> None:
     sessions.clear()
+    active_occupancy_alerts.clear()
 
 
 def normalize_object_type(object_type: Optional[str]) -> str:
@@ -708,3 +710,110 @@ def log_event(
     raise RuntimeError(
         "log_event() is deprecated in session mode; use update_session_event() instead."
     )
+
+
+def _write_occupancy_alert_to_db(
+    camera_id: int,
+    zone_id: int,
+    zone_name: str,
+    current_count: int,
+    limit: int,
+    frame_number: int,
+    video_time: float,
+    video_path: str
+) -> None:
+    timestamp = _utc_now_iso()
+    try:
+        conn = connect_db(validate_schema=False)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO events (
+                timestamp, object_type, track_id, global_id, camera_id, video_path,
+                frame_number, frame_start, frame_end, video_time, zone_id,
+                event_type, event_mode, mode_type, entry_time, exit_time, duration, stayed
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                timestamp,
+                "zone",
+                -1,
+                -1,
+                camera_id,
+                video_path,
+                frame_number,
+                frame_number,
+                frame_number,
+                video_time,
+                zone_id,
+                "occupancy_alert",
+                "single",
+                "system",
+                timestamp,
+                timestamp,
+                float(current_count),
+                limit
+            )
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Error logging occupancy alert: {e}")
+    finally:
+        if "conn" in locals():
+            conn.close()
+
+    alert_event = {
+        "event_id": -1,
+        "timestamp": timestamp,
+        "type": "occupancy_alert",
+        "camera_id": camera_id,
+        "zone_id": zone_id,
+        "zone_name": zone_name,
+        "count": current_count,
+        "limit": limit,
+        "description": f"Occupancy limit exceeded in {zone_name}: {current_count} (limit: {limit})"
+    }
+    for cb in EVENT_CALLBACKS:
+        try:
+            cb(alert_event)
+        except Exception as e:
+            print(f"Error executing callback: {e}")
+
+
+def check_occupancy_alerts(
+    camera_id: int,
+    pixel_zones: List[Dict],
+    frame_number: int,
+    video_time: float,
+    video_path: str = ""
+) -> None:
+    if not pixel_zones:
+        return
+
+    zone_counts = {}
+    for session in sessions.values():
+        if (
+            session.get("inside_status")
+            and session.get("last_frame_number") == frame_number
+            and session.get("camera_id") == camera_id
+        ):
+            zid = session.get("zone_id")
+            if zid is not None:
+                zone_counts[zid] = zone_counts.get(zid, 0) + 1
+
+    for zone in pixel_zones:
+        zone_id = zone.get("id")
+        limit = zone.get("max_occupancy", 3)
+        current_count = zone_counts.get(zone_id, 0)
+        
+        alert_key = (camera_id, zone_id)
+        
+        if current_count > limit:
+            if alert_key not in active_occupancy_alerts:
+                active_occupancy_alerts.add(alert_key)
+                print(f"🚨 [OCCUPANCY ALERT] Camera {camera_id} Zone {zone_id} ({zone.get('name')}) occupancy: {current_count} (limit: {limit})")
+                _write_occupancy_alert_to_db(camera_id, zone_id, zone.get("name", f"Zone {zone_id}"), current_count, limit, frame_number, video_time, video_path)
+        else:
+            if alert_key in active_occupancy_alerts:
+                active_occupancy_alerts.remove(alert_key)
+                print(f"✅ [OCCUPANCY CLEAN] Camera {camera_id} Zone {zone_id} ({zone.get('name')}) back to normal: {current_count} (limit: {limit})")

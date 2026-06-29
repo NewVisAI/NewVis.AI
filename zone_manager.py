@@ -103,6 +103,7 @@ def build_pixel_zones(zone_defs: List[Dict], frame_shape: Tuple[int, int, int]) 
         bbox["id"] = zone.get("id")
         bbox["name"] = zone.get("name", f"Zone {zone.get('id')}")
         bbox["polygon"] = pixel_polygon
+        bbox["max_occupancy"] = zone.get("max_occupancy", 3)
 
         pixel_zones.append(bbox)
 
