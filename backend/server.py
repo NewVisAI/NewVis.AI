@@ -1,12 +1,14 @@
 import os
 import asyncio
-from typing import List, Set
+from typing import List, Set, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from query_engine import QueryEngine
 from event import register_event_callback
+from zone_manager import get_all_zones, get_camera_zones, overwrite_zones
+
 
 app = FastAPI(
     title="Sentinel AI CCTV Web Server",
@@ -129,3 +131,80 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
     except Exception:
         if websocket in active_websockets:
             active_websockets.remove(websocket)
+
+
+class ZoneModel(BaseModel):
+    id: Optional[int] = None
+    camera_id: int
+    name: str
+    points: List[List[float]]
+    max_occupancy: Optional[int] = 3
+
+
+@app.get("/api/zones")
+def list_zones():
+    """
+    Lists all configured tracking zones.
+    """
+    return {"zones": get_all_zones()}
+
+
+@app.get("/api/zones/camera/{camera_id}")
+def list_camera_zones(camera_id: int):
+    """
+    Lists configured tracking zones for a specific camera.
+    """
+    return {"zones": get_camera_zones(camera_id)}
+
+
+@app.post("/api/zones")
+def save_zone(zone: ZoneModel):
+    """
+    Saves (adds or updates) a tracking zone configuration.
+    """
+    all_zones = get_all_zones()
+    
+    if zone.id is None:
+        ids = [z.get("id", 0) for z in all_zones]
+        zone_id = max(ids, default=0) + 1
+    else:
+        zone_id = zone.id
+
+    new_zone_def = {
+        "id": zone_id,
+        "camera_id": zone.camera_id,
+        "name": zone.name,
+        "points": zone.points,
+        "max_occupancy": zone.max_occupancy
+    }
+
+    updated_zones = [z for z in all_zones if z.get("id") != zone_id]
+    updated_zones.append(new_zone_def)
+    
+    overwrite_zones(updated_zones)
+    return {
+        "status": "success",
+        "message": f"Zone {zone_id} saved successfully.",
+        "zone": new_zone_def
+    }
+
+
+@app.delete("/api/zones/{zone_id}")
+def delete_zone(zone_id: int):
+    """
+    Deletes a specific tracking zone configuration.
+    """
+    all_zones = get_all_zones()
+    updated_zones = [z for z in all_zones if z.get("id") != zone_id]
+    
+    if len(updated_zones) == len(all_zones):
+        return {
+            "status": "error",
+            "message": f"Zone {zone_id} not found."
+        }
+        
+    overwrite_zones(updated_zones)
+    return {
+        "status": "success",
+        "message": f"Zone {zone_id} deleted successfully."
+    }
