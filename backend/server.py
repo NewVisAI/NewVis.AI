@@ -208,3 +208,16 @@ def delete_zone(zone_id: int):
         "status": "success",
         "message": f"Zone {zone_id} deleted successfully."
     }
+
+
+@app.get("/api/trajectory/{global_id}")
+def get_trajectory_timeline(global_id: int):
+    """
+    Returns the chronological timeline of zone transitions for a specific Global ID (GID).
+    """
+    timeline = query_engine.get_trajectory(global_id)
+    return {
+        "global_id": global_id,
+        "timeline_count": len(timeline),
+        "timeline": timeline
+    }

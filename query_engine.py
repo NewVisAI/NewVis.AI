@@ -305,3 +305,36 @@ class QueryEngine:
         conn.close()
         return "\n".join(report)
 
+    def get_trajectory(self, global_id: int) -> List[Dict[str, Any]]:
+        """
+        Queries database to build a chronological timeline of zone transitions
+        and camera sightings for a specific global_id.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        sql = """
+            SELECT camera_id, zone_id, entry_time, exit_time, duration, stayed, object_type, video_path
+            FROM events
+            WHERE global_id = ? AND entry_time IS NOT NULL
+            ORDER BY entry_time ASC
+        """
+        cursor.execute(sql, (global_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        trajectory = []
+        for row in rows:
+            trajectory.append({
+                "camera_id": row[0],
+                "zone_id": row[1],
+                "entry_time": row[2],
+                "exit_time": row[3],
+                "duration": row[4],
+                "stayed": bool(row[5]),
+                "object_type": row[6],
+                "video_path": row[7]
+            })
+            
+        return trajectory
+

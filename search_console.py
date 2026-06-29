@@ -26,6 +26,14 @@ while True:
         print("No results.")
         continue
 
+    global_id = filters.get("global_id")
+    if global_id is not None:
+        trajectory = engine.get_trajectory(global_id)
+        if trajectory:
+            print(f"\n📍 Chronological Trajectory for GID {global_id}:")
+            for t in trajectory:
+                print(f"  - Camera {t['camera_id']} | Zone {t['zone_id']} | Entry: {t['entry_time']} | Duration: {t['duration']:.1f}s")
+
     print("\nResults:")
 
     for i, r in enumerate(results):
