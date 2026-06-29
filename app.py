@@ -446,6 +446,7 @@ def _process_camera_frame(
             bbox=(x1, y1, x2, y2),
             object_type=locked_type,
             current_time=video_time,
+            active_track_count=len(tracked_objects),
         )
 
         log_tracking_data(

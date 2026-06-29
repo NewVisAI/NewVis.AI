@@ -368,6 +368,7 @@ class GlobalIdentityManager:
         bbox: Tuple[int, int, int, int],
         object_type: str,
         current_time: float,
+        active_track_count: int = 1,
     ) -> int:
         local_key = (camera_id, track_id)
         object_type = normalize_object_type(object_type)
@@ -378,8 +379,16 @@ class GlobalIdentityManager:
         
         existing_global_id = self.track_id_to_global_id.get(local_key)
         
-        # Lazy ReID embedding: only run model if track is new or every 15 frames
-        need_embedding = (existing_global_id is None) or (count % 15 == 0)
+        # Determine dynamic ReID stride based on crowd density
+        if active_track_count <= 2:
+            stride = 5
+        elif active_track_count <= 5:
+            stride = 15
+        else:
+            stride = 30
+            
+        # Lazy ReID embedding: only run model if track is new or every N frames
+        need_embedding = (existing_global_id is None) or (count % stride == 0)
         
         if not need_embedding:
             cached = self.embedding_cache.get(local_key)
