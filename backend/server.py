@@ -221,3 +221,14 @@ def get_trajectory_timeline(global_id: int):
         "timeline_count": len(timeline),
         "timeline": timeline
     }
+
+
+@app.get("/api/zones/flow")
+def get_zones_flow():
+    """
+    Returns the cumulative zone flow metrics (total entries, exits, active counts, average dwell times).
+    """
+    report = query_engine.get_zone_flow_report()
+    return {
+        "zones_flow": report
+    }

@@ -340,3 +340,49 @@ class QueryEngine:
             
         return trajectory
 
+    def get_zone_flow_report(self) -> List[Dict[str, Any]]:
+        """
+        Calculates and returns cumulative traffic metrics for each zone:
+        total entries, exits, current active occupant count, and average dwell time.
+        """
+        conn = connect_db(validate_schema=False)
+        cursor = conn.cursor()
+        
+        # 1. Query total entries, exits, and average duration per zone
+        sql = """
+            SELECT zone_id, 
+                   COUNT(*) as total_entries,
+                   SUM(CASE WHEN exit_time IS NOT NULL THEN 1 ELSE 0 END) as total_exits,
+                   AVG(duration) as avg_duration
+            FROM events
+            WHERE entry_time IS NOT NULL
+            GROUP BY zone_id
+        """
+        cursor.execute(adapt_query(sql))
+        rows = cursor.fetchall()
+        
+        # 2. Query currently active occupants in each zone (exit_time is null)
+        sql_active = """
+            SELECT zone_id, COUNT(*)
+            FROM events
+            WHERE entry_time IS NOT NULL AND exit_time IS NULL
+            GROUP BY zone_id
+        """
+        cursor.execute(adapt_query(sql_active))
+        active_rows = dict(cursor.fetchall())
+        
+        conn.close()
+        
+        report = []
+        for row in rows:
+            zone_id = row[0]
+            report.append({
+                "zone_id": zone_id,
+                "total_entries": row[1],
+                "total_exits": row[2],
+                "active_occupants": active_rows.get(zone_id, 0),
+                "avg_dwell_time_seconds": round(row[3] or 0.0, 1)
+            })
+            
+        return report
+
