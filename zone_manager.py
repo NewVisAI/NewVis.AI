@@ -273,7 +273,7 @@ class ZoneDrawer:
             self._draw_zones(canvas)
             self._draw_instructions(canvas)
             cv2.imshow(self.window_name, canvas)
-            key = cv2.waitKeyEx(30)
+            key = cv2.waitKey(30) & 0xFF
 
             if key in (ord("s"), ord("S")) and self.pending_rect:
                 self._finalize_rectangle(self.pending_rect)

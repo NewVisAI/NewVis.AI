@@ -179,9 +179,16 @@ def capture_static_frame(camera_config):
     if not cap.isOpened():
         return None
 
-    ret, frame = cap.read()
+    frame = None
+    # Try reading a few frames in case the first few are empty or fail
+    for _ in range(10):
+        ret, temp_frame = cap.read()
+        if ret and temp_frame is not None:
+            frame = temp_frame
+            break
+
     cap.release()
-    return frame if ret else None
+    return frame
 
 
 def _frame_delta_for_seconds(fps, seconds):
@@ -372,8 +379,7 @@ def _process_camera_frame(
         for zone in camera_state.pixel_zones:
             polygon_np = np.array(zone["polygon"], dtype=np.int32)
             camera_state.sv_zones[zone["id"]] = sv.PolygonZone(
-                polygon=polygon_np,
-                frame_resolution_wh=(frame.shape[1], frame.shape[0])
+                polygon=polygon_np
             )
 
     video_time = camera_state.current_frame_number / camera_state.fps if camera_state.fps else camera_state.current_frame_number / DEFAULT_FPS
