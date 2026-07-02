@@ -112,7 +112,12 @@ def extract_shirt_color(frame, bbox: Tuple[int, int, int, int]) -> Optional[np.n
     upper_y2 = y1 + int(box_height * 0.55)
     upper_y2 = max(upper_y1 + 1, min(upper_y2, y2))
 
-    crop = frame[upper_y1:upper_y2, x1:x2]
+    box_width = max(1, x2 - x1)
+    center_x1 = x1 + int(box_width * 0.35)
+    center_x2 = x1 + int(box_width * 0.65)
+    center_x2 = max(center_x1 + 1, min(center_x2, x2))
+
+    crop = frame[upper_y1:upper_y2, center_x1:center_x2]
     if crop.size == 0:
         return None
 

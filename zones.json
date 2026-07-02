@@ -3,26 +3,19 @@
     {
       "id": 1,
       "camera_id": 1,
-      "name": "Surveillance Area",
-      "points": [
-        [
-          10,
-          10
-        ],
-        [
-          630,
-          10
-        ],
-        [
-          630,
-          470
-        ],
-        [
-          10,
-          470
-        ]
-      ],
-      "max_occupancy": 3
+      "name": "Restricted Zone (West half)",
+      "points": [[0.0, 0.0], [0.5, 0.0], [0.5, 1.0], [0.0, 1.0]],
+      "max_occupancy": 2,
+      "restricted": true
+    },
+    {
+      "id": 2,
+      "camera_id": 1,
+      "name": "Monitored Entrance (East half)",
+      "points": [[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.5, 1.0]],
+      "max_occupancy": 3,
+      "active_hours": {"start": "07:00", "end": "09:00"},
+      "school_days": ["mon", "tue", "wed", "thu", "fri"]
     }
   ]
 }

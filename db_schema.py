@@ -37,7 +37,7 @@ def _connect_absolute_db():
         return psycopg2.connect(DATABASE_URL)
     else:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        return sqlite3.connect(get_db_path())
+        return sqlite3.connect(get_db_path(), check_same_thread=False, timeout=15.0)
 
 
 def _table_exists(cursor, table_name: str) -> bool:
@@ -139,6 +139,7 @@ def ensure_valid_schema() -> str:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_stayed ON events (stayed)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_tracking_camera_global_lookup ON tracking_data (camera_id, video_path, global_id, frame_number)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_session_lookup ON events (camera_id, video_path, zone_id, global_id, entry_time, exit_time)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_video_time ON events (video_path, video_time)")
             
             conn.commit()
             return DATABASE_URL
@@ -272,6 +273,12 @@ def ensure_valid_schema() -> str:
                 """
                 CREATE INDEX IF NOT EXISTS idx_events_session_lookup
                 ON events (camera_id, video_path, zone_id, global_id, entry_time, exit_time)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_events_video_time
+                ON events (video_path, video_time)
                 """
             )
 

@@ -1,9 +1,10 @@
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Hashable, List, Optional, Tuple
 
 from db_schema import connect_db, get_db_path, adapt_query, get_db_type
+from alerts import raise_zone_alert
 
 DB_PATH = get_db_path()
 
@@ -26,6 +27,7 @@ OBJECT_TYPE_ALIASES = {
 tracking_write_buffer: List[Tuple[object, ...]] = []
 EVENT_CALLBACKS = []
 active_occupancy_alerts = set()
+active_uniform_violations = set()
 
 
 def register_event_callback(callback) -> None:
@@ -35,6 +37,7 @@ def register_event_callback(callback) -> None:
 def reset_runtime_state() -> None:
     sessions.clear()
     active_occupancy_alerts.clear()
+    active_uniform_violations.clear()
 
 
 def normalize_object_type(object_type: Optional[str]) -> str:
@@ -124,6 +127,7 @@ def init_db():
 
 def clear_event_logs() -> None:
     sessions.clear()
+    active_uniform_violations.clear()
     tracking_write_buffer.clear()
     conn = _connect()
     cursor = conn.cursor()
@@ -138,7 +142,7 @@ def clear_event_logs() -> None:
 
 
 def _utc_now_iso() -> str:
-    return datetime.utcnow().replace(microsecond=0).isoformat()
+    return datetime.now(timezone.utc).replace(tzinfo=None).replace(microsecond=0).isoformat()
 
 
 def _iso_with_offset(timestamp: Optional[str], seconds: float) -> Optional[str]:
@@ -358,6 +362,7 @@ def update_session_event(
     frame_number: int,
     event_mode: str = "single",
     assigned_zone_id: Optional[int] = None,
+    frame: Optional[object] = None,
 ) -> Optional[str]:
     global_id = _require_global_id(global_id)
     event_mode = normalize_event_mode(event_mode)
@@ -392,6 +397,18 @@ def update_session_event(
         print(
             f"ENTERING [{event_mode}] [{object_type}] GID {global_id} "
             f"(track {track_id}, camera {camera_id}) in zone {zone_id}"
+        )
+        x1, y1, w, h = bbox
+        raise_zone_alert(
+            zone=matched_zone,
+            camera_id=camera_id,
+            global_id=global_id,
+            object_type=object_type,
+            track_id=track_id,
+            video_path=video_path,
+            frame_number=frame_number,
+            frame=frame,
+            bbox=(x1, y1, x1 + w, y1 + h),
         )
         return "entering"
 
@@ -825,3 +842,118 @@ def check_occupancy_alerts(
             if alert_key in active_occupancy_alerts:
                 active_occupancy_alerts.remove(alert_key)
                 print(f"✅ [OCCUPANCY CLEAN] Camera {camera_id} Zone {zone_id} ({zone.get('name')}) back to normal: {current_count} (limit: {limit})")
+
+
+def check_dress_code(
+    global_id: int,
+    camera_id: int,
+    frame,
+    bbox: Tuple[int, int, int, int],
+    video_time: float,
+    video_path: str = ""
+) -> None:
+    if global_id in active_uniform_violations:
+        return
+        
+    x1, y1, x2, y2 = bbox
+    height = y2 - y1
+    width = x2 - x1
+    
+    # Enforce aspect ratio filter: standing humans have a height/width aspect ratio of >= 1.8
+    # If the ratio is lower, they are sitting or occluded by desks, which distorts shirt color extraction.
+    if height < 100 or (height / max(1, width)) < 1.8:
+        return
+
+    from reid import extract_shirt_color, color_similarity
+    import numpy as np
+    
+    shirt_rgb = extract_shirt_color(frame, bbox)
+    if shirt_rgb is None:
+        return
+
+    # Standard school uniform colors (RGB):
+    allowed_uniforms = [
+        np.array([230.0, 230.0, 230.0], dtype=np.float32),  # White
+        np.array([170.0, 210.0, 240.0], dtype=np.float32),  # Light Blue
+        np.array([30.0, 45.0, 90.0], dtype=np.float32),     # Navy Blue
+        np.array([15.0, 25.0, 60.0], dtype=np.float32),     # Dark Navy
+        np.array([40.0, 40.0, 50.0], dtype=np.float32),     # Dark Blazer
+        np.array([20.0, 20.0, 20.0], dtype=np.float32),     # Black
+        np.array([128.0, 128.0, 128.0], dtype=np.float32),  # Grey
+        np.array([139.0, 69.0, 19.0], dtype=np.float32),    # Khaki/Brown
+    ]
+
+    max_sim = 0.0
+    for uniform_rgb in allowed_uniforms:
+        sim = color_similarity(shirt_rgb, uniform_rgb)
+        if sim > max_sim:
+            max_sim = sim
+
+    # If the clothing similarity to standard school uniform colors is low:
+    if max_sim < 0.50:
+        active_uniform_violations.add(global_id)
+        _write_dress_code_violation_to_db(global_id, camera_id, shirt_rgb, video_time, video_path)
+
+
+def _write_dress_code_violation_to_db(
+    global_id: int,
+    camera_id: int,
+    shirt_rgb,
+    video_time: float,
+    video_path: str
+) -> None:
+    conn = connect_db(validate_schema=False)
+    cursor = conn.cursor()
+
+    timestamp = _utc_now_iso()
+    color_desc = f"RGB({int(shirt_rgb[0])},{int(shirt_rgb[1])},{int(shirt_rgb[2])})"
+
+    sql = """
+        INSERT INTO events (
+            timestamp, object_type, track_id, global_id, camera_id, video_path,
+            frame_number, frame_start, frame_end, video_time, zone_id, event_type,
+            entry_time, exit_time, duration, stayed, event_mode, mode_type
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+
+    params = (
+        timestamp,
+        "person",
+        -1,
+        global_id,
+        camera_id,
+        video_path,
+        0,
+        0,
+        0,
+        video_time,
+        0,
+        "dress_code_violation",
+        timestamp,
+        timestamp,
+        0.0,
+        1,
+        "single",
+        "single"
+    )
+
+    cursor.execute(adapt_query(sql), params)
+    conn.commit()
+    conn.close()
+
+    print(f"🚨 [DRESS CODE VIOLATION] GID {global_id} is wearing non-uniform clothing: {color_desc}")
+
+    # Broadcast alert live to the WebSocket dashboard
+    alert_event = {
+        "event_id": -1,
+        "timestamp": timestamp,
+        "type": "dress_code_violation",
+        "camera_id": camera_id,
+        "global_id": global_id,
+        "description": f"Dress code violation: GID {global_id} is wearing non-uniform clothing ({color_desc})."
+    }
+    for cb in EVENT_CALLBACKS:
+        try:
+            cb(alert_event)
+        except Exception as e:
+            print(f"Error executing event callback: {e}")

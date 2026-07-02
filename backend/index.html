@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel AI CCTV - Premium Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0a0a0f;
+            --bg-surface: rgba(20, 20, 30, 0.6);
+            --bg-card: rgba(30, 30, 45, 0.4);
+            --border-glow: rgba(0, 150, 255, 0.3);
+            --border-muted: rgba(255, 255, 255, 0.08);
+            
+            --primary: #0096ff;
+            --primary-glow: rgba(0, 150, 255, 0.5);
+            --secondary: #bd00ff;
+            
+            --text-main: #f5f5fa;
+            --text-muted: #8fa0ba;
+            
+            --alert-danger: #ff3b30;
+            --alert-warning: #ffcc00;
+            --alert-success: #34c759;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(189, 0, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 150, 255, 0.05) 0%, transparent 40%);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-muted);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            box-shadow: 0 0 15px var(--primary-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 18px;
+        }
+
+        .logo-text {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(to right, #ffffff, #8fa0ba);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(52, 199, 89, 0.1);
+            border: 1px solid rgba(52, 199, 89, 0.2);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--alert-success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--alert-success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--alert-success);
+        }
+
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 25px;
+            padding: 30px 40px;
+            max-width: 1800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-muted);
+            border-radius: 16px;
+            backdrop-filter: blur(16px);
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: border-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--border-glow);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--primary);
+            padding-left: 12px;
+        }
+
+        /* Drag & Drop Upload Zone */
+        .upload-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.02);
+            position: relative;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(0, 150, 255, 0.04);
+            box-shadow: inset 0 0 20px rgba(0, 150, 255, 0.05);
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+            color: var(--text-muted);
+        }
+
+        .upload-text {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .upload-text strong {
+            color: var(--primary);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            border-radius: 3px;
+            transition: width 0.2s ease;
+        }
+
+        .progress-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Video Player Area */
+        .video-container {
+            display: none;
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-muted);
+            background: #000;
+            width: 100%;
+            aspect-ratio: 16/9;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+
+        /* Realtime Alert Stream Panel */
+        .alert-stream-container {
+            display: flex;
+            flex-direction: column;
+            height: 650px;
+        }
+
+        .stream-items {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 5px;
+        }
+
+        .stream-items::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .stream-items::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .alert-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-muted);
+            border-radius: 10px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .alert-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--primary);
+        }
+
+        .alert-item.fall::before {
+            background: var(--alert-danger);
+        }
+
+        .alert-item.violation::before {
+            background: var(--alert-warning);
+        }
+
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .alert-badge.fall {
+            background: rgba(255, 59, 48, 0.15);
+            color: var(--alert-danger);
+            border: 1px solid rgba(255, 59, 48, 0.3);
+        }
+
+        .alert-badge.running {
+            background: rgba(0, 150, 255, 0.15);
+            color: var(--primary);
+            border: 1px solid rgba(0, 150, 255, 0.3);
+        }
+
+        .alert-badge.violation {
+            background: rgba(255, 204, 0, 0.15);
+            color: var(--alert-warning);
+            border: 1px solid rgba(255, 204, 0, 0.3);
+        }
+
+        .alert-time {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .alert-desc {
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        /* Search Section */
+        .search-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .search-bar {
+            position: relative;
+            display: flex;
+            gap: 12px;
+        }
+
+        .search-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-muted);
+            padding: 14px 20px;
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(0, 150, 255, 0.15);
+        }
+
+        .search-btn {
+            background: linear-gradient(135deg, var(--primary), #0076c8);
+            border: none;
+            color: white;
+            padding: 0 25px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .search-btn:hover {
+            opacity: 0.9;
+        }
+
+        .search-results {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-muted);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .result-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--primary);
+            text-transform: capitalize;
+        }
+
+        .result-details {
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 15px;
+        }
+
+        .result-play-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-muted);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .result-play-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        /* Custom Login Overlay */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(10, 15, 30, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease;
+        }
+        .login-box {
+            background: var(--card-bg);
+            border: 1px solid var(--border-muted);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        .login-logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .login-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-muted);
+            padding: 14px;
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 15px;
+            margin-bottom: 20px;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .login-input:focus {
+            border-color: var(--primary);
+        }
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary), #0076c8);
+            border: none;
+            color: white;
+            padding: 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .login-error {
+            color: #ff4d4d;
+            font-size: 14px;
+            margin-top: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Custom Login Overlay -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-box">
+            <div class="login-logo">
+                <div class="logo-icon" style="width: 35px; height: 35px; line-height: 35px; font-size: 18px;">S</div>
+                <span>SENTINEL AI LOGIN</span>
+            </div>
+            <input type="text" class="login-input" id="login-username" placeholder="Username" autocomplete="off">
+            <input type="password" class="login-input" id="login-password" placeholder="Password">
+            <button class="login-btn" id="login-btn-submit">Sign In</button>
+            <div class="login-error" id="login-error-msg">Incorrect username or password.</div>
+        </div>
+    </div>
+
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">S</div>
+            <div class="logo-text">SENTINEL AI CCTV</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="system-status" id="role-badge" style="display: none; color: var(--primary); background: rgba(0,150,255,0.1); border-color: rgba(0,150,255,0.25);">
+                <span class="status-dot" style="background: var(--primary); box-shadow: 0 0 8px var(--primary);"></span>
+                <span></span>
+            </div>
+            <div class="system-status">
+                <div class="status-dot"></div>
+                SYSTEM SECURE (Active)
+            </div>
+            <button id="logout-btn" class="system-status" style="cursor: pointer; color: var(--text-muted); background: rgba(255,255,255,0.04); border-color: var(--border-muted);">Sign out</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="left-col">
+            <!-- Upload & Playback Card (upload = tech/dev; playback also for principal footage jumps) -->
+            <div class="card" data-roles="tech,principal">
+                <div class="card-title">Live Video Analytics</div>
+                
+                <div class="upload-zone" id="upload-zone">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-text">Drag and drop your video clip here, or <strong>browse</strong></div>
+                    <input type="file" id="file-input" accept="video/*">
+                </div>
+
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="progress-status">Uploading video...</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                </div>
+
+                <div class="video-container" id="video-container" style="position: relative;">
+                    <video id="video-player" controls preload="auto"></video>
+                    <canvas id="zone-canvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; z-index: 10;"></canvas>
+                </div>
+                <div class="video-controls-row" id="zone-controls" style="display: none; margin-top: 15px; justify-content: flex-end; gap: 10px;">
+                    <button class="result-play-btn" id="btn-edit-zone" style="background: rgba(0, 150, 255, 0.1); border-color: var(--primary); color: var(--primary);">Configure Detection Zone</button>
+                    <button class="result-play-btn" id="btn-save-zone" style="display: none; background: var(--primary); border-color: var(--primary); color: white;">Save Zone & Reprocess</button>
+                    <button class="result-play-btn" id="btn-cancel-zone" style="display: none; background: rgba(255, 255, 255, 0.05);">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Natural Language Search Card -->
+            <div class="card">
+                <div class="card-title">AI Intent Search Console</div>
+                <div class="search-container">
+                    <div class="search-bar">
+                        <input type="text" class="search-input" id="search-query" placeholder="Ask something (e.g. 'Show falls', 'Is anyone running', 'Find uniform violations')">
+                        <button class="search-btn" id="search-btn">Search</button>
+                    </div>
+                    <div class="search-results" id="search-results-list">
+                        <!-- Query results populate here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side Alerts Stream -->
+        <div class="card alert-stream-container">
+            <div class="card-title">Security Incident Feed <span id="live-dot" style="display:none; font-size: 11px; color: var(--alert-success);">● LIVE</span></div>
+            <div class="stream-items" id="alerts-list">
+                <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 14px;">
+                    No incidents logged. Upload a video clip to start.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role-based panels -->
+    <div class="main-container" style="grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); padding-top: 0;">
+
+        <!-- Principal: notification inbox -->
+        <div class="card" data-roles="principal" style="display:none;">
+            <div class="card-title">🔔 Principal Notifications
+                <button class="result-play-btn" id="notif-mark-read" style="float:right; font-size: 12px;">Mark all read</button>
+            </div>
+            <div class="stream-items" id="notifications-list" style="max-height: 420px; overflow-y: auto;">
+                <div style="color: var(--text-muted); font-size: 14px;">Loading…</div>
+            </div>
+        </div>
+
+        <!-- Principal: headcount / reports -->
+        <div class="card" data-roles="principal" style="display:none;">
+            <div class="card-title">👥 Campus Headcount Report
+                <select id="report-period" style="float:right; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 6px; padding: 4px 8px;">
+                    <option value="day">Last 24 hours</option>
+                    <option value="week">Last 7 days</option>
+                    <option value="month">Last 30 days</option>
+                    <option value="all" selected>All time</option>
+                </select>
+            </div>
+            <div id="report-body" style="font-size: 14px; line-height: 1.9; color: var(--text-muted);">Loading…</div>
+        </div>
+
+        <!-- Tech team: zone alert rules -->
+        <div class="card" data-roles="tech" style="display:none;">
+            <div class="card-title">🛡️ Zone Alert Rules <span style="font-size:12px; color: var(--text-muted);">(restricted / school hours)</span></div>
+            <div id="zone-rules-list" style="font-size: 14px;">Loading…</div>
+        </div>
+
+        <!-- Tech team: school holidays -->
+        <div class="card" data-roles="tech" style="display:none;">
+            <div class="card-title">📅 School Holiday Calendar</div>
+            <div style="display:flex; gap: 10px; margin-bottom: 14px;">
+                <input type="date" id="holiday-date" style="flex:1; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 8px; padding: 8px 12px;">
+                <button class="search-btn" id="holiday-add">Add Holiday</button>
+            </div>
+            <div id="holidays-list" style="font-size: 14px; color: var(--text-muted);">Loading…</div>
+        </div>
+
+        <!-- Developer: license governance -->
+        <div class="card" data-roles="developer" style="display:none;">
+            <div class="card-title">🔑 License &amp; Camera Governance <span style="font-size:12px; color: var(--text-muted);">(developer only)</span></div>
+            <div id="license-body" style="font-size: 14px; line-height: 2; color: var(--text-muted);">Loading…</div>
+        </div>
+    </div>
+
+    <script>
+        const loginOverlay = document.getElementById('login-overlay');
+        const loginUsernameInput = document.getElementById('login-username');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginBtnSubmit = document.getElementById('login-btn-submit');
+        const loginErrorMsg = document.getElementById('login-error-msg');
+
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressStatus = document.getElementById('progress-status');
+        const videoContainer = document.getElementById('video-container');
+        const videoPlayer = document.getElementById('video-player');
+        const alertsList = document.getElementById('alerts-list');
+        const searchInput = document.getElementById('search-query');
+        const searchBtn = document.getElementById('search-btn');
+        const searchResultsList = document.getElementById('search-results-list');
+
+        let processingInterval = null;
+
+        // Token-based authentication (POST /api/login -> bearer token + role)
+        function getAuthHeader() {
+            const token = localStorage.getItem('sentinel_token') || '';
+            return token ? ('Bearer ' + token) : '';
+        }
+
+        function getRole() {
+            return localStorage.getItem('sentinel_role') || '';
+        }
+
+        function clearSession() {
+            localStorage.removeItem('sentinel_token');
+            localStorage.removeItem('sentinel_role');
+            localStorage.removeItem('sentinel_user');
+        }
+
+        function checkAuth() {
+            if (!getAuthHeader()) {
+                loginOverlay.style.display = 'flex';
+                return;
+            }
+            fetch('/api/me', {
+                headers: { 'Authorization': getAuthHeader() }
+            }).then(res => {
+                if (res.status === 401) {
+                    clearSession();
+                    loginOverlay.style.display = 'flex';
+                } else {
+                    loginOverlay.style.display = 'none';
+                    initAppAfterAuth();
+                }
+            }).catch(() => {
+                loginOverlay.style.display = 'none';
+            });
+        }
+
+        loginBtnSubmit.addEventListener('click', () => {
+            const user = loginUsernameInput.value.trim();
+            const pass = loginPasswordInput.value.trim();
+            if (!user || !pass) return;
+
+            fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            }).then(res => {
+                if (res.status === 200) return res.json();
+                throw new Error('bad-credentials');
+            }).then(data => {
+                localStorage.setItem('sentinel_token', data.token);
+                localStorage.setItem('sentinel_role', data.role);
+                localStorage.setItem('sentinel_user', data.username);
+                loginOverlay.style.display = 'none';
+                loginErrorMsg.style.display = 'none';
+                initAppAfterAuth();
+            }).catch(err => {
+                if (err.message === 'bad-credentials') {
+                    loginErrorMsg.innerText = "Invalid username or password.";
+                } else {
+                    loginErrorMsg.innerText = "Connection error. Is backend server running?";
+                }
+                loginErrorMsg.style.display = 'block';
+            });
+        });
+
+        loginPasswordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') loginBtnSubmit.click();
+        });
+
+        // Try to trigger auth check on load
+        window.addEventListener('DOMContentLoaded', checkAuth);
+
+        function initAppAfterAuth() {
+            const role = getRole();
+            const username = localStorage.getItem('sentinel_user') || '';
+            console.log(`Authenticated as ${username} (${role}).`);
+
+            const roleBadge = document.getElementById('role-badge');
+            if (roleBadge) {
+                roleBadge.style.display = 'flex';
+                roleBadge.querySelector('span:last-child').innerText = `${username} · ${role.toUpperCase()}`;
+            }
+
+            // Role-based section visibility (developer sees everything)
+            document.querySelectorAll('[data-roles]').forEach(el => {
+                const allowed = el.getAttribute('data-roles').split(',');
+                el.style.display = (role === 'developer' || allowed.includes(role)) ? '' : 'none';
+            });
+
+            if (role === 'principal') {
+                // Principal keeps playback (jump-to-footage) but cannot upload/reconfigure.
+                const uz = document.getElementById('upload-zone');
+                if (uz) uz.style.display = 'none';
+                const zc = document.getElementById('zone-controls');
+                if (zc) zc.dataset.locked = '1';
+            }
+
+            if (role === 'developer') loadLicensePanel();
+            if (role === 'developer' || role === 'tech') { loadZoneRulesPanel(); loadHolidaysPanel(); }
+            if (role === 'developer' || role === 'principal') { loadNotifications(); loadHeadcountReport(); }
+            connectAlertSocket();
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'logout-btn') {
+                clearSession();
+                location.reload();
+            }
+        });
+
+        // Prevent click events on the file input from bubbling up to the upload zone (avoiding loop)
+        fileInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Click to upload
+        uploadZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Drag & drop handlers
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFileUpload(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        function handleFileUpload(file) {
+            uploadZone.style.display = 'none';
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressPercent.innerText = '0%';
+            progressStatus.innerText = 'Uploading video...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload', true);
+            xhr.setRequestHeader('Authorization', getAuthHeader());
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressFill.style.width = percent + '%';
+                    progressPercent.innerText = percent + '%';
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const res = JSON.parse(xhr.responseText);
+                    if (res.status === 'processing') {
+                        progressFill.style.width = '99%';
+                        progressPercent.innerText = '99%';
+                        pollProcessingStatus(res.output_url, res.db_video_path);
+                    } else if (res.status === 'ready') {
+                        progressFill.style.width = '100%';
+                        progressPercent.innerText = '100%';
+                        progressStatus.innerText = 'Processing complete! Loading dashboard...';
+                        fetchEventsAndPlay(res.output_url, res.db_video_path);
+                    } else {
+                        alert('Processing failed: ' + (res.message || 'unknown error'));
+                        resetUpload();
+                    }
+                } else if (xhr.status === 401) {
+                    alert('Session expired. Please sign in again.');
+                    localStorage.removeItem('sentinel_auth');
+                    location.reload();
+                } else {
+                    alert('Upload failed.');
+                    resetUpload();
+                }
+            };
+
+            xhr.onerror = function() {
+                alert('Upload network error occurred.');
+                resetUpload();
+            };
+
+            xhr.ontimeout = function() {
+                alert('Upload request timed out.');
+                resetUpload();
+            };
+
+            xhr.send(formData);
+        }
+
+        function resetUpload() {
+            uploadZone.style.display = 'block';
+            progressContainer.style.display = 'none';
+            videoContainer.style.display = 'none';
+            document.getElementById('zone-controls').style.display = 'none';
+        }
+
+        let allDatabaseEvents = [];
+
+        function fetchEventsAndPlay(videoUrl, dbVideoPath) {
+            progressContainer.style.display = 'none';
+            videoContainer.style.display = 'block';
+            document.getElementById('zone-controls').style.display = 'flex';
+            window.currentDbVideoPath = dbVideoPath;
+            window.currentVideoUrl = videoUrl;
+            videoPlayer.src = videoUrl;
+            
+            // Fetch all database events for this specific video once
+            const eventsUrl = dbVideoPath ? `/api/events?video_path=${encodeURIComponent(dbVideoPath)}` : '/api/events';
+            fetch(eventsUrl, {
+                headers: { 'Authorization': getAuthHeader() }
+            })
+                .then(res => {
+                    if (res.status === 401) {
+                        localStorage.removeItem('sentinel_auth');
+                        location.reload();
+                        return { results: [] };
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data && data.results) {
+                        allDatabaseEvents = data.results;
+                    }
+                    videoPlayer.play();
+                });
+        }
+
+        // Sync events to video time
+        videoPlayer.addEventListener('timeupdate', () => {
+            const currentTime = videoPlayer.currentTime;
+            renderEventsUpToTime(currentTime);
+        });
+
+        function renderEventsUpToTime(currentTime) {
+            alertsList.innerHTML = '';
+            
+            // Filter events that happened on or before the current video time
+            const visibleEvents = allDatabaseEvents.filter(e => (e.video_time || 0) <= currentTime);
+            
+            if (visibleEvents.length > 0) {
+                visibleEvents.forEach(event => {
+                            const dateStr = new Date(event.entry_time || event.timestamp).toLocaleTimeString();
+                            let eventClass = '';
+                            let badgeClass = '';
+                            let desc = '';
+
+                            if (event.event_type === 'fall_detected') {
+                                eventClass = 'fall';
+                                badgeClass = 'fall';
+                                desc = `GID ${event.global_id}: Fall detected in Zone ${event.zone_id}`;
+                            } else if (event.event_type === 'running_detected') {
+                                eventClass = 'running';
+                                badgeClass = 'running';
+                                desc = `GID ${event.global_id}: Running speed violation`;
+                            } else if (event.event_type === 'dress_code_violation') {
+                                eventClass = 'violation';
+                                badgeClass = 'violation';
+                                desc = `GID ${event.global_id}: Dress code compliance violation`;
+                            } else {
+                                desc = `GID ${event.global_id}: ${event.event_type}`;
+                            }
+
+                            const item = document.createElement('div');
+                            item.className = `alert-item ${eventClass}`;
+                            item.innerHTML = `
+                                <div class="alert-header">
+                                    <span class="alert-badge ${badgeClass}">${event.event_type.replace('_', ' ')}</span>
+                                    <span class="alert-time">${dateStr}</span>
+                                </div>
+                                <div class="alert-desc">${desc}</div>
+                            `;
+                            alertsList.appendChild(item);
+                        });
+                    }
+        }
+
+        // Search trigger
+        searchBtn.addEventListener('click', executeSearch);
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') executeSearch();
+        });
+
+        function executeSearch() {
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            searchResultsList.innerHTML = '<div style="color: var(--text-muted);">Searching...</div>';
+
+            fetch('/api/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': getAuthHeader() },
+                body: JSON.stringify({ query: query })
+            })
+            .then(res => res.json())
+            .then(data => {
+                searchResultsList.innerHTML = '';
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(r => {
+                        const item = document.createElement('div');
+                        item.className = 'result-item';
+                        item.innerHTML = `
+                            <div class="result-meta">
+                                <div class="result-title">${r.display_label || r.event_type}</div>
+                                <div class="result-details">
+                                    <span>GID: ${r.global_id || '-'}</span>
+                                    <span>Zone: ${r.zone_id || '-'}</span>
+                                    <span>Time: ${r.video_time ? r.video_time.toFixed(1) + 's' : '-'}</span>
+                                </div>
+                            </div>
+                            <button class="result-play-btn" onclick="seekToEvent('${(r.video_path || '').replace(/\\/g, '\\\\')}', ${r.video_time || 0})">Seek Video</button>
+                        `;
+                        searchResultsList.appendChild(item);
+                    });
+                } else {
+                    searchResultsList.innerHTML = '<div style="color: var(--text-muted); font-size: 14px;">No matching incidents found.</div>';
+                }
+            })
+            .catch(() => {
+                searchResultsList.innerHTML = '<div style="color: var(--alert-danger);">Failed to execute search.</div>';
+            });
+        }
+
+        function getWebVideoUrl(videoPath) {
+            if (!videoPath) return '';
+            const parts = videoPath.split(/[\\/]/);
+            const filename = parts[parts.length - 1];
+            return `/static/outputs/processed_${filename}`;
+        }
+
+        function seekToEvent(videoPath, time) {
+            const videoUrl = getWebVideoUrl(videoPath);
+            if (videoUrl && (!videoPlayer.src || !videoPlayer.src.includes(videoUrl))) {
+                fetchEventsAndPlay(videoUrl, videoPath);
+                videoPlayer.addEventListener('loadedmetadata', () => {
+                    videoPlayer.currentTime = time;
+                    videoPlayer.play();
+                }, { once: true });
+            } else if (videoPlayer.src) {
+                videoPlayer.currentTime = time;
+                videoPlayer.play();
+            }
+        }
+
+        // Zone Editor Configuration
+        const zoneCanvas = document.getElementById('zone-canvas');
+        const ctx = zoneCanvas.getContext('2d');
+        const btnEditZone = document.getElementById('btn-edit-zone');
+        const btnSaveZone = document.getElementById('btn-save-zone');
+        const btnCancelZone = document.getElementById('btn-cancel-zone');
+
+        let isDrawing = false;
+        let startX = 0;
+        let startY = 0;
+        let endX = 0;
+        let endY = 0;
+
+        btnEditZone.addEventListener('click', () => {
+            videoPlayer.pause();
+            
+            // Sync canvas display size to video element size
+            zoneCanvas.width = videoPlayer.clientWidth;
+            zoneCanvas.height = videoPlayer.clientHeight;
+            
+            zoneCanvas.style.display = 'block';
+            btnEditZone.style.display = 'none';
+            btnSaveZone.style.display = 'inline-block';
+            btnCancelZone.style.display = 'inline-block';
+            
+            drawCanvasState();
+        });
+
+        function drawCanvasState() {
+            ctx.clearRect(0, 0, zoneCanvas.width, zoneCanvas.height);
+            
+            // Draw transparent background overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, zoneCanvas.width, zoneCanvas.height);
+            
+            if (isDrawing || (startX !== endX && startY !== endY)) {
+                const x = Math.min(startX, endX);
+                const y = Math.min(startY, endY);
+                const w = Math.abs(startX - endX);
+                const h = Math.abs(startY - endY);
+                
+                ctx.clearRect(x, y, w, h);
+                
+                // Draw border for the selection rectangle
+                ctx.strokeStyle = '#0096ff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, w, h);
+                
+                // Draw coordinates/info text
+                ctx.fillStyle = '#f5f5fa';
+                ctx.font = '14px Outfit';
+                ctx.fillText(`Detection Zone Selection: ${Math.round(w)}x${Math.round(h)}`, x + 5, y - 8);
+            } else {
+                ctx.fillStyle = '#f5f5fa';
+                ctx.font = '16px Outfit';
+                ctx.textAlign = 'center';
+                ctx.fillText('Click & Drag to define custom detection zone', zoneCanvas.width / 2, zoneCanvas.height / 2);
+            }
+        }
+
+        zoneCanvas.addEventListener('mousedown', (e) => {
+            const rect = zoneCanvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            endX = startX;
+            endY = startY;
+            isDrawing = true;
+            drawCanvasState();
+        });
+
+        zoneCanvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const rect = zoneCanvas.getBoundingClientRect();
+            endX = e.clientX - rect.left;
+            endY = e.clientY - rect.top;
+            drawCanvasState();
+        });
+
+        zoneCanvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+
+        btnCancelZone.addEventListener('click', () => {
+            zoneCanvas.style.display = 'none';
+            btnEditZone.style.display = 'inline-block';
+            btnSaveZone.style.display = 'none';
+            btnCancelZone.style.display = 'none';
+            ctx.clearRect(0, 0, zoneCanvas.width, zoneCanvas.height);
+            startX = startY = endX = endY = 0;
+        });
+
+        btnSaveZone.addEventListener('click', () => {
+            if (startX === endX || startY === endY) {
+                alert('Please draw a valid rectangular detection zone.');
+                return;
+            }
+            
+            // Normalize points coordinates
+            const cw = zoneCanvas.width;
+            const ch = zoneCanvas.height;
+            const x1 = Math.min(startX, endX) / cw;
+            const y1 = Math.min(startY, endY) / ch;
+            const x2 = Math.max(startX, endX) / cw;
+            const y2 = Math.max(startY, endY) / ch;
+            
+            const points = [
+                [x1, y1],
+                [x2, y1],
+                [x2, y2],
+                [x1, y2]
+            ];
+            
+            progressStatus.innerText = 'Updating detection zone...';
+            progressPercent.innerText = '';
+            progressContainer.style.display = 'block';
+            videoContainer.style.display = 'none';
+            document.getElementById('zone-controls').style.display = 'none';
+            
+            fetch('/api/zones', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': getAuthHeader()
+                },
+                body: JSON.stringify({
+                    id: 1,
+                    camera_id: 1,
+                    name: 'Custom Zone',
+                    points: points,
+                    max_occupancy: 3
+                })
+            })
+            .then(res => {
+                if (res.status === 403) {
+                    throw new Error('License limit reached or invalid license.');
+                }
+                return res.json();
+            })
+            .then(data => {
+                progressStatus.innerText = 'Re-processing video with new zone...';
+                return fetch('/api/reprocess', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': getAuthHeader()
+                    },
+                    body: JSON.stringify({
+                        video_path: window.currentDbVideoPath
+                    })
+                });
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'processing') {
+                    zoneCanvas.style.display = 'none';
+                    btnEditZone.style.display = 'inline-block';
+                    btnSaveZone.style.display = 'none';
+                    btnCancelZone.style.display = 'none';
+                    startX = startY = endX = endY = 0;
+                    
+                    pollProcessingStatus(data.output_url, data.db_video_path);
+                } else if (data.status === 'ready') {
+                    zoneCanvas.style.display = 'none';
+                    btnEditZone.style.display = 'inline-block';
+                    btnSaveZone.style.display = 'none';
+                    btnCancelZone.style.display = 'none';
+                    startX = startY = endX = endY = 0;
+                    
+                    fetchEventsAndPlay(data.output_url, data.db_video_path);
+                } else {
+                    alert('Reprocessing failed: ' + (data.message || 'unknown error'));
+                    resetUpload();
+                }
+            })
+            .catch(err => {
+                alert('Error: ' + err.message);
+                resetUpload();
+            });
+        });
+
+        // Background Processing Status Poller
+        function pollProcessingStatus(videoUrl, dbVideoPath) {
+            progressStatus.innerText = 'Server is processing video, please wait...';
+            
+            const interval = setInterval(() => {
+                fetch(`/api/status?video_path=${encodeURIComponent(dbVideoPath)}`, {
+                    headers: { 'Authorization': getAuthHeader() }
+                })
+                .then(res => {
+                    if (res.status === 401) {
+                        clearInterval(interval);
+                        localStorage.removeItem('sentinel_auth');
+                        location.reload();
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.status === 'ready') {
+                        clearInterval(interval);
+                        progressFill.style.width = '100%';
+                        progressPercent.innerText = '100%';
+                        progressStatus.innerText = 'Processing complete! Loading dashboard...';
+                        fetchEventsAndPlay(videoUrl, dbVideoPath);
+                    } else if (data.status === 'processing') {
+                        const progress = data.progress !== undefined ? data.progress : 99;
+                        progressFill.style.width = progress + '%';
+                        progressPercent.innerText = progress + '%';
+                    } else if (data.status && data.status.startsWith('error')) {
+                        clearInterval(interval);
+                        alert('Video processing failed on server: ' + data.status);
+                        resetUpload();
+                    }
+                })
+                .catch(err => {
+                    console.warn('Polling error:', err);
+                });
+            }, 2000);
+        }
+
+        // ------------------------------------------------------------------
+        // Role panels
+        // ------------------------------------------------------------------
+
+        function authFetch(url, options = {}) {
+            options.headers = Object.assign({}, options.headers, { 'Authorization': getAuthHeader() });
+            return fetch(url, options).then(res => {
+                if (res.status === 401) { clearSession(); location.reload(); throw new Error('unauthorized'); }
+                return res;
+            });
+        }
+
+        // --- Principal: notifications inbox ---
+        function loadNotifications() {
+            const list = document.getElementById('notifications-list');
+            authFetch('/api/notifications?limit=50')
+                .then(res => res.json())
+                .then(data => {
+                    const notes = data.notifications || [];
+                    if (!notes.length) {
+                        list.innerHTML = '<div style="color: var(--text-muted); font-size: 14px;">No notifications yet. Alerts from restricted zones, after-hours entries, and falls will appear here with snapshot photos.</div>';
+                        return;
+                    }
+                    list.innerHTML = '';
+                    notes.forEach(n => {
+                        const item = document.createElement('div');
+                        item.className = 'result-item';
+                        item.style.cssText = 'display:block; padding: 12px; margin-bottom: 10px; border: 1px solid ' + (n.read ? 'var(--border-muted)' : 'var(--border-glow)') + '; border-radius: 10px; background: var(--bg-card);';
+                        const snapshotHtml = n.snapshot_path && n.alert_id
+                            ? `<img data-alert-id="${n.alert_id}" alt="snapshot"
+                                    style="display:none; width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border-muted);">`
+                            : '';
+                        item.innerHTML = `
+                            <div style="display:flex; justify-content: space-between; gap: 8px;">
+                                <strong style="color: ${n.read ? 'var(--text-muted)' : 'var(--text-main)'};">${n.read ? '' : '🔵 '}${n.title}</strong>
+                                <span style="color: var(--text-muted); font-size: 12px; white-space: nowrap;">${(n.timestamp || '').replace('T', ' ')}</span>
+                            </div>
+                            <div style="color: var(--text-muted); font-size: 13px; margin-top: 6px;">${n.message || ''}</div>
+                            <div style="color: var(--text-muted); font-size: 12px; margin-top: 6px;">
+                                Camera ${n.camera_id ?? '-'} · Zone ${n.zone_name || '-'} · ${n.object_type || ''} GID ${n.global_id ?? '-'}
+                            </div>
+                            ${n.snapshot_path && n.alert_id ? `<button class="result-play-btn" style="margin-top: 8px; font-size: 12px;" onclick="toggleSnapshot(this)">📸 View snapshot</button>` : ''}
+                            ${snapshotHtml}
+                        `;
+                        list.appendChild(item);
+                    });
+                })
+                .catch(err => {
+                    if (err.message !== 'unauthorized')
+                        list.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Notifications unavailable (feature not licensed or server error).</div>';
+                });
+        }
+
+        function toggleSnapshot(btn) {
+            const img = btn.nextElementSibling;
+            if (!img) return;
+            const showing = img.style.display !== 'none';
+            if (showing) {
+                img.style.display = 'none';
+                btn.innerText = '📸 View snapshot';
+                return;
+            }
+            // <img> can't send Authorization headers — fetch the snapshot as a blob.
+            if (!img.src) {
+                btn.innerText = 'Loading…';
+                authFetch(`/api/alerts/${img.dataset.alertId}/snapshot`)
+                    .then(res => { if (!res.ok) throw new Error('no-snapshot'); return res.blob(); })
+                    .then(blob => {
+                        img.src = URL.createObjectURL(blob);
+                        img.style.display = 'block';
+                        btn.innerText = '🙈 Hide snapshot';
+                    })
+                    .catch(() => { btn.innerText = '⚠ Snapshot unavailable'; });
+            } else {
+                img.style.display = 'block';
+                btn.innerText = '🙈 Hide snapshot';
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'notif-mark-read') {
+                authFetch('/api/notifications/read', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                }).then(() => loadNotifications());
+            }
+        });
+
+        // --- Principal: headcount report ---
+        function loadHeadcountReport() {
+            const period = document.getElementById('report-period').value;
+            const body = document.getElementById('report-body');
+            authFetch(`/api/reports/summary?period=${period}`)
+                .then(res => res.json())
+                .then(d => {
+                    const zoneRows = Object.entries(d.zone_headcount || {})
+                        .map(([z, c]) => `<div>&nbsp;&nbsp;• Zone ${z}: <strong style="color: var(--text-main);">${c}</strong> unique people</div>`)
+                        .join('') || '<div>&nbsp;&nbsp;• No zone activity in this period.</div>';
+                    const suspicious = (d.suspicious_activities || []).slice(0, 5)
+                        .map(a => `<div>&nbsp;&nbsp;• ${a.object} in zone ${a.zone} for ${a.duration} (${(a.time || '').replace('T', ' ')})</div>`)
+                        .join('') || '<div>&nbsp;&nbsp;• All clear — no prolonged stays.</div>';
+                    body.innerHTML = `
+                        <div>👥 Unique people (headcount): <strong style="color: var(--primary); font-size: 20px;">${d.headcount}</strong></div>
+                        <div>🚶 Total visits (incl. re-entries): <strong style="color: var(--text-main);">${d.total_people_visits}</strong></div>
+                        <div>🚗 Vehicles: <strong style="color: var(--text-main);">${d.total_vehicles}</strong></div>
+                        <div style="margin-top: 8px;">📍 Headcount by zone:</div>${zoneRows}
+                        <div style="margin-top: 8px;">⚠️ Prolonged stays:</div>${suspicious}
+                    `;
+                })
+                .catch(err => {
+                    if (err.message !== 'unauthorized')
+                        body.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Reports unavailable (feature not licensed or server error).</div>';
+                });
+        }
+
+        document.addEventListener('change', (e) => {
+            if (e.target && e.target.id === 'report-period') loadHeadcountReport();
+        });
+
+        // --- Tech: zone alert rules ---
+        function loadZoneRulesPanel() {
+            const container = document.getElementById('zone-rules-list');
+            authFetch('/api/zones')
+                .then(res => res.json())
+                .then(data => {
+                    const zones = data.zones || [];
+                    if (!zones.length) {
+                        container.innerHTML = '<div style="color: var(--text-muted);">No zones configured yet. Upload a video and configure a detection zone first.</div>';
+                        return;
+                    }
+                    container.innerHTML = '';
+                    zones.forEach(z => {
+                        const row = document.createElement('div');
+                        row.style.cssText = 'padding: 12px; margin-bottom: 10px; border: 1px solid var(--border-muted); border-radius: 10px; background: var(--bg-card);';
+                        const hours = z.active_hours ? `${z.active_hours.start}–${z.active_hours.end}` : '';
+                        row.innerHTML = `
+                            <div style="display:flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div>
+                                    <strong>${z.name}</strong>
+                                    <span style="color: var(--text-muted); font-size: 12px;">(camera ${z.camera_id}, zone ${z.id})</span>
+                                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                                        ${z.restricted ? '<span style="color: var(--alert-danger);">⛔ RESTRICTED</span>' : 'Open zone'}
+                                        ${hours ? ` · 🕐 ${hours} (${(z.school_days || []).join(', ') || 'mon-fri'})` : ''}
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <label style="font-size: 12px; color: var(--text-muted);"><input type="checkbox" ${z.restricted ? 'checked' : ''} data-zr="restricted"> Restricted</label>
+                                    <input type="time" data-zr="start" value="${z.active_hours ? z.active_hours.start : ''}" style="background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 6px; padding: 3px 6px;">
+                                    <input type="time" data-zr="end" value="${z.active_hours ? z.active_hours.end : ''}" style="background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 6px; padding: 3px 6px;">
+                                    <button class="result-play-btn" style="font-size: 12px;" onclick="saveZoneRules(this, ${z.camera_id}, ${z.id})">Save</button>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(row);
+                    });
+                })
+                .catch(() => { container.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Could not load zones.</div>'; });
+        }
+
+        function saveZoneRules(btn, cameraId, zoneId) {
+            const row = btn.closest('div[style*="border"]') || btn.parentElement.parentElement;
+            const restricted = row.querySelector('[data-zr="restricted"]').checked;
+            const start = row.querySelector('[data-zr="start"]').value;
+            const end = row.querySelector('[data-zr="end"]').value;
+            const payload = { camera_id: cameraId, zone_id: zoneId, restricted: restricted };
+            if (start && end) {
+                payload.active_hours = { start: start, end: end };
+                payload.school_days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+            }
+            authFetch('/api/zones/rules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(res => {
+                btn.innerText = res.ok ? '✓ Saved' : '⚠ Failed';
+                setTimeout(() => { btn.innerText = 'Save'; loadZoneRulesPanel(); }, 1200);
+            });
+        }
+
+        // --- Tech: holidays ---
+        function loadHolidaysPanel() {
+            const list = document.getElementById('holidays-list');
+            authFetch('/api/holidays')
+                .then(res => res.json())
+                .then(data => {
+                    const holidays = data.holidays || [];
+                    if (!holidays.length) {
+                        list.innerHTML = '<div>No holidays configured. Zone-hours alerts treat every weekday as a school day.</div>';
+                        return;
+                    }
+                    list.innerHTML = holidays.map(h => `
+                        <div style="display:flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-muted);">
+                            <span>📅 ${h}</span>
+                            <button class="result-play-btn" style="font-size: 11px;" onclick="removeHoliday('${h}')">Remove</button>
+                        </div>`).join('');
+                })
+                .catch(() => { list.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Could not load holidays.</div>'; });
+        }
+
+        function removeHoliday(date) {
+            authFetch(`/api/holidays/${date}`, { method: 'DELETE' }).then(() => loadHolidaysPanel());
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'holiday-add') {
+                const date = document.getElementById('holiday-date').value;
+                if (!date) return;
+                authFetch('/api/holidays', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: date })
+                }).then(() => loadHolidaysPanel());
+            }
+        });
+
+        // --- Developer: license panel ---
+        function loadLicensePanel() {
+            const body = document.getElementById('license-body');
+            authFetch('/api/license')
+                .then(res => res.json())
+                .then(d => {
+                    const featureChips = (d.features || []).map(f =>
+                        `<span style="display:inline-block; background: rgba(0,150,255,0.12); border: 1px solid var(--border-glow); color: var(--primary); border-radius: 12px; padding: 2px 10px; font-size: 11px; margin: 2px;">${f}</span>`
+                    ).join('');
+                    const modeColor = d.mode === 'licensed' ? 'var(--alert-success)' : (d.mode === 'evaluation' ? 'var(--alert-warning)' : 'var(--alert-danger)');
+                    body.innerHTML = `
+                        <div>Status: <strong style="color: ${modeColor}; text-transform: uppercase;">${d.mode}</strong> — ${d.message}</div>
+                        <div>Client: <strong style="color: var(--text-main);">${d.client_id || '-'}</strong></div>
+                        <div>Camera limit: <strong style="color: var(--primary); font-size: 18px;">${d.max_cameras}</strong>
+                             &nbsp;(currently configured: <strong style="color: var(--text-main);">${d.cameras_configured}</strong>)</div>
+                        <div>Expires: <strong style="color: var(--text-main);">${d.expiration || 'never'}</strong></div>
+                        <div>Hardware fingerprint (for issuing keys): <code style="font-family: 'JetBrains Mono', monospace; color: var(--secondary);">${d.hardware_fingerprint}</code></div>
+                        <div style="margin-top: 6px;">Licensed features:<br>${featureChips || '<em>none</em>'}</div>
+                        <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+                            To extend the client (e.g. trial 20 → contract 10,000 cameras), run <code>generate_key.py</code> on the dev machine with the fingerprint above and replace <code>license.key</code>. Expired keys automatically revoke all camera access.
+                        </div>
+                    `;
+                })
+                .catch(() => { body.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Could not load license status.</div>'; });
+        }
+
+        // --- Live alert stream over WebSocket ---
+        let alertSocket = null;
+        function connectAlertSocket() {
+            const token = localStorage.getItem('sentinel_token') || '';
+            if (!token || alertSocket) return;
+            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+            alertSocket = new WebSocket(`${proto}://${location.host}/ws/alerts?token=${encodeURIComponent(token)}`);
+            alertSocket.onopen = () => {
+                const dot = document.getElementById('live-dot');
+                if (dot) dot.style.display = 'inline';
+            };
+            alertSocket.onmessage = (msg) => {
+                try {
+                    const payload = JSON.parse(msg.data);
+                    if (payload.type === 'alert') {
+                        prependLiveAlert(payload.data);
+                        if (getRole() !== 'tech') loadNotifications();
+                    }
+                } catch (e) { /* ignore malformed frames */ }
+            };
+            alertSocket.onclose = () => {
+                alertSocket = null;
+                const dot = document.getElementById('live-dot');
+                if (dot) dot.style.display = 'none';
+                setTimeout(connectAlertSocket, 5000);
+            };
+        }
+
+        function prependLiveAlert(a) {
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            item.style.cssText = 'padding: 10px; margin-bottom: 8px; border: 1px solid var(--alert-danger); border-radius: 10px; background: rgba(255,59,48,0.08); animation: fadeIn 0.4s;';
+            item.innerHTML = `
+                <div style="font-weight: 600; color: var(--alert-danger); font-size: 13px;">🚨 ${(a.alert_type || 'alert').replace(/_/g, ' ').toUpperCase()}</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${a.message || ''}</div>
+            `;
+            const placeholder = alertsList.querySelector('div[style*="text-align: center"]');
+            if (placeholder) placeholder.remove();
+            alertsList.prepend(item);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: sentinel_postgres
+    environment:
+      POSTGRES_USER: sentinel_admin
+      POSTGRES_PASSWORD: sentinel_password
+      POSTGRES_DB: sentinel_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - sentinel_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  web:
+    build: .
+    container_name: sentinel_backend
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://sentinel_admin:sentinel_password@db:5432/sentinel_db
+      - ADMIN_USER=admin
+      - ADMIN_PASS=sentinel2026
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/static/uploads:/app/backend/static/uploads
+      - ./backend/static/outputs:/app/backend/static/outputs
+      - ./license.key:/app/license.key
+    restart: unless-stopped
+
+volumes:
+  sentinel_pgdata:

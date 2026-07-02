@@ -104,6 +104,9 @@ def build_pixel_zones(zone_defs: List[Dict], frame_shape: Tuple[int, int, int]) 
         bbox["name"] = zone.get("name", f"Zone {zone.get('id')}")
         bbox["polygon"] = pixel_polygon
         bbox["max_occupancy"] = zone.get("max_occupancy", 3)
+        bbox["restricted"] = bool(zone.get("restricted", False))
+        bbox["active_hours"] = zone.get("active_hours")
+        bbox["school_days"] = zone.get("school_days")
 
         pixel_zones.append(bbox)
 
@@ -118,6 +121,111 @@ def persist_camera_zones(camera_id: int, zone_defs: List[Dict]) -> None:
 
 def overwrite_zones(zone_defs: List[Dict]) -> None:
     _persist_all_zones(zone_defs)
+
+
+def _find_zone_index(zones: List[Dict], camera_id: int, zone_id: int) -> Optional[int]:
+    for index, zone in enumerate(zones):
+        if zone.get("camera_id") == camera_id and zone.get("id") == zone_id:
+            return index
+    return None
+
+
+def set_zone_alert_rules(
+    camera_id: int,
+    zone_id: int,
+    restricted: Optional[bool] = None,
+    active_hours: Optional[Dict[str, str]] = None,
+    school_days: Optional[List[str]] = None,
+) -> bool:
+    zones = _load_all_zones()
+    index = _find_zone_index(zones, camera_id, zone_id)
+    if index is None:
+        return False
+
+    if restricted is not None:
+        zones[index]["restricted"] = restricted
+    if active_hours is not None:
+        zones[index]["active_hours"] = active_hours
+    if school_days is not None:
+        zones[index]["school_days"] = school_days
+
+    _persist_all_zones(zones)
+    return True
+
+
+WEEKDAY_CODES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+DEFAULT_SCHOOL_DAYS = ["mon", "tue", "wed", "thu", "fri"]
+
+
+def _prompt_zone_time(label: str) -> Optional[str]:
+    value = input(f"    {label} (HH:MM, blank to skip): ").strip()
+    if not value:
+        return None
+    try:
+        hours, minutes = value.split(":")
+        int(hours), int(minutes)
+    except ValueError:
+        print("    ⚠️ Invalid time format, skipping.")
+        return None
+    return value
+
+
+def _prompt_school_days() -> List[str]:
+    raw = input(
+        "    School days this zone is active (comma-separated mon-sun, "
+        "Enter for Mon-Fri, 'all' for every day): "
+    ).strip().lower()
+
+    if not raw:
+        return DEFAULT_SCHOOL_DAYS
+    if raw == "all":
+        return list(WEEKDAY_CODES)
+
+    days = [day.strip()[:3] for day in raw.split(",") if day.strip()]
+    valid_days = [day for day in days if day in WEEKDAY_CODES]
+    if not valid_days:
+        print("    ⚠️ No valid days recognized, defaulting to Mon-Fri.")
+        return DEFAULT_SCHOOL_DAYS
+    return valid_days
+
+
+def configure_zone_rules_interactive(camera_id: int) -> None:
+    zones = get_camera_zones(camera_id)
+    if not zones:
+        print(f"⚠️ No zones found for camera {camera_id}.")
+        return
+
+    for zone in zones:
+        zone_id = zone.get("id")
+        print(f"\nZone {zone_id} - {zone.get('name', 'Unnamed')}")
+
+        restricted_choice = input(
+            "  Mark as restricted area? Alerts on ANY entry (y/n, blank = leave unchanged): "
+        ).strip().lower()
+        restricted = {"y": True, "n": False}.get(restricted_choice)
+
+        active_hours = None
+        school_days = None
+        set_hours_choice = input(
+            "  Set allowed hours/school days for this zone? Entries outside them "
+            "(and on non-school days) will alert (y/n): "
+        ).strip().lower()
+        if set_hours_choice == "y":
+            start = _prompt_zone_time("Start time")
+            end = _prompt_zone_time("End time")
+            if start and end:
+                active_hours = {"start": start, "end": end}
+                school_days = _prompt_school_days()
+
+        if restricted is not None or active_hours is not None:
+            set_zone_alert_rules(
+                camera_id,
+                zone_id,
+                restricted=restricted,
+                active_hours=active_hours,
+                school_days=school_days,
+            )
+            print(f"  ✅ Updated alert rules for zone {zone_id}")
 
 
 def _template_to_zones(camera_config: Dict, start_id: int) -> List[Dict]:

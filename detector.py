@@ -15,7 +15,7 @@ class HumanDetector:
             print(f"[HumanDetector] Loading RT-DETR model with weights: {model_weights}...")
             self.model = RTDETR(model_weights)
         else:
-            model_weights = weights or "yolov8n.pt"
+            model_weights = weights or "yolov8s.pt"
             print(f"[HumanDetector] Loading YOLO model with weights: {model_weights}...")
             self.model = YOLO(model_weights)
 
@@ -42,7 +42,7 @@ class HumanDetector:
                 cls_id = int(box.cls[0])
 
                 # Filter only selected classes
-                if cls_id in self.TARGET_CLASSES and conf > 0.5:
+                if cls_id in self.TARGET_CLASSES and conf > 0.20:
                     detections.append((
                         x1,
                         y1,

@@ -63,6 +63,12 @@ class QueryEngine:
             sql += " AND stayed = 1"
         elif event_type == "leaving":
             sql += " AND exit_time IS NOT NULL"
+        elif event_type == "dress_code_violation":
+            sql += " AND event_type = ?"
+            params.append("dress_code_violation")
+        elif event_type in ("running_detected", "fall_detected"):
+            sql += " AND event_type = ?"
+            params.append(event_type)
 
         zone_id = filters.get("zone_id")
         if isinstance(zone_id, int):

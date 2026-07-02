@@ -5,8 +5,8 @@ import supervision as sv
 class PersonTracker:
     def __init__(self):
         self.tracker = sv.ByteTrack(
-            track_activation_threshold=0.25,
-            lost_track_buffer=50
+            track_activation_threshold=0.20,
+            lost_track_buffer=150
         )
 
     def update(self, frame, detections):

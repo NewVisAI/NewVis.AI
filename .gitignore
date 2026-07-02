@@ -6,6 +6,7 @@ __pycache__/
 
 # Virtual Environment
 venv/
+.venv/
 .env
 .env.*
 
@@ -23,6 +24,16 @@ runs/
 # Videos
 *.mp4
 *.avi
+
+# Cleanup staging (created by cleanup_hackathonpro.ps1)
+_to_delete/
+
+# License signing (PRIVATE key — never commit or ship)
+dev_keys/
+license.key
+
+# Alert snapshots (runtime artifacts)
+alert_snapshots/
 
 # IDE
 .vscode/

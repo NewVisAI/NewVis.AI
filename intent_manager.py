@@ -39,6 +39,23 @@ class IntentManager:
         "exit": "leaving",
         "leave": "leaving",
         "leaving": "leaving",
+        "uniform": "dress_code_violation",
+        "dress": "dress_code_violation",
+        "violation": "dress_code_violation",
+        "violations": "dress_code_violation",
+        "run": "running_detected",
+        "running": "running_detected",
+        "fall": "fall_detected",
+        "fell": "fall_detected",
+        "fallen": "fall_detected",
+        "falling": "fall_detected",
+        "collapse": "fall_detected",
+        "collapsed": "fall_detected",
+        "slip": "fall_detected",
+        "hazard": "fall_detected",
+        "intrusion": "restricted_zone_entry",
+        "trespass": "restricted_zone_entry",
+        "trespassing": "restricted_zone_entry",
     }
 
     def __init__(self):
@@ -194,7 +211,14 @@ class IntentManager:
         return None
 
     def _normalize_event(self, value: str) -> Optional[str]:
-        return self.EVENT_ALIAS.get(value.lower())
+        lowered = value.lower()
+        if lowered in self.EVENT_ALIAS:
+            return self.EVENT_ALIAS[lowered]
+        # Already-normalized values (e.g. "fall_detected" from the rule parser
+        # or the LLM parser) must pass through, not be dropped.
+        if lowered in self.EVENT_ALIAS.values():
+            return lowered
+        return None
 
     def _extract_track_id(self, query: str) -> Optional[int]:
         match = re.search(r"track(?:_?id)?\s*[:=#]?\s*(\d+)", query)

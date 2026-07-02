@@ -1,5 +1,16 @@
+import os
+import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
+
+# Windows consoles often default to a legacy code page that can't encode the
+# emoji used in log output; a failed print must never crash the pipeline.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
 
 import cv2
 import numpy as np
@@ -16,7 +27,15 @@ from event import (
     log_tracking_data,
     reset_runtime_state,
     update_session_event,
+    check_dress_code,
+    active_uniform_violations,
 )
+from running import check_running, is_currently_running, reset_running_state
+from fall_detector import check_fall, is_currently_fallen, reset_fall_state
+from alerts import init_alerts_db, raise_fall_alert, get_notifications, mark_notifications_read, get_alert_playback_entry
+from school_calendar import configure_holidays_interactive
+from zone_manager import configure_zone_rules_interactive
+from license_validator import verify_license, load_license_key
 
 def _draw_corner_rect(img, pt1, pt2, color, thickness, r, d):
     x1, y1 = pt1
@@ -38,11 +57,13 @@ def _draw_corner_rect(img, pt1, pt2, color, thickness, r, d):
     cv2.line(img, (x2, y2), (x2 - r, y2), color, thickness)
     cv2.line(img, (x2, y2), (x2, y2 - r), color, thickness)
 from intent_manager import IntentManager
+from mode_manager import ModeManager
 from query_engine import QueryEngine
 from reid import GlobalIdentityManager
+from search_service import SearchService
 from tracker import PersonTracker
 from video_player import play_event
-from zone_manager import build_pixel_zones, draw_camera_zones, get_camera_zones, overwrite_zones
+from zone_manager import build_pixel_zones, draw_camera_zones, get_camera_zones, overwrite_zones, has_any_zones
 
 box_annotator = sv.BoxAnnotator(thickness=2)
 label_annotator = sv.LabelAnnotator(text_scale=0.5, text_thickness=1)
@@ -118,8 +139,10 @@ def prompt_camera_configs():
 
 
 def resolve_capture_source(source):
-    if isinstance(source, str) and source.isdigit():
-        return int(source)
+    if isinstance(source, str):
+        source = source.strip('\'"')
+        if source.isdigit():
+            return int(source)
     return source
 
 
@@ -223,26 +246,22 @@ def configure_zones_at_startup(camera_configs):
     if not camera_configs:
         return
 
-    print("\n📦 Zone setup starts now. Existing zones will be overwritten in zones.json.")
-    overwrite_zones([])
+    if has_any_zones():
+        print("💾 Existing zones loaded from zones.json.")
+        return
+
+    print("📦 No zones found. Automatically configuring whole video frame as the zone for all cameras.")
     all_zones = []
-    next_zone_id = 1
-
     for camera in camera_configs:
-        print(f"\n🎯 Draw zones for {camera['name']} ({camera['source']})")
-        print("   Drag with the mouse, press 's' to save each zone, 'z' to remove the last one, Enter to finish.")
-
-        frame = capture_static_frame(camera)
-        if frame is None:
-            print(f"⚠️ Unable to capture frame for {camera['name']}; saving no zones for this camera.")
-            continue
-
-        drawn_zones = draw_camera_zones(camera, frame, next_zone_id)
-        all_zones.extend(drawn_zones)
-        next_zone_id += len(drawn_zones)
-
+        all_zones.append({
+            "id": camera["camera_id"],
+            "camera_id": camera["camera_id"],
+            "name": "Whole Frame",
+            "points": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            "max_occupancy": 3
+        })
     overwrite_zones(all_zones)
-    print(f"💾 Saved {len(all_zones)} zone(s) to zones.json")
+    print(f"💾 Saved default whole-frame zone(s) to zones.json")
 
 
 def _print_event_summary(results: list):
@@ -286,9 +305,8 @@ def run_query_mode(query_engine: QueryEngine, intent_manager: IntentManager, ses
         if not query:
             return
 
-        intent_manager.set_intent(query)
-        filters = intent_manager.get_filters()
-        results = query_engine.run_query(filters=filters, session_mode=session_mode)
+        search_service = SearchService(query_engine=query_engine, intent_manager=intent_manager)
+        results = search_service.search(query, session_mode=session_mode)
 
         if not results:
             print("No matching events found.")
@@ -309,9 +327,14 @@ def _create_camera_runtime(camera_config: Dict[str, object]) -> Optional[CameraR
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     zone_defs = get_camera_zones(camera_config["camera_id"])
     if not zone_defs:
-        print(f"⚠️ No zones configured for {camera_config['name']}; camera will be skipped.")
-        cap.release()
-        return None
+        print(f"⚠️ No zones configured for {camera_config['name']}; defaulting to entire video frame.")
+        zone_defs = [{
+            "id": 1,
+            "camera_id": camera_config["camera_id"],
+            "name": "Whole Frame",
+            "points": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            "max_occupancy": 3
+        }]
 
     is_live = False
     source_val = camera_config["source"]
@@ -479,6 +502,7 @@ def _process_camera_frame(
             frame_number=camera_state.current_frame_number,
             event_mode=session_mode,
             assigned_zone_id=assigned_zone_id,
+            frame=frame,
         )
 
         # Update Incident Risk
@@ -500,11 +524,61 @@ def _process_camera_frame(
                 "zone_name": zone_name
             })
 
+        # Run school uniform dress code check
+        check_dress_code(
+            global_id=global_id,
+            camera_id=camera_state.camera_id,
+            frame=frame,
+            bbox=(x1, y1, x2, y2),
+            video_time=video_time,
+            video_path=camera_state.source
+        )
+
+        # Run running detection check
+        check_running(
+            track_key=(camera_state.camera_id, track_id),
+            global_id=global_id,
+            camera_id=camera_state.camera_id,
+            bbox=(x1, y1, x2, y2),
+            video_time=video_time,
+            video_path=camera_state.source
+        )
+
+        # Run fall detection check (person only); a detected fall goes through
+        # the alerts pipeline so it gets a snapshot + principal notification.
+        if locked_type == "person":
+            fall_details = check_fall(
+                track_key=(camera_state.camera_id, track_id),
+                global_id=global_id,
+                bbox=(x1, y1, x2, y2),
+                video_time=video_time,
+            )
+            if fall_details:
+                raise_fall_alert(
+                    camera_id=camera_state.camera_id,
+                    global_id=global_id,
+                    track_id=track_id,
+                    video_path=camera_state.source,
+                    frame_number=camera_state.current_frame_number,
+                    frame=frame,
+                    bbox=(x1, y1, x2, y2),
+                    details=fall_details,
+                )
+
         active_tracked_objects.append((x1, y1, x2, y2, track_id, cls_id))
         
         label = f"{locked_type} GID {global_id}"
-        if risk_data["score"] > 0:
+        if global_id in active_uniform_violations:
+            label += " | UNIFORM VIOLATION"
+        elif risk_data["score"] > 0:
             label += f" | RISK: {risk_data['score']}"
+        
+        if is_currently_running(global_id, video_time):
+            label += " | RUNNING"
+
+        if is_currently_fallen(global_id, video_time):
+            label += " | FALL DETECTED"
+            
         custom_labels.append(label)
 
     if active_tracked_objects:
@@ -540,6 +614,8 @@ def _process_camera_frame(
 
 def _seek_all_cameras(camera_states: List[CameraRuntime], identity_manager: GlobalIdentityManager, direction: int) -> None:
     reset_runtime_state()
+    reset_running_state()
+    reset_fall_state()
     for camera_state in camera_states:
         if camera_state.finished:
             continue
@@ -579,6 +655,8 @@ def run_surveillance_mode(camera_configs, detector, identity_manager, incident_m
     print("   Controls: SPACE pause/play, LEFT/RIGHT seek, Q/Esc exit.")
 
     reset_runtime_state()
+    reset_running_state()
+    reset_fall_state()
     paused = False
     window_name = "CCTV - Surveillance"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -631,12 +709,157 @@ def run_surveillance_mode(camera_configs, detector, identity_manager, incident_m
         camera_state.close()
         cv2.destroyWindow(window_name)
 
-    return True
+def process_video_headless(video_path: str, output_path: Optional[str] = None, progress_cb = None) -> None:
+    # 🔑 Force license validation check first (empty key = evaluation mode)
+    license_key = load_license_key()
+    is_valid, msg = verify_license(license_key, 1)
+    if not is_valid:
+        print(f"❌ [LICENSING ERROR] {msg}")
+        return
+
+    # Initialize detectors/managers
+    init_alerts_db()
+    detector = HumanDetector(model_type="yolo", weights="yolov8s.pt")
+    identity_manager = GlobalIdentityManager()
+    incident_manager = IncidentManager()
+    
+    camera_config = {
+        "camera_id": 1,
+        "name": "Uploaded Video",
+        "source": video_path
+    }
+    
+    camera_state = _create_camera_runtime(camera_config)
+    if camera_state is None:
+        print("❌ Could not open uploaded video.")
+        return
+
+    # If output_path is provided, set up video writer
+    writer = None
+    if output_path:
+        w = int(camera_state.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(camera_state.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = camera_state.fps or DEFAULT_FPS
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
+        writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+        if not writer.isOpened():
+            print("⚠️ [WARNING] avc1 (H.264) codec failed to open. Falling back to mp4v.")
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+
+    identity_manager.clear_camera_track_mappings(camera_state.camera_id)
+    reset_runtime_state()
+    reset_running_state()
+    reset_fall_state()
+
+    print(f"🎬 Processing video headless: {video_path}")
+    total_frames = max(1, camera_state.total_frames)
+    try:
+        while not camera_state.finished:
+            _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "single")
+            if writer and camera_state.display_frame is not None:
+                writer.write(camera_state.display_frame)
+            
+            # Update progress
+            current_frame = camera_state.current_frame_number
+            if progress_cb:
+                progress_cb(current_frame, total_frames)
+            next_frame = camera_state.current_frame_number + camera_state.frame_skip
+            if camera_state.total_frames > 0 and next_frame >= camera_state.total_frames:
+                camera_state.finished = True
+                break
+            _seek_frame(camera_state.cap, next_frame, camera_state.total_frames)
+            camera_state.display_frame = None
+    finally:
+        finalize_camera_sessions(camera_state.camera_id, camera_state.source)
+        flush_tracking_data()
+        camera_state.close()
+        if writer:
+            writer.release()
+        print("✅ Headless video processing finished.")
+
+
+def _view_notification_snapshot(snapshot_path: str) -> None:
+    if not snapshot_path or not os.path.exists(snapshot_path):
+        print("  ⚠️ No snapshot available for this notification.")
+        return
+
+    image = cv2.imread(snapshot_path)
+    if image is None:
+        print(f"  ⚠️ Could not open snapshot file: {snapshot_path}")
+        return
+
+    window_name = "Alert Snapshot (press any key to close)"
+    cv2.imshow(window_name, image)
+    cv2.waitKey(0)
+    cv2.destroyWindow(window_name)
+
+
+def _show_principal_notifications() -> None:
+    notifications = get_notifications(unread_only=False, limit=50)
+    if not notifications:
+        print("\n🔔 No notifications yet.")
+        return
+
+    unread_count = sum(1 for n in notifications if not n["read"])
+    print(f"\n🔔 Principal Notifications ({unread_count} unread of {len(notifications)} shown)")
+    for idx, note in enumerate(notifications):
+        flag = " " if note["read"] else "*"
+        camera_label = f"camera {note['camera_id']}" if note.get("camera_id") is not None else "camera -"
+        zone_label = note.get("zone_name") or "-"
+        photo_label = "📸" if note.get("snapshot_path") else "  "
+        print(
+            f"  {idx:2} [{flag}] {photo_label} {note['timestamp']} | {camera_label} | zone {zone_label} | "
+            f"{note['title']}: {note['message']}"
+        )
+
+    choice = input(
+        "\nEnter number to view snapshot/footage, 'r' to mark all read, or Enter to go back: "
+    ).strip().lower()
+
+    if choice == "r":
+        mark_notifications_read()
+        print("✅ All notifications marked as read.")
+        return
+
+    if choice.isdigit():
+        idx = int(choice)
+        if 0 <= idx < len(notifications):
+            note = notifications[idx]
+            _view_notification_snapshot(note.get("snapshot_path"))
+            playback_entry = get_alert_playback_entry(note["alert_id"]) if note.get("alert_id") else None
+            if playback_entry and input("  Jump to footage for this alert? (y/n): ").strip().lower() == "y":
+                flush_tracking_data()
+                play_event(playback_entry)
+            elif not playback_entry:
+                print("  ⚠️ No footage reference stored for this notification.")
+            mark_notifications_read([note["id"]])
+        else:
+            print("  ⚠️ Invalid index.")
+
+
+def _configure_zone_rules(camera_configs) -> None:
+    for camera in camera_configs:
+        print(f"\n⚙️ Alert rules for {camera['name']} (camera {camera['camera_id']})")
+        configure_zone_rules_interactive(camera["camera_id"])
 
 
 def main():
     camera_configs, session_mode = prompt_camera_configs()
+    
+    # 🔑 License Validation & Camera Governance Check
+    license_key = load_license_key()
+    if not license_key:
+        print("\n🔑 [LICENSING] Warning: No license.key file found. Running in evaluation mode (1 camera, core features).")
+
+    is_valid, msg = verify_license(license_key, len(camera_configs))
+    print(f"🔑 [LICENSING] {msg}\n")
+    if not is_valid:
+        print("❌ [LICENSING ERROR] Access Denied. Exiting surveillance application.")
+        return
+
     init_db()
+    init_alerts_db()
     clear_event_logs()
     
     print("\nSelect Detection Model:")
@@ -659,9 +882,12 @@ def main():
         print("1. Full Surveillance Mode")
         print("2. Query-Based Mode")
         print("3. AI Session Summary")
+        print("4. Configure Zone Alert Rules (restricted / school hours)")
+        print("5. Manage School Holidays")
+        print("6. View Principal Notifications")
         print("q. Quit")
 
-        choice = input("Enter choice (1/2/3/q): ").strip().lower()
+        choice = input("Enter choice (1-6/q): ").strip().lower()
 
         if choice == "1":
             should_continue = run_surveillance_mode(camera_configs, detector, identity_manager, incident_manager, session_mode)
@@ -670,6 +896,12 @@ def main():
         elif choice == "2":
             run_query_mode(query_engine, intent_manager, session_mode)
         elif choice == "3":
+            period = input("Report period — day / week / month / all (default all): ").strip().lower()
+            if period not in ("day", "week", "month", "all"):
+                period = "all"
+            use_zones = input("Break down by zone? (y/n): ").strip().lower() == "y"
+            ModeManager().print_summary_report(use_zones=use_zones, time_frame=period)
+
             print("\nGenerating AI Security Report...")
             stats_report = query_engine.generate_security_report()
             print("\n" + stats_report)
@@ -684,10 +916,16 @@ def main():
                 print("\nRecent Incidents (InMemory):")
                 for inc in incident_manager.get_recent_incidents(10):
                     print(f"- [{inc['timestamp']}] GID {inc['global_id']}: {inc['type']} - {inc['description']}")
+        elif choice == "4":
+            _configure_zone_rules(camera_configs)
+        elif choice == "5":
+            configure_holidays_interactive()
+        elif choice == "6":
+            _show_principal_notifications()
         elif choice == "q":
             break
         else:
-            print("Invalid choice. Please enter 1, 2 or q.")
+            print("Invalid choice. Please enter 1-6 or q.")
 
 
 if __name__ == "__main__":
