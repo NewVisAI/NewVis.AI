@@ -1,1530 +1,2293 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel AI CCTV - Premium Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-base: #0a0a0f;
-            --bg-surface: rgba(20, 20, 30, 0.6);
-            --bg-card: rgba(30, 30, 45, 0.4);
-            --border-glow: rgba(0, 150, 255, 0.3);
-            --border-muted: rgba(255, 255, 255, 0.08);
-            
-            --primary: #0096ff;
-            --primary-glow: rgba(0, 150, 255, 0.5);
-            --secondary: #bd00ff;
-            
-            --text-main: #f5f5fa;
-            --text-muted: #8fa0ba;
-            
-            --alert-danger: #ff3b30;
-            --alert-warning: #ffcc00;
-            --alert-success: #34c759;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinel AI — Campus Surveillance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ============================= THEME ============================= */
+:root {
+  --bg: #070b14;
+  --bg-2: #0b101d;
+  --surface: #101728;
+  --surface-2: #16203a;
+  --card: rgba(22, 30, 52, 0.72);
+  --border: rgba(120, 140, 200, 0.14);
+  --border-strong: rgba(120, 140, 200, 0.28);
+  --text: #e8ecf6;
+  --text-dim: #93a0bd;
+  --text-faint: #5c6a8a;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --accent-soft: rgba(99, 102, 241, 0.14);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --radius: 14px;
+  --font: 'Outfit', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  font-size: 14.5px;
+}
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(120,140,200,0.22); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(120,140,200,0.4); }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Outfit', sans-serif;
-            -webkit-font-smoothing: antialiased;
-        }
+/* ============================= LOGIN ============================= */
+#login-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(1200px 700px at 20% -10%, rgba(99,102,241,0.22), transparent 60%),
+              radial-gradient(900px 600px at 95% 110%, rgba(34,211,238,0.14), transparent 55%),
+              var(--bg);
+}
+.login-card {
+  width: 400px; max-width: calc(100vw - 40px);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 40px 36px;
+  backdrop-filter: blur(18px); box-shadow: var(--shadow);
+  animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.brand-logo {
+  width: 42px; height: 42px; border-radius: 12px; flex: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 18px rgba(99,102,241,0.45);
+}
+.brand-logo svg { width: 24px; height: 24px; }
+.brand h1 { font-size: 24px; font-weight: 800; letter-spacing: 0.5px; }
+.brand h1 span { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.login-sub { color: var(--text-dim); font-size: 13.5px; margin-bottom: 28px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 7px; }
+.field input {
+  width: 100%; background: rgba(8, 12, 22, 0.65); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; color: var(--text); font-family: var(--font); font-size: 14.5px;
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+.field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,0.18); }
+.btn-primary {
+  width: 100%; padding: 12px; border: none; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(90deg, var(--accent), #818cf8); color: #fff;
+  font-family: var(--font); font-size: 15px; font-weight: 700; letter-spacing: 0.3px;
+  transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
+}
+.btn-primary:hover { filter: brightness(1.12); box-shadow: 0 6px 22px rgba(99,102,241,0.4); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+#login-error { display: none; color: var(--danger); background: var(--danger-soft); border: 1px solid rgba(248,113,113,0.3); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+.demo-row { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+.demo-row p { font-size: 11.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.demo-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--border); background: rgba(120,140,200,0.07); color: var(--text-dim);
+  padding: 6px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer; font-family: var(--font);
+  transition: all 0.18s;
+}
+.chip:hover, .chip.active { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
 
-        body {
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(189, 0, 255, 0.05) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(0, 150, 255, 0.05) 0%, transparent 40%);
-        }
+/* ============================= APP SHELL ============================= */
+#app { display: none; height: 100vh; grid-template-columns: 238px 1fr; }
+#app.on { display: grid; }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 40px;
-            background: rgba(10, 10, 15, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border-muted);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
+.sidebar {
+  background: var(--bg-2); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 20px 14px; gap: 4px; overflow-y: auto;
+}
+.sidebar .brand { padding: 2px 10px 18px; }
+.sidebar .brand h1 { font-size: 19px; }
+.sidebar .brand-logo { width: 34px; height: 34px; border-radius: 10px; }
+.sidebar .brand-logo svg { width: 19px; height: 19px; }
+.nav-label { font-size: 10.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--text-faint); padding: 14px 12px 6px; font-weight: 600; }
+.nav-item {
+  display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 10px;
+  color: var(--text-dim); cursor: pointer; font-weight: 500; font-size: 14px;
+  border: 1px solid transparent; transition: all 0.16s; position: relative; user-select: none;
+}
+.nav-item svg { width: 18px; height: 18px; flex: none; opacity: 0.85; }
+.nav-item:hover { color: var(--text); background: rgba(120,140,200,0.08); }
+.nav-item.active { color: #fff; background: var(--accent-soft); border-color: rgba(99,102,241,0.35); }
+.nav-item.active::before { content: ''; position: absolute; left: -14px; top: 20%; height: 60%; width: 3px; border-radius: 3px; background: linear-gradient(var(--accent), var(--accent-2)); }
+.nav-badge { margin-left: auto; background: var(--danger); color: #fff; font-size: 10.5px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: none; align-items: center; justify-content: center; padding: 0 5px; }
+.sidebar-foot { margin-top: auto; padding: 14px 10px 4px; border-top: 1px solid var(--border); }
+.user-box { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff; flex: none; }
+.user-box .who { line-height: 1.25; overflow: hidden; }
+.user-box .who b { display: block; font-size: 13.5px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.user-box .who span { font-size: 11px; color: var(--accent-2); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+#logout-btn { margin-left: auto; background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: 8px; padding: 6px 8px; cursor: pointer; transition: all 0.18s; }
+#logout-btn:hover { color: var(--danger); border-color: var(--danger); }
 
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+.main { display: flex; flex-direction: column; overflow: hidden; }
+.topbar {
+  display: flex; align-items: center; gap: 16px; padding: 16px 28px;
+  border-bottom: 1px solid var(--border); background: rgba(10, 14, 24, 0.6); backdrop-filter: blur(10px);
+}
+.topbar h2 { font-size: 19px; font-weight: 700; }
+.topbar .crumb { color: var(--text-faint); font-size: 13px; }
+.ws-pill { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-dim); border: 1px solid var(--border); padding: 6px 13px; border-radius: 999px; }
+.ws-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); }
+.ws-pill.live .ws-dot { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 1.6s infinite; }
+.ws-pill.live { color: var(--success); border-color: rgba(52,211,153,0.35); }
+@keyframes pulse { 50% { opacity: 0.45; } }
+.lic-pill { font-size: 12px; border: 1px solid var(--border); padding: 6px 13px; border-radius: 999px; color: var(--text-dim); }
+.lic-pill b { color: var(--success); }
 
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            box-shadow: 0 0 15px var(--primary-glow);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 18px;
-        }
+.content { flex: 1; overflow-y: auto; padding: 26px 28px 60px; }
+.view { display: none; animation: fadein 0.28s ease; }
+.view.active { display: block; }
+@keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-        .logo-text {
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: 1px;
-            background: linear-gradient(to right, #ffffff, #8fa0ba);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+/* ============================= COMPONENTS ============================= */
+.grid { display: grid; gap: 18px; }
+.cols-2 { grid-template-columns: 1fr 1fr; }
+.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1200px) { .cols-4 { grid-template-columns: repeat(2, 1fr); } .cols-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 860px) { #app { grid-template-columns: 70px 1fr; } .sidebar .brand h1, .nav-item span, .nav-label, .user-box .who { display: none; } .cols-2, .cols-3 { grid-template-columns: 1fr; } }
 
-        .system-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(52, 199, 89, 0.1);
-            border: 1px solid rgba(52, 199, 89, 0.2);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--alert-success);
-        }
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 22px; backdrop-filter: blur(14px);
+  transition: border-color 0.2s;
+}
+.card:hover { border-color: var(--border-strong); }
+.card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.card-h h3 { font-size: 15.5px; font-weight: 700; }
+.card-h .sub { color: var(--text-faint); font-size: 12.5px; }
+.card-h .right { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background-color: var(--alert-success);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--alert-success);
-        }
+.stat { position: relative; overflow: hidden; }
+.stat .k { font-size: 32px; font-weight: 800; font-family: var(--mono); margin: 4px 0 2px; }
+.stat .t { color: var(--text-dim); font-size: 13px; font-weight: 500; }
+.stat .ico { position: absolute; right: 16px; top: 16px; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); }
+.stat .ico svg { width: 19px; height: 19px; }
+.stat.green .ico { background: rgba(52,211,153,0.13); }
+.stat.amber .ico { background: rgba(251,191,36,0.13); }
+.stat.red .ico { background: var(--danger-soft); }
 
-        .main-container {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            gap: 25px;
-            padding: 30px 40px;
-            max-width: 1800px;
-            margin: 0 auto;
-            width: 100%;
-        }
+.btn {
+  border: 1px solid var(--border); background: rgba(120,140,200,0.07); color: var(--text);
+  border-radius: 9px; padding: 8px 15px; font-family: var(--font); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.16s; display: inline-flex; align-items: center; gap: 7px;
+}
+.btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.btn.acc { background: linear-gradient(90deg, var(--accent), #818cf8); border: none; color: #fff; }
+.btn.acc:hover { filter: brightness(1.12); }
+.btn.danger { color: var(--danger); }
+.btn.danger:hover { border-color: var(--danger); background: var(--danger-soft); }
+.btn.sm { padding: 5px 11px; font-size: 12px; border-radius: 8px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .left-col {
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-        }
+select.inp, input.inp {
+  background: rgba(8,12,22,0.65); border: 1px solid var(--border); color: var(--text);
+  border-radius: 9px; padding: 8px 12px; font-family: var(--font); font-size: 13px; outline: none;
+}
+select.inp:focus, input.inp:focus { border-color: var(--accent); }
+select.inp option { background: var(--surface); }
 
-        .card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border-muted);
-            border-radius: 16px;
-            backdrop-filter: blur(16px);
-            padding: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            transition: border-color 0.3s ease;
-        }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.tbl td { padding: 9px 10px; border-bottom: 1px solid rgba(120,140,200,0.07); vertical-align: top; }
+.tbl tr:hover td { background: rgba(120,140,200,0.05); }
+.mono { font-family: var(--mono); font-size: 12px; }
 
-        .card:hover {
-            border-color: var(--border-glow);
-        }
+.tag { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--border); color: var(--text-dim); }
+.tag.blue { color: #a5b4fc; border-color: rgba(99,102,241,0.4); background: var(--accent-soft); }
+.tag.green { color: var(--success); border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.1); }
+.tag.amber { color: var(--warning); border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.1); }
+.tag.red { color: var(--danger); border-color: rgba(248,113,113,0.35); background: var(--danger-soft); }
 
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 4px solid var(--primary);
-            padding-left: 12px;
-        }
+.empty { text-align: center; color: var(--text-faint); padding: 42px 10px; font-size: 13.5px; }
+.empty svg { width: 40px; height: 40px; margin-bottom: 10px; opacity: 0.4; }
+.skel { background: linear-gradient(90deg, rgba(120,140,200,0.07), rgba(120,140,200,0.16), rgba(120,140,200,0.07)); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 8px; height: 15px; margin: 9px 0; }
+@keyframes shimmer { to { background-position: -200% 0; } }
 
-        /* Drag & Drop Upload Zone */
-        .upload-zone {
-            border: 2px dashed rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-            padding: 40px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.02);
-            position: relative;
-        }
+/* upload zone */
+.dropzone {
+  border: 2px dashed var(--border-strong); border-radius: var(--radius); padding: 42px 20px;
+  text-align: center; cursor: pointer; transition: all 0.2s; color: var(--text-dim);
+}
+.dropzone:hover, .dropzone.over { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+.dropzone .big { font-size: 34px; margin-bottom: 8px; }
+.dropzone input { display: none; }
+.progress-wrap { display: none; margin-top: 14px; }
+.progress-bar { height: 8px; border-radius: 4px; background: rgba(120,140,200,0.12); overflow: hidden; }
+.progress-fill { height: 100%; width: 0%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.3s; }
+.progress-meta { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-dim); margin-top: 7px; }
 
-        .upload-zone:hover, .upload-zone.dragover {
-            border-color: var(--primary);
-            background: rgba(0, 150, 255, 0.04);
-            box-shadow: inset 0 0 20px rgba(0, 150, 255, 0.05);
-        }
+.video-shell { position: relative; border-radius: 12px; overflow: hidden; background: #000; display: none; }
+.video-shell video, .video-shell img.feed { width: 100%; display: block; }
+#zone-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; z-index: 5; display: none; }
 
-        .upload-icon {
-            font-size: 40px;
-            margin-bottom: 15px;
-            color: var(--text-muted);
-        }
+/* camera grid */
+.cam-grid { display: grid; gap: 12px; }
+.cam-tile { position: relative; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #05070d; cursor: pointer; transition: all 0.2s; min-height: 120px; }
+.cam-tile:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.cam-tile img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
+.cam-tile .lbl { position: absolute; left: 0; right: 0; bottom: 0; padding: 7px 11px; font-size: 12px; display: flex; align-items: center; gap: 7px; background: linear-gradient(transparent, rgba(0,0,0,0.85)); }
+.cam-tile .lbl .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 6px var(--success); animation: pulse 1.6s infinite; }
+.cam-tile .off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 12.5px; }
 
-        .upload-text {
-            font-size: 15px;
-            color: var(--text-muted);
-            margin-bottom: 10px;
-        }
+/* incident / notification items */
+.feed-item { border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; margin-bottom: 10px; background: rgba(10,15,28,0.5); transition: border-color 0.2s; animation: fadein 0.3s; }
+.feed-item:hover { border-color: var(--border-strong); }
+.feed-item.alert { border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.05); }
+.feed-item .row1 { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.feed-item .row1 b { font-size: 13.5px; }
+.feed-item .when { margin-left: auto; color: var(--text-faint); font-size: 11.5px; font-family: var(--mono); white-space: nowrap; }
+.feed-item .msg { color: var(--text-dim); font-size: 13px; margin-top: 5px; line-height: 1.45; }
+.feed-item .meta { color: var(--text-faint); font-size: 12px; margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+.feed-item img.snap { display: none; width: 100%; border-radius: 9px; margin-top: 10px; border: 1px solid var(--border); }
+.unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); box-shadow: 0 0 7px var(--accent-2); flex: none; }
 
-        .upload-text strong {
-            color: var(--primary);
-        }
+/* search */
+.search-bar { display: flex; gap: 10px; }
+.search-bar input { flex: 1; background: rgba(8,12,22,0.65); border: 1px solid var(--border); border-radius: 11px; padding: 13px 16px; color: var(--text); font-family: var(--font); font-size: 14.5px; outline: none; transition: all 0.2s; }
+.search-bar input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,0.16); }
+.sugg { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.result-card { display: flex; align-items: center; gap: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 13px 16px; margin-bottom: 10px; background: rgba(10,15,28,0.5); transition: all 0.18s; }
+.result-card:hover { border-color: var(--accent); transform: translateX(3px); }
+.result-num { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: #a5b4fc; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 13px; font-weight: 600; flex: none; }
+.result-main { flex: 1; min-width: 0; }
+.result-main b { font-size: 13.5px; display: block; }
+.result-main .d { color: var(--text-faint); font-size: 12px; margin-top: 3px; }
 
-        #file-input {
-            display: none;
-        }
+/* zones */
+.zone-row { display: flex; gap: 16px; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: rgba(10,15,28,0.5); flex-wrap: wrap; align-items: center; }
+.zone-poly { width: 120px; height: 68px; flex: none; border-radius: 8px; background: rgba(8,12,22,0.8); border: 1px solid var(--border); }
+.zone-info { flex: 1; min-width: 200px; }
+.zone-ctrl { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.zone-ctrl label { font-size: 12.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; }
+input[type="time"].inp { padding: 6px 8px; }
+input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+.daychip { padding: 4px 8px; border-radius: 7px; border: 1px solid var(--border); font-size: 11px; cursor: pointer; color: var(--text-faint); user-select: none; }
+.daychip.on { color: #fff; background: var(--accent-soft); border-color: var(--accent); }
 
-        .progress-container {
-            display: none;
-            margin-top: 20px;
-        }
+/* modal */
+.modal { display: none; position: fixed; inset: 0; z-index: 900; background: rgba(4,6,12,0.8); backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 26px; }
+.modal.on { display: flex; }
+.modal-box { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 18px; max-width: 980px; width: 100%; max-height: 92vh; overflow-y: auto; padding: 24px; animation: rise 0.3s cubic-bezier(0.2,0.8,0.2,1); box-shadow: var(--shadow); }
+.modal-box.slim { max-width: 440px; }
+.modal-h { display: flex; align-items: center; margin-bottom: 14px; }
+.modal-h h3 { font-size: 17px; }
+.modal-x { margin-left: auto; background: none; border: 1px solid var(--border); color: var(--text-dim); width: 32px; height: 32px; border-radius: 9px; cursor: pointer; font-size: 15px; transition: all 0.18s; }
+.modal-x:hover { color: var(--danger); border-color: var(--danger); }
+.clip-shell { position: relative; border-radius: 12px; overflow: hidden; background: #000; }
+.clip-shell video { width: 100%; display: block; }
+#clip-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.traj-step { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(120,140,200,0.08); font-size: 12.5px; }
+.traj-step .n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: #a5b4fc; display: flex; align-items: center; justify-content: center; font-size: 11px; font-family: var(--mono); flex: none; }
 
-        .progress-bar {
-            height: 6px;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 3px;
-            overflow: hidden;
-        }
+/* toasts */
+#toasts { position: fixed; right: 22px; top: 20px; z-index: 1200; display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+.toast { background: var(--surface-2); border: 1px solid var(--border-strong); border-left: 3px solid var(--accent); border-radius: 12px; padding: 13px 16px; box-shadow: var(--shadow); animation: slidein 0.3s cubic-bezier(0.2,0.8,0.2,1); font-size: 13.5px; }
+.toast.ok { border-left-color: var(--success); }
+.toast.err { border-left-color: var(--danger); }
+.toast.warn { border-left-color: var(--warning); }
+.toast b { display: block; margin-bottom: 2px; font-size: 13.5px; }
+.toast .m { color: var(--text-dim); font-size: 12.5px; }
+@keyframes slidein { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+.toast.bye { animation: slideout 0.3s forwards; }
+@keyframes slideout { to { opacity: 0; transform: translateX(30px); } }
 
-        .progress-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(to right, var(--primary), var(--secondary));
-            border-radius: 3px;
-            transition: width 0.2s ease;
-        }
-
-        .progress-text {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-top: 8px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        /* Video Player Area */
-        .video-container {
-            display: none;
-            position: relative;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border-muted);
-            background: #000;
-            width: 100%;
-            aspect-ratio: 16/9;
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            display: block;
-            object-fit: contain;
-        }
-
-        /* Realtime Alert Stream Panel */
-        .alert-stream-container {
-            display: flex;
-            flex-direction: column;
-            height: 650px;
-        }
-
-        .stream-items {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            padding-right: 5px;
-        }
-
-        .stream-items::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .stream-items::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-        }
-
-        .alert-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-muted);
-            border-radius: 10px;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .alert-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: var(--primary);
-        }
-
-        .alert-item.fall::before {
-            background: var(--alert-danger);
-        }
-
-        .alert-item.violation::before {
-            background: var(--alert-warning);
-        }
-
-        .alert-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .alert-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-        }
-
-        .alert-badge.fall {
-            background: rgba(255, 59, 48, 0.15);
-            color: var(--alert-danger);
-            border: 1px solid rgba(255, 59, 48, 0.3);
-        }
-
-        .alert-badge.running {
-            background: rgba(0, 150, 255, 0.15);
-            color: var(--primary);
-            border: 1px solid rgba(0, 150, 255, 0.3);
-        }
-
-        .alert-badge.violation {
-            background: rgba(255, 204, 0, 0.15);
-            color: var(--alert-warning);
-            border: 1px solid rgba(255, 204, 0, 0.3);
-        }
-
-        .alert-time {
-            font-size: 12px;
-            color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .alert-desc {
-            font-size: 14px;
-            color: var(--text-main);
-        }
-
-        /* Search Section */
-        .search-container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .search-bar {
-            position: relative;
-            display: flex;
-            gap: 12px;
-        }
-
-        .search-input {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-muted);
-            padding: 14px 20px;
-            border-radius: 10px;
-            color: var(--text-main);
-            font-size: 15px;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-
-        .search-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 15px rgba(0, 150, 255, 0.15);
-        }
-
-        .search-btn {
-            background: linear-gradient(135deg, var(--primary), #0076c8);
-            border: none;
-            color: white;
-            padding: 0 25px;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s ease;
-        }
-
-        .search-btn:hover {
-            opacity: 0.9;
-        }
-
-        .search-results {
-            margin-top: 10px;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 12px;
-        }
-
-        .result-item {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-muted);
-            border-radius: 8px;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .result-meta {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .result-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--primary);
-            text-transform: capitalize;
-        }
-
-        .result-details {
-            font-size: 13px;
-            color: var(--text-muted);
-            display: flex;
-            gap: 15px;
-        }
-
-        .result-play-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-muted);
-            color: var(--text-main);
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .result-play-btn:hover {
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-
-        /* Custom Login Overlay */
-        .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(10, 15, 30, 0.95);
-            backdrop-filter: blur(10px);
-            z-index: 9999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: opacity 0.3s ease;
-        }
-        .login-box {
-            background: var(--card-bg);
-            border: 1px solid var(--border-muted);
-            border-radius: 16px;
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-            text-align: center;
-        }
-        .login-logo {
-            font-size: 24px;
-            font-weight: 800;
-            color: var(--primary);
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-        }
-        .login-input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-muted);
-            padding: 14px;
-            border-radius: 8px;
-            color: var(--text-main);
-            font-size: 15px;
-            margin-bottom: 20px;
-            outline: none;
-            box-sizing: border-box;
-        }
-        .login-input:focus {
-            border-color: var(--primary);
-        }
-        .login-btn {
-            width: 100%;
-            background: linear-gradient(135deg, var(--primary), #0076c8);
-            border: none;
-            color: white;
-            padding: 14px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .login-error {
-            color: #ff4d4d;
-            font-size: 14px;
-            margin-top: 15px;
-            display: none;
-        }
-    </style>
+pre.report { font-family: var(--mono); font-size: 12px; line-height: 1.65; color: var(--text-dim); white-space: pre-wrap; background: rgba(8,12,22,0.6); border: 1px solid var(--border); border-radius: 10px; padding: 16px; max-height: 420px; overflow-y: auto; }
+.kv { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(120,140,200,0.08); font-size: 13px; }
+.kv span { color: var(--text-dim); }
+.kv b { text-align: right; }
+</style>
 </head>
 <body>
-    <!-- Custom Login Overlay -->
-    <div class="login-overlay" id="login-overlay">
-        <div class="login-box">
-            <div class="login-logo">
-                <div class="logo-icon" style="width: 35px; height: 35px; line-height: 35px; font-size: 18px;">S</div>
-                <span>SENTINEL AI LOGIN</span>
-            </div>
-            <input type="text" class="login-input" id="login-username" placeholder="Username" autocomplete="off">
-            <input type="password" class="login-input" id="login-password" placeholder="Password">
-            <button class="login-btn" id="login-btn-submit">Sign In</button>
-            <div class="login-error" id="login-error-msg">Incorrect username or password.</div>
-        </div>
+
+<!-- ============================= LOGIN ============================= -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2L4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z"/><circle cx="12" cy="11" r="3"/></svg></div>
+      <h1>SENTINEL <span>AI</span></h1>
+    </div>
+    <div class="login-sub">Campus surveillance &amp; analytics platform. Sign in to continue.</div>
+    <div id="login-error"></div>
+    <div class="field"><label>Username</label><input id="login-user" autocomplete="username" placeholder="e.g. developer"></div>
+    <div class="field"><label>Password</label><input id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <button class="btn-primary" id="login-btn">Sign in</button>
+    <div class="demo-row">
+      <p>Demo accounts</p>
+      <div class="demo-chips">
+        <button class="chip" data-u="developer" data-p="dev@sentinel">Developer</button>
+        <button class="chip" data-u="techteam" data-p="tech@sentinel">Admin (Tech)</button>
+        <button class="chip" data-u="principal" data-p="principal@sentinel">Principal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= APP ============================= -->
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2L4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z"/><circle cx="12" cy="11" r="3"/></svg></div>
+      <h1>SENTINEL <span>AI</span></h1>
+    </div>
+    <div id="nav"></div>
+    <div class="sidebar-foot">
+      <div class="user-box">
+        <div class="avatar" id="ub-avatar">?</div>
+        <div class="who"><b id="ub-name">—</b><span id="ub-role">—</span></div>
+        <button id="logout-btn" title="Sign out"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h2 id="page-title">Overview</h2>
+      <span class="crumb" id="page-crumb"></span>
+      <div class="ws-pill" id="ws-pill"><span class="ws-dot"></span><span id="ws-text">Connecting…</span></div>
+      <div class="lic-pill" id="lic-pill" style="display:none;"></div>
     </div>
 
-    <header>
-        <div class="logo-container">
-            <div class="logo-icon">S</div>
-            <div class="logo-text">SENTINEL AI CCTV</div>
+    <div class="content">
+
+      <!-- ================= OVERVIEW ================= -->
+      <section class="view" id="view-overview">
+        <div class="grid cols-4" style="margin-bottom: 18px;">
+          <div class="card stat"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/><circle cx="9" cy="7" r="4"/></svg></div><div class="t">Unique people (headcount)</div><div class="k" id="st-headcount">—</div></div>
+          <div class="card stat green"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div><div class="t">Logged events</div><div class="k" id="st-events">—</div></div>
+          <div class="card stat amber"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div><div class="t">Security alerts</div><div class="k" id="st-alerts">—</div></div>
+          <div class="card stat"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div><div class="t">Cameras registered</div><div class="k" id="st-cams">—</div></div>
         </div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <div class="system-status" id="role-badge" style="display: none; color: var(--primary); background: rgba(0,150,255,0.1); border-color: rgba(0,150,255,0.25);">
-                <span class="status-dot" style="background: var(--primary); box-shadow: 0 0 8px var(--primary);"></span>
-                <span></span>
-            </div>
-            <div class="system-status">
-                <div class="status-dot"></div>
-                SYSTEM SECURE (Active)
-            </div>
-            <button id="logout-btn" class="system-status" style="cursor: pointer; color: var(--text-muted); background: rgba(255,255,255,0.04); border-color: var(--border-muted);">Sign out</button>
-        </div>
-    </header>
-
-    <div class="main-container">
-        <div class="left-col">
-            <!-- Upload & Playback Card (upload = tech/dev; playback also for principal footage jumps) -->
-            <div class="card" data-roles="tech,principal">
-                <div class="card-title">Live Video Analytics</div>
-                
-                <div class="upload-zone" id="upload-zone">
-                    <div class="upload-icon">📤</div>
-                    <div class="upload-text">Drag and drop your video clip here, or <strong>browse</strong></div>
-                    <input type="file" id="file-input" accept="video/*">
-                </div>
-
-                <div class="progress-container" id="progress-container">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progress-fill"></div>
-                    </div>
-                    <div class="progress-text">
-                        <span id="progress-status">Uploading video...</span>
-                        <span id="progress-percent">0%</span>
-                    </div>
-                </div>
-
-                <div class="video-container" id="video-container" style="position: relative;">
-                    <video id="video-player" controls preload="auto"></video>
-                    <canvas id="zone-canvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; z-index: 10;"></canvas>
-                </div>
-                <div class="video-controls-row" id="zone-controls" style="display: none; margin-top: 15px; justify-content: flex-end; gap: 10px;">
-                    <button class="result-play-btn" id="btn-edit-zone" style="background: rgba(0, 150, 255, 0.1); border-color: var(--primary); color: var(--primary);">Configure Detection Zone</button>
-                    <button class="result-play-btn" id="btn-save-zone" style="display: none; background: var(--primary); border-color: var(--primary); color: white;">Save Zone & Reprocess</button>
-                    <button class="result-play-btn" id="btn-cancel-zone" style="display: none; background: rgba(255, 255, 255, 0.05);">Cancel</button>
-                </div>
-            </div>
-
-            <!-- Natural Language Search Card -->
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="card-h"><h3>🛰️ Incident Feed</h3><span class="sub">live via WebSocket</span><div class="right"><button class="btn sm" id="ov-feed-refresh">Refresh</button></div></div>
+            <div id="ov-feed" style="max-height: 520px; overflow-y: auto;"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:18px;">
             <div class="card">
-                <div class="card-title">AI Intent Search Console</div>
-                <div class="search-container">
-                    <div class="search-bar">
-                        <input type="text" class="search-input" id="search-query" placeholder="Ask something (e.g. 'Show falls', 'Is anyone running', 'Find uniform violations')">
-                        <button class="search-btn" id="search-btn">Search</button>
-                    </div>
-                    <div class="search-results" id="search-results-list">
-                        <!-- Query results populate here -->
-                    </div>
-                </div>
+              <div class="card-h"><h3>🔀 Zone Flow</h3><span class="sub">entries / exits / dwell per zone</span></div>
+              <div id="ov-flow"></div>
             </div>
+            <div class="card">
+              <div class="card-h"><h3>📋 Security Report</h3><span class="sub">aggregated stats</span></div>
+              <div id="ov-stats"><div class="skel"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:85%"></div></div>
+            </div>
+          </div>
         </div>
+      </section>
 
-        <!-- Right Side Alerts Stream -->
-        <div class="card alert-stream-container">
-            <div class="card-title">Security Incident Feed <span id="live-dot" style="display:none; font-size: 11px; color: var(--alert-success);">● LIVE</span></div>
-            <div class="stream-items" id="alerts-list">
-                <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 14px;">
-                    No incidents logged. Upload a video clip to start.
-                </div>
+      <!-- ================= LIVE CAMERAS ================= -->
+      <section class="view" id="view-cameras">
+        <div class="card" style="margin-bottom: 18px;">
+          <div class="card-h">
+            <h3>🎥 Live Camera Grid</h3><span class="sub">grouped by floor / location</span>
+            <div class="right">
+              <div id="floor-chips" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+              <select class="inp" id="grid-layout"><option value="1">1 tile</option><option value="4" selected>4 tiles</option><option value="8">8 tiles</option><option value="all">All</option></select>
+              <button class="btn acc sm" id="grid-start">▶ Start streams</button>
+              <button class="btn sm" id="grid-stop">■ Stop</button>
             </div>
+          </div>
+          <div class="sub" id="grid-info" style="color:var(--text-faint); font-size:12.5px; margin-bottom:12px;">Pick a floor and press Start — streams load on demand to respect the browser connection limit.</div>
+          <div class="cam-grid" id="cam-grid"></div>
         </div>
-    </div>
-
-    <!-- Role-based panels -->
-    <div class="main-container" style="grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); padding-top: 0;">
-
-        <!-- Principal: notification inbox -->
-        <div class="card" data-roles="principal" style="display:none;">
-            <div class="card-title">🔔 Principal Notifications
-                <button class="result-play-btn" id="notif-mark-read" style="float:right; font-size: 12px;">Mark all read</button>
-            </div>
-            <div class="stream-items" id="notifications-list" style="max-height: 420px; overflow-y: auto;">
-                <div style="color: var(--text-muted); font-size: 14px;">Loading…</div>
-            </div>
+        <div class="card" style="margin-top:18px;">
+          <div class="card-h"><h3>🔗 Cross-camera Hand-off</h3><span class="sub">topology graph + identities tracked across cameras</span><div class="right"><button class="btn sm" id="xcam-refresh">Refresh</button></div></div>
+          <div id="xcam-body"><div class="skel"></div></div>
         </div>
+      </section>
 
-        <!-- Principal: headcount / reports -->
-        <div class="card" data-roles="principal" style="display:none;">
-            <div class="card-title">👥 Campus Headcount Report
-                <select id="report-period" style="float:right; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 6px; padding: 4px 8px;">
-                    <option value="day">Last 24 hours</option>
-                    <option value="week">Last 7 days</option>
-                    <option value="month">Last 30 days</option>
-                    <option value="all" selected>All time</option>
+      <!-- ================= VIDEO ANALYTICS ================= -->
+      <section class="view" id="view-analytics">
+        <div class="grid cols-2">
+          <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-h">
+              <h3>🎬 Live Video Analytics</h3><span class="sub" id="ana-sub">upload footage → AI pipeline → annotated playback</span>
+              <div class="right" id="ana-live-ctl" style="display:none;">
+                <select class="inp" id="ana-cam-select"></select>
+                <button class="btn sm" id="ana-cam-go">View feed</button>
+              </div>
+            </div>
+            <div class="dropzone" id="dropzone">
+              <div class="big">📤</div>
+              <div><b>Drag &amp; drop</b> a video clip here, or click to browse</div>
+              <div style="font-size:12px; color:var(--text-faint); margin-top:6px;">MP4 / AVI — processed by the detection &amp; tracking pipeline</div>
+              <input type="file" id="file-input" accept="video/*">
+            </div>
+            <div class="progress-wrap" id="progress-wrap">
+              <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+              <div class="progress-meta"><span id="progress-status">Uploading…</span><span id="progress-pct">0%</span></div>
+            </div>
+            <div class="video-shell" id="video-shell" style="margin-top:14px;">
+              <video id="video-player" controls preload="auto"></video>
+              <canvas id="zone-canvas"></canvas>
+            </div>
+            <div id="playback-row" style="display:none; margin-top:13px; gap:9px; align-items:center; flex-wrap:wrap;">
+              <span style="font-size:12.5px; color:var(--text-faint);">Playback:</span>
+              <button class="btn sm acc" id="btn-annotated">Annotated (boxes &amp; IDs)</button>
+              <button class="btn sm" id="btn-original">Original video</button>
+              <span style="flex:1"></span>
+              <button class="btn sm" id="btn-edit-zone">✏️ Draw polygon zone</button>
+              <button class="btn sm" id="btn-draw-line">📏 Counting line</button>
+              <button class="btn sm acc" id="btn-save-zone" style="display:none;">💾 Save &amp; reprocess</button>
+              <button class="btn sm acc" id="btn-save-line" style="display:none;">💾 Save line</button>
+              <button class="btn sm" id="btn-cancel-zone" style="display:none;">Cancel</button>
+            </div>
+            <div id="zone-hint" style="display:none; margin-top:9px; font-size:12.5px; color:var(--accent-2);">Click to drop vertices · click the <b>green dot</b> to close the polygon · minimum 3 points.</div>
+          </div>
+          <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-h"><h3>🧾 Events from this footage</h3><span class="sub">click any row to jump to its clip</span></div>
+            <div id="ana-events"><div class="empty">Process a video to see its logged events here.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= AI SEARCH ================= -->
+      <section class="view" id="view-search">
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-h"><h3>🧠 AI Intent Search</h3><span class="sub">natural language → filtered events with one-click clips</span></div>
+          <div class="search-bar">
+            <input id="search-input" placeholder='Try "show me falls", "people running", "GID 12", "camera 1" — or press Enter empty for every event'>
+            <button class="btn acc" id="search-btn">Search</button>
+          </div>
+          <div class="sugg">
+            <button class="chip" data-q="">📜 All events</button>
+            <button class="chip" data-q="show me falls">🤕 Falls</button>
+            <button class="chip" data-q="people running">🏃 Running</button>
+            <button class="chip" data-q="uniform violations">👔 Dress code</button>
+            <button class="chip" data-q="cars">🚗 Vehicles</button>
+            <button class="chip" id="gid-chip">🆔 Search by GID…</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3 id="search-title">Results</h3><span class="sub" id="search-intent"></span></div>
+          <div id="search-results"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><br>Ask the AI something about your footage.</div></div>
+        </div>
+      </section>
+
+      <!-- ================= NOTIFICATIONS ================= -->
+      <section class="view" id="view-notifications">
+        <div class="card">
+          <div class="card-h">
+            <h3>🔔 Notifications</h3><span class="sub">restricted zones · after-hours entries · falls</span>
+            <div class="right"><button class="btn sm" id="notif-refresh">Refresh</button><button class="btn sm acc" id="notif-read">Mark all read</button></div>
+          </div>
+          <div id="notif-list" style="max-height: 640px; overflow-y:auto;"></div>
+        </div>
+      </section>
+
+      <!-- ================= REPORTS ================= -->
+      <section class="view" id="view-reports">
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="card-h">
+              <h3>👥 Headcount Summary</h3>
+              <div class="right"><select class="inp" id="sum-period"><option value="day">Today</option><option value="week">This week</option><option value="month">This month</option><option value="all" selected>All time</option></select></div>
+            </div>
+            <div id="sum-body"><div class="skel"></div><div class="skel" style="width:75%"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h">
+              <h3>📊 Periodic Report</h3><span class="sub">auto-generated summaries</span>
+              <div class="right"><select class="inp" id="per-period"><option value="daily" selected>Daily</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>
+            </div>
+            <div id="per-body"><div class="skel"></div><div class="skel" style="width:75%"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>📈 Headcount over time</h3><span class="sub">unique people by hour of day</span></div>
+            <div id="chart-headcount"><div class="skel"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>🔀 Zone flow</h3><span class="sub">entries per zone (hover for exits &amp; dwell)</span></div>
+            <div id="chart-zoneflow"><div class="skel"></div></div>
+          </div>
+          <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-h"><h3>🚪 Turnstile Counts</h3><span class="sub">directional line-crossing tallies</span><div class="right"><button class="btn sm" id="lc-refresh">Refresh</button></div></div>
+            <div id="line-counts"><div class="skel"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= HEATMAP ================= -->
+      <section class="view" id="view-heatmap">
+        <div class="card">
+          <div class="card-h">
+            <h3>🔥 Spatial Heatmap</h3><span class="sub">where people spend the most time</span>
+            <div class="right">
+              <select class="inp" id="heat-portion"><option value="all" selected>Whole video</option><option value="first">First half</option><option value="second">Second half</option></select>
+              <button class="btn sm" id="heat-refresh">Refresh</button>
+            </div>
+          </div>
+          <div style="position:relative; border-radius:12px; overflow:hidden; background:#05070d;">
+            <canvas id="heat-canvas" style="width:100%; display:block;"></canvas>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:12px; flex-wrap:wrap;">
+            <span class="sub" id="heat-info" style="color:var(--text-faint); font-size:12.5px;">Loading…</span>
+            <span style="flex:1"></span>
+            <span class="sub" style="font-size:11.5px; color:var(--text-faint);">low</span>
+            <span style="width:140px; height:10px; border-radius:5px; background:linear-gradient(90deg, rgba(30,60,190,0.7), rgba(30,190,160,0.8), rgba(240,210,60,0.85), rgba(240,60,60,0.9));"></span>
+            <span class="sub" style="font-size:11.5px; color:var(--text-faint);">high</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ZONES & RULES ================= -->
+      <section class="view" id="view-zones">
+        <div class="grid cols-2">
+          <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-h"><h3>🛡️ Zones &amp; Alert Rules</h3><span class="sub">restricted areas · allowed hours · school days</span><div class="right"><button class="btn sm" id="zones-refresh">Refresh</button></div></div>
+            <div id="zones-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>📅 School Holiday Calendar</h3><span class="sub">no after-hours alerts on holidays</span></div>
+            <div style="display:flex; gap:9px; margin-bottom:14px;">
+              <input type="date" class="inp" id="holiday-date" style="flex:1;">
+              <button class="btn acc sm" id="holiday-add">Add holiday</button>
+            </div>
+            <div id="holiday-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>📏 Counting Lines</h3><span class="sub">tripwires for entry/exit counts</span><div class="right"><button class="btn sm" id="lines-refresh">Refresh</button></div></div>
+            <div style="font-size:12.5px; color:var(--text-faint); margin-bottom:12px;">Draw a new tripwire on a processed clip in <b>Video Analytics → 📏 Counting line</b>. Counts populate on the next reprocess.</div>
+            <div id="lines-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= AUDIT ================= -->
+      <section class="view" id="view-audit">
+        <div class="card">
+          <div class="card-h">
+            <h3>🧾 Audit Log</h3><span class="sub">who viewed what, when — append-only</span>
+            <div class="right">
+              <input class="inp" id="audit-user" placeholder="filter username" style="width:150px;">
+              <input class="inp" id="audit-action" placeholder="filter action" style="width:150px;">
+              <button class="btn sm" id="audit-refresh">Apply</button>
+              <button class="btn sm danger" id="audit-clear" style="display:none;">🗑 Clear log</button>
+            </div>
+          </div>
+          <div id="audit-body" style="max-height: 620px; overflow-y:auto;"></div>
+        </div>
+      </section>
+
+      <!-- ================= LICENSE ================= -->
+      <section class="view" id="view-license">
+        <div class="grid cols-2">
+          <!-- Current license state -->
+          <div class="card">
+            <div class="card-h"><h3>🔑 Current License</h3><span class="sub">what this deployment is running on</span></div>
+            <div id="lic-current"><div class="skel"></div><div class="skel" style="width:70%"></div></div>
+          </div>
+          <!-- Mint / issue -->
+          <div class="card">
+            <div class="card-h"><h3>🪪 Issue a License</h3><span class="sub">allocate cameras, features & term to a client</span></div>
+            <div id="lic-signing-warn" class="empty" style="display:none; color:var(--warning); margin-bottom:12px;"></div>
+
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+              <button class="btn sm" id="lic-preset-trial" title="20 cameras · 30 days · all features">Trial preset</button>
+              <button class="btn sm" id="lic-preset-full" title="10000 cameras · 1 year · all features">Full preset</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div class="field"><label>Client ID</label><input class="inp" id="lic-client" placeholder="e.g. ADIVA_SCHOOL"></div>
+              <div class="field"><label>Max cameras</label><input class="inp" id="lic-cameras" type="number" min="1" value="10"></div>
+              <div class="field"><label>Expiry (YYYY-MM-DD)</label><input class="inp" id="lic-expiry" type="date"></div>
+              <div class="field"><label>Hardware lock</label>
+                <select class="inp" id="lic-hwmode">
+                  <option value="ANY">ANY — runs on any machine</option>
+                  <option value="machine">Lock to THIS machine</option>
+                  <option value="custom">Lock to a fingerprint…</option>
                 </select>
+              </div>
             </div>
-            <div id="report-body" style="font-size: 14px; line-height: 1.9; color: var(--text-muted);">Loading…</div>
-        </div>
-
-        <!-- Tech team: zone alert rules -->
-        <div class="card" data-roles="tech" style="display:none;">
-            <div class="card-title">🛡️ Zone Alert Rules <span style="font-size:12px; color: var(--text-muted);">(restricted / school hours)</span></div>
-            <div id="zone-rules-list" style="font-size: 14px;">Loading…</div>
-        </div>
-
-        <!-- Tech team: school holidays -->
-        <div class="card" data-roles="tech" style="display:none;">
-            <div class="card-title">📅 School Holiday Calendar</div>
-            <div style="display:flex; gap: 10px; margin-bottom: 14px;">
-                <input type="date" id="holiday-date" style="flex:1; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 8px; padding: 8px 12px;">
-                <button class="search-btn" id="holiday-add">Add Holiday</button>
+            <div class="field" id="lic-hw-custom-wrap" style="display:none; margin-top:2px;">
+              <label>Client fingerprint</label>
+              <input class="inp mono" id="lic-hw-custom" placeholder="16-char fingerprint from the client's machine">
             </div>
-            <div id="holidays-list" style="font-size: 14px; color: var(--text-muted);">Loading…</div>
+
+            <div style="margin:14px 0 8px; font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">Features allocated</div>
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+              <button class="btn sm" id="lic-feat-all" type="button">Select all</button>
+              <button class="btn sm" id="lic-feat-none" type="button">Clear</button>
+            </div>
+            <div id="lic-features" style="display:flex; flex-wrap:wrap; gap:8px 14px;"></div>
+
+            <div style="display:flex; gap:10px; margin-top:18px; align-items:center;">
+              <button class="btn" id="lic-generate">Generate key</button>
+              <button class="btn acc" id="lic-generate-apply" title="Generate and activate immediately on this server">Generate &amp; activate</button>
+            </div>
+
+            <div id="lic-result" style="display:none; margin-top:16px;">
+              <div style="font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Generated key</div>
+              <textarea class="inp mono" id="lic-key-out" rows="4" readonly style="word-break:break-all; resize:vertical;"></textarea>
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <button class="btn sm" id="lic-copy">Copy key</button>
+                <button class="btn sm acc" id="lic-apply-generated" style="display:none;">Activate this key</button>
+              </div>
+              <div id="lic-result-info" style="margin-top:10px;"></div>
+            </div>
+          </div>
         </div>
 
-        <!-- Developer: license governance -->
-        <div class="card" data-roles="developer" style="display:none;">
-            <div class="card-title">🔑 License &amp; Camera Governance <span style="font-size:12px; color: var(--text-muted);">(developer only)</span></div>
-            <div id="license-body" style="font-size: 14px; line-height: 2; color: var(--text-muted);">Loading…</div>
+        <!-- Activate an existing key -->
+        <div class="card" style="margin-top:16px;">
+          <div class="card-h"><h3>📥 Activate an Existing Key</h3><span class="sub">paste a key issued elsewhere — it's signature-verified before it replaces license.key</span></div>
+          <textarea class="inp mono" id="lic-paste" rows="3" placeholder="paste license key…" style="word-break:break-all;"></textarea>
+          <button class="btn acc" id="lic-paste-apply" style="margin-top:10px;">Verify &amp; activate</button>
         </div>
+      </section>
+
+      <!-- ================= ADMIN ================= -->
+      <section class="view" id="view-admin">
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="card-h"><h3>🔑 License &amp; Camera Governance</h3></div>
+            <div id="license-body"><div class="skel"></div><div class="skel" style="width:70%"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>👤 User Management</h3><span class="sub">create or update dashboard accounts</span></div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:14px;">
+              <input class="inp" id="nu-user" placeholder="username">
+              <input class="inp" id="nu-pass" type="password" placeholder="password">
+              <select class="inp" id="nu-role"><option value="principal">principal</option><option value="tech">tech</option><option value="developer">developer</option></select>
+              <button class="btn acc" id="nu-save">Save user</button>
+            </div>
+            <div id="users-list"></div>
+          </div>
+        </div>
+      </section>
+
     </div>
+  </div>
+</div>
 
-    <script>
-        const loginOverlay = document.getElementById('login-overlay');
-        const loginUsernameInput = document.getElementById('login-username');
-        const loginPasswordInput = document.getElementById('login-password');
-        const loginBtnSubmit = document.getElementById('login-btn-submit');
-        const loginErrorMsg = document.getElementById('login-error-msg');
+<!-- ============================= CLIP MODAL ============================= -->
+<div class="modal" id="clip-modal">
+  <div class="modal-box">
+    <div class="modal-h">
+      <h3 id="clip-title">Clip</h3>
+      <div style="margin-left:18px; display:flex; gap:6px;">
+        <button class="btn sm acc" id="clip-mode-clip" title="Play exactly the event, nothing more">▶ Clip</button>
+        <button class="btn sm" id="clip-mode-full" title="Full recording; box only during the event">⏵ Full clip</button>
+      </div>
+      <button class="modal-x" id="clip-close">✕</button>
+    </div>
+    <div class="clip-shell">
+      <video id="clip-video" controls preload="auto"></video>
+      <canvas id="clip-canvas"></canvas>
+    </div>
+    <div class="grid cols-2" style="margin-top:16px;">
+      <div>
+        <div class="card-h" style="margin-bottom:8px;"><h3 style="font-size:14px;">Why this was logged</h3></div>
+        <div id="clip-meta" style="font-size:13px; color:var(--text-dim); line-height:1.7;"></div>
+      </div>
+      <div>
+        <div class="card-h" style="margin-bottom:8px;"><h3 style="font-size:14px;">Subject trajectory</h3><span class="sub" id="traj-sub"></span></div>
+        <div id="clip-traj" style="max-height:220px; overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-        const uploadZone = document.getElementById('upload-zone');
-        const fileInput = document.getElementById('file-input');
-        const progressContainer = document.getElementById('progress-container');
-        const progressFill = document.getElementById('progress-fill');
-        const progressPercent = document.getElementById('progress-percent');
-        const progressStatus = document.getElementById('progress-status');
-        const videoContainer = document.getElementById('video-container');
-        const videoPlayer = document.getElementById('video-player');
-        const alertsList = document.getElementById('alerts-list');
-        const searchInput = document.getElementById('search-query');
-        const searchBtn = document.getElementById('search-btn');
-        const searchResultsList = document.getElementById('search-results-list');
+<!-- ============================= CONFIRM MODAL ============================= -->
+<div class="modal" id="confirm-modal">
+  <div class="modal-box slim">
+    <div class="modal-h"><h3 id="confirm-title">Are you sure?</h3></div>
+    <div id="confirm-msg" style="color:var(--text-dim); font-size:13.5px; margin-bottom:18px;"></div>
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn" id="confirm-no">Cancel</button>
+      <button class="btn danger" id="confirm-yes">Confirm</button>
+    </div>
+  </div>
+</div>
 
-        let processingInterval = null;
+<div id="toasts"></div>
 
-        // Token-based authentication (POST /api/login -> bearer token + role)
-        function getAuthHeader() {
-            const token = localStorage.getItem('sentinel_token') || '';
-            return token ? ('Bearer ' + token) : '';
+<script>
+'use strict';
+/* =====================================================================
+   Sentinel AI dashboard — single-file SPA.
+   Roles: developer (everything) · tech/admin (ingest, zones, audit view)
+          · principal (view: cameras, notifications, reports, audit view)
+===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtT = (t) => (t || '').replace('T', ' ');
+
+const State = {
+  token: localStorage.getItem('sentinel_token') || '',
+  role: localStorage.getItem('sentinel_role') || '',
+  user: localStorage.getItem('sentinel_user') || '',
+  cameras: [], floors: [], ws: null, view: '',
+  dbVideoPath: null, annotatedUrl: null, originalUrl: null,
+  clips: [], unread: 0,
+};
+
+function authHeader() { return State.token ? ('Bearer ' + State.token) : ''; }
+function rawToken() { return State.token; }
+
+// Each /api/query result carries its clip metadata nested under `.clip`
+// (why_logged, event_start_seconds, clip window, …). Merge it up so the row
+// exposes both the event fields (duration, stayed, entry/exit) and the clip
+// fields at the top level.
+function normalizeClips(results) {
+  return (results || []).map(r => Object.assign({}, r, r.clip || {}));
+}
+
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ 'Authorization': authHeader() }, opts.headers || {});
+  const res = await fetch(path, opts);
+  if (res.status === 401) { doLogout(false); throw new Error('Session expired — please sign in again.'); }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+/* ------------------------------ toasts ------------------------------ */
+function toast(title, msg = '', kind = '') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind;
+  t.innerHTML = `<b>${esc(title)}</b>${msg ? `<span class="m">${esc(msg)}</span>` : ''}`;
+  $('toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('bye'); setTimeout(() => t.remove(), 320); }, 4200);
+}
+
+/* ------------------------------ confirm ------------------------------ */
+let _confirmCb = null;
+function confirmDlg(title, msg, cb) {
+  $('confirm-title').innerText = title;
+  $('confirm-msg').innerText = msg;
+  _confirmCb = cb;
+  $('confirm-modal').classList.add('on');
+}
+$('confirm-no').onclick = () => { $('confirm-modal').classList.remove('on'); _confirmCb = null; };
+$('confirm-yes').onclick = () => { $('confirm-modal').classList.remove('on'); if (_confirmCb) _confirmCb(); _confirmCb = null; };
+
+/* =====================================================================
+   NAVIGATION — role gated
+===================================================================== */
+const ICONS = {
+  overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>',
+  cameras: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
+  analytics: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
+  notifications: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>',
+  reports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
+  heatmap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4c0 3-4 4-4 8a4 4 0 008 0c0-1-1-2-1-3M9 20a5 5 0 01-4-8"/><circle cx="12" cy="14" r="2.5"/></svg>',
+  zones: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z"/></svg>',
+  audit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>',
+  license: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M12 11l6.5-6.5M18 4l3 3-3 3-3-3z"/></svg>',
+  admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+};
+
+const NAV = [
+  { section: 'Monitor' },
+  { id: 'overview', label: 'Overview', roles: ['developer', 'tech', 'principal'] },
+  { id: 'cameras', label: 'Live Cameras', roles: ['developer', 'tech', 'principal'] },
+  { id: 'analytics', label: 'Video Analytics', roles: ['developer', 'tech', 'principal'] },
+  { id: 'search', label: 'AI Search', roles: ['developer', 'tech', 'principal'] },
+  { section: 'Insights' },
+  { id: 'notifications', label: 'Notifications', roles: ['developer', 'principal'], badge: true },
+  { id: 'reports', label: 'Reports', roles: ['developer', 'tech', 'principal'] },
+  { id: 'heatmap', label: 'Heatmap', roles: ['developer', 'tech', 'principal'] },
+  { section: 'Manage' },
+  { id: 'zones', label: 'Zones & Rules', roles: ['developer', 'tech'] },
+  { id: 'audit', label: 'Audit Log', roles: ['developer', 'tech', 'principal'] },
+  { id: 'license', label: 'License', roles: ['developer'] },
+  { id: 'admin', label: 'Administration', roles: ['developer'] },
+];
+
+const TITLES = {
+  overview: ['Overview', 'live security posture at a glance'],
+  cameras: ['Live Cameras', 'multi-camera grid by floor & location'],
+  analytics: ['Video Analytics', 'AI pipeline: detect · track · re-identify'],
+  search: ['AI Search', 'ask questions about your footage'],
+  notifications: ['Notifications', 'alert inbox with snapshots'],
+  reports: ['Reports', 'headcount · density · charts'],
+  heatmap: ['Heatmap', 'spatial density — where people dwell'],
+  zones: ['Zones & Rules', 'restricted areas, hours, holidays'],
+  audit: ['Audit Log', 'accountability trail'],
+  license: ['License', 'issue & govern client licenses'],
+  admin: ['Administration', 'license & user management'],
+};
+
+function allowed(item) { return State.role === 'developer' || (item.roles || []).includes(State.role); }
+
+function buildNav() {
+  const nav = $('nav');
+  nav.innerHTML = '';
+  let pendingSection = null;
+  NAV.forEach(item => {
+    if (item.section) { pendingSection = item.section; return; }
+    if (!allowed(item)) return;
+    if (pendingSection) {
+      const lb = document.createElement('div');
+      lb.className = 'nav-label'; lb.innerText = pendingSection;
+      nav.appendChild(lb); pendingSection = null;
+    }
+    const el = document.createElement('div');
+    el.className = 'nav-item'; el.dataset.view = item.id;
+    el.innerHTML = `${ICONS[item.id]}<span>${item.label}</span>${item.badge ? '<span class="nav-badge" id="nav-badge-' + item.id + '"></span>' : ''}`;
+    el.onclick = () => navigate(item.id);
+    nav.appendChild(el);
+  });
+}
+
+const LOADERS = {}; // view id -> loader fn (registered below)
+
+function navigate(view) {
+  const item = NAV.find(n => n.id === view);
+  if (!item || !allowed(item)) view = 'overview';
+  State.view = view;
+  location.hash = '#/' + view;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+  const [t, c] = TITLES[view] || [view, ''];
+  $('page-title').innerText = t;
+  $('page-crumb').innerText = c;
+  if (view !== 'cameras') stopCameraGrid(); // free MJPEG connections when leaving
+  if (LOADERS[view]) LOADERS[view]();
+}
+
+/* =====================================================================
+   AUTH
+===================================================================== */
+document.querySelectorAll('.demo-chips .chip').forEach(ch => {
+  ch.onclick = () => { $('login-user').value = ch.dataset.u; $('login-pass').value = ch.dataset.p; $('login-btn').click(); };
+});
+
+$('login-btn').onclick = async () => {
+  const username = $('login-user').value.trim(), password = $('login-pass').value.trim();
+  if (!username || !password) return;
+  try {
+    const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    if (!res.ok) throw new Error(res.status === 401 ? 'Invalid username or password.' : 'Server error — is the backend running?');
+    const data = await res.json();
+    State.token = data.token; State.role = data.role; State.user = data.username;
+    localStorage.setItem('sentinel_token', data.token);
+    localStorage.setItem('sentinel_role', data.role);
+    localStorage.setItem('sentinel_user', data.username);
+    enterApp();
+  } catch (err) {
+    const e = $('login-error'); e.innerText = err.message; e.style.display = 'block';
+  }
+};
+$('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+$('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-pass').focus(); });
+
+function doLogout(callApi = true) {
+  if (callApi) fetch('/api/logout', { method: 'POST', headers: { 'Authorization': authHeader() } }).catch(() => {});
+  if (State.ws) { try { State.ws.close(); } catch (e) {} State.ws = null; }
+  stopCameraGrid();
+  localStorage.removeItem('sentinel_token'); localStorage.removeItem('sentinel_role'); localStorage.removeItem('sentinel_user');
+  State.token = State.role = State.user = '';
+  $('app').classList.remove('on');
+  $('login-screen').style.display = 'flex';
+}
+$('logout-btn').onclick = () => doLogout(true);
+
+async function enterApp() {
+  $('login-screen').style.display = 'none';
+  $('app').classList.add('on');
+  $('ub-name').innerText = State.user;
+  $('ub-role').innerText = State.role === 'tech' ? 'admin · tech' : State.role;
+  $('ub-avatar').innerText = (State.user[0] || '?').toUpperCase();
+  buildNav();
+  applyRoleUI();
+  connectWS();
+  loadCamerasIndex();
+  if (State.role === 'developer') loadLicensePill();
+  if (State.role !== 'tech') refreshUnreadBadge();
+  const want = (location.hash || '').replace('#/', '');
+  navigate(want || 'overview');
+}
+
+function applyRoleUI() {
+  const isPrincipal = State.role === 'principal';
+  // principal: no upload, no zone drawing — analytics defaults to a live feed
+  $('dropzone').style.display = isPrincipal ? 'none' : '';
+  $('ana-live-ctl').style.display = isPrincipal ? 'flex' : 'none';
+  $('ana-sub').innerText = isPrincipal ? 'live camera feed · processed footage playback' : 'upload footage → AI pipeline → annotated playback';
+  // developer-only: clear audit
+  $('audit-clear').style.display = State.role === 'developer' ? '' : 'none';
+}
+
+async function loadLicensePill() {
+  try {
+    const d = await api('/api/license');
+    $('lic-pill').style.display = '';
+    $('lic-pill').innerHTML = d.mode === 'licensed'
+      ? `🔑 <b>LICENSED</b> · ${esc(d.client_id || '')} · ${d.cameras_configured}/${d.max_cameras} cams`
+      : `🔑 <span style="color:var(--warning)">${esc((d.mode || '').toUpperCase())}</span>`;
+  } catch (e) {}
+}
+
+/* =====================================================================
+   WEBSOCKET — live alerts
+===================================================================== */
+function connectWS() {
+  if (!State.token || State.ws) return;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/alerts?token=${encodeURIComponent(State.token)}`);
+  State.ws = ws;
+  ws.onopen = () => { $('ws-pill').classList.add('live'); $('ws-text').innerText = 'Live'; };
+  ws.onmessage = (msg) => {
+    try {
+      const payload = JSON.parse(msg.data);
+      if (payload.type === 'alert') {
+        const a = payload.data || {};
+        toast('🚨 ' + (a.alert_type || 'alert').replace(/_/g, ' ').toUpperCase(), a.message || '', 'err');
+        prependFeedItem(a, true);
+        if (State.role !== 'tech') { refreshUnreadBadge(); if (State.view === 'notifications') loadNotifications(); }
+      } else if (payload.type === 'event') {
+        prependFeedItem(payload.data || {}, false);
+      }
+    } catch (e) {}
+  };
+  ws.onclose = () => {
+    State.ws = null;
+    $('ws-pill').classList.remove('live'); $('ws-text').innerText = 'Reconnecting…';
+    if (State.token) setTimeout(connectWS, 5000);
+  };
+}
+
+/* =====================================================================
+   OVERVIEW
+===================================================================== */
+LOADERS.overview = async function loadOverview() {
+  loadOverviewStats();
+  loadOverviewFeed();
+  loadZoneFlow();
+  loadSecurityReport();
+};
+
+async function loadOverviewStats() {
+  api('/api/reports/summary?period=all')
+    .then(d => { $('st-headcount').innerText = d.headcount ?? '0'; })
+    .catch(() => { $('st-headcount').innerText = '—'; });
+  api('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: '' }) })
+    .then(d => { $('st-events').innerText = d.results_count ?? '0'; })
+    .catch(() => { $('st-events').innerText = '—'; });
+  if (State.role !== 'tech') {
+    api('/api/alerts?limit=1000').then(d => { $('st-alerts').innerText = (d.alerts || []).length; }).catch(() => { $('st-alerts').innerText = '—'; });
+  } else {
+    $('st-alerts').innerText = '·'; // /api/alerts is principal+dev; tech sees live feed only
+  }
+  api('/api/cameras').then(d => { $('st-cams').innerText = (d.cameras || []).length; }).catch(() => { $('st-cams').innerText = '—'; });
+}
+
+function feedItemHTML(a, isAlert) {
+  const title = isAlert ? (a.alert_type || 'alert').replace(/_/g, ' ').toUpperCase()
+                        : `${a.object_type || 'person'} · zone event`;
+  const when = fmtT(a.timestamp || a.exit_time || '');
+  const meta = [];
+  if (a.camera_id != null) meta.push(`📷 cam ${a.camera_id}`);
+  if (a.zone_name || a.zone_id != null) meta.push(`📍 ${a.zone_name || ('zone ' + a.zone_id)}`);
+  if (a.global_id != null) meta.push(`🆔 GID ${a.global_id}`);
+  if (a.duration != null) meta.push(`⏱ ${Number(a.duration).toFixed(1)}s`);
+  return `<div class="row1">${isAlert ? '<span class="tag red">ALERT</span>' : '<span class="tag blue">EVENT</span>'}<b>${esc(title)}</b><span class="when">${esc(when)}</span></div>` +
+         (a.message ? `<div class="msg">${esc(a.message)}</div>` : '') +
+         (meta.length ? `<div class="meta">${meta.map(esc).join(' · ')}</div>` : '');
+}
+
+function prependFeedItem(a, isAlert) {
+  const feed = $('ov-feed');
+  if (!feed) return;
+  const empty = feed.querySelector('.empty');
+  if (empty) empty.remove();
+  const el = document.createElement('div');
+  el.className = 'feed-item' + (isAlert ? ' alert' : '');
+  el.innerHTML = feedItemHTML(a, isAlert);
+  feed.prepend(el);
+  while (feed.children.length > 60) feed.lastChild.remove();
+}
+
+async function loadOverviewFeed() {
+  const feed = $('ov-feed');
+  feed.innerHTML = '<div class="skel"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:65%"></div>';
+  try {
+    let items = [];
+    if (State.role !== 'tech') {
+      const d = await api('/api/alerts?limit=30');
+      items = (d.alerts || []).map(a => ({ a, isAlert: true }));
+    }
+    if (!items.length) {
+      const d = await api('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: '' }) });
+      items = (d.results || []).slice(-30).reverse().map(a => ({ a, isAlert: false }));
+    }
+    feed.innerHTML = items.length ? '' : '<div class="empty">No incidents yet — the feed updates live as the pipeline logs events.</div>';
+    items.forEach(({ a, isAlert }) => {
+      const el = document.createElement('div');
+      el.className = 'feed-item' + (isAlert ? ' alert' : '');
+      el.innerHTML = feedItemHTML(a, isAlert);
+      feed.appendChild(el);
+    });
+  } catch (e) { feed.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('ov-feed-refresh').onclick = loadOverviewFeed;
+
+async function loadZoneFlow() {
+  const el = $('ov-flow');
+  el.innerHTML = '<div class="skel"></div><div class="skel" style="width:70%"></div>';
+  try {
+    const d = await api('/api/zones/flow');
+    const rows = d.zones_flow || [];
+    if (!rows.length) { el.innerHTML = '<div class="empty">No zone traffic recorded yet.</div>'; return; }
+    el.innerHTML = `<table class="tbl"><thead><tr><th>Zone</th><th>Entries</th><th>Exits</th><th>Active</th><th>Avg dwell</th></tr></thead><tbody>` +
+      rows.map(r => `<tr><td><span class="tag blue">Zone ${esc(r.zone_id)}</span></td><td class="mono">${esc(r.total_entries)}</td><td class="mono">${esc(r.total_exits)}</td><td class="mono">${esc(r.active_occupants)}</td><td class="mono">${esc(r.avg_dwell_time_seconds)}s</td></tr>`).join('') +
+      `</tbody></table>`;
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function loadSecurityReport() {
+  try {
+    const d = await api('/api/stats');
+    $('ov-stats').innerHTML = `<pre class="report">${esc(d.report || 'No data.')}</pre>`;
+  } catch (e) { $('ov-stats').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+/* =====================================================================
+   LIVE CAMERAS
+===================================================================== */
+let currentFloor = '';
+
+async function loadCamerasIndex() {
+  try {
+    const d = await api('/api/cameras');
+    State.cameras = d.cameras || [];
+    State.floors = d.floors || [];
+    // floor chips
+    const chips = $('floor-chips');
+    chips.innerHTML = '';
+    const all = document.createElement('button');
+    all.className = 'chip active'; all.innerText = 'All floors'; all.dataset.floor = '';
+    chips.appendChild(all);
+    State.floors.forEach(f => {
+      const c = document.createElement('button');
+      c.className = 'chip'; c.innerText = f.label || f.id; c.dataset.floor = f.id;
+      chips.appendChild(c);
+    });
+    chips.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+      chips.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+      c.classList.add('active'); currentFloor = c.dataset.floor;
+    });
+    // principal's analytics camera select
+    const sel = $('ana-cam-select');
+    sel.innerHTML = State.cameras.map(c => `<option value="${c.id}">${esc(c.name)} — ${esc(c.location || '')}</option>`).join('');
+  } catch (e) {}
+}
+
+LOADERS.cameras = function () { renderCamGridPlaceholder(); loadCrossCamera(); };
+
+async function loadCrossCamera() {
+  const el = $('xcam-body');
+  try {
+    const d = await api('/api/cross-camera');
+    const edges = d.topology || [];
+    const ids = d.cross_camera_identities || [];
+    const edgesHtml = edges.length
+      ? edges.map(e => `<span class="tag blue" style="margin:3px;">Cam ${esc(e.a)} ↔ Cam ${esc(e.b)} <span style="color:var(--text-faint);">≤${esc(e.max_transit_seconds)}s</span></span>`).join('')
+      : '<span class="sub">No topology configured.</span>';
+    const idsHtml = ids.length
+      ? ids.map(i => `<div class="kv"><span>🆔 <b>GID ${esc(i.global_id)}</b></span><span>seen on cameras <b>${esc((i.cameras || []).join(', '))}</b> <span class="tag green">${esc(i.camera_count)} cams</span></span></div>`).join('')
+      : '<div class="empty" style="padding:16px;">No cross-camera identities in the current data. Hand-off populates when footage is processed in multi-camera mode with people moving between adjacent cameras.</div>';
+    el.innerHTML =
+      `<div style="font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Camera adjacency (transit-time gated)</div>` +
+      `<div style="line-height:2;">${edgesHtml}</div>` +
+      `<div style="font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px; margin:14px 0 8px;">Identities handed off across cameras (${ids.length})</div>` +
+      idsHtml;
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('xcam-refresh').onclick = loadCrossCamera;
+
+function renderCamGridPlaceholder() {
+  const grid = $('cam-grid');
+  if (grid.querySelector('img')) return; // streams already running
+  grid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+  grid.innerHTML = State.cameras.slice(0, 8).map(c =>
+    `<div class="cam-tile" style="aspect-ratio:16/9;"><div class="off">📷 ${esc(c.name)} — idle</div></div>`).join('')
+    || '<div class="empty">No cameras registered in cameras.json.</div>';
+}
+
+async function startCameraGrid() {
+  const layoutSel = $('grid-layout').value;
+  try {
+    const q = currentFloor ? `floor=${encodeURIComponent(currentFloor)}` : 'q=';
+    const d = await api(`/api/cameras/by-location?${q}`);
+    let cams = d.cameras || [];
+    let cols = (d.layout && d.layout.cols) || 2;
+    if (layoutSel === '1') { cams = cams.slice(0, 1); cols = 1; }
+    else if (layoutSel === '4') { cams = cams.slice(0, 4); cols = 2; }
+    else if (layoutSel === '8') { cams = cams.slice(0, 8); cols = 4; }
+    else { cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(cams.length)))); }
+    $('grid-info').innerHTML = `${d.floor ? 'Floor: <b>' + esc(d.floor) + '</b> · ' : ''}${cams.length} stream(s) live` +
+      (cams.length > 6 ? ' · <span style="color:var(--warning)">⚠ more than 6 tiles can hit the browser connection cap</span>' : '');
+    const grid = $('cam-grid');
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.innerHTML = '';
+    cams.forEach(c => {
+      const tile = document.createElement('div');
+      tile.className = 'cam-tile';
+      tile.innerHTML = `<img src="/api/cameras/${c.id}/stream?token=${encodeURIComponent(rawToken())}" alt="${esc(c.name)}" onerror="this.closest('.cam-tile').innerHTML='<div class=off>⚠ stream unavailable</div>';">` +
+        `<div class="lbl"><span class="dot"></span>${esc(c.name)} · ${esc(c.location || '')}</div>`;
+      tile.title = 'Click to solo this camera';
+      tile.onclick = () => {
+        $('grid-layout').value = '1';
+        stopCameraGrid();
+        const grid2 = $('cam-grid');
+        grid2.style.gridTemplateColumns = '1fr';
+        grid2.innerHTML = `<div class="cam-tile"><img src="/api/cameras/${c.id}/stream?token=${encodeURIComponent(rawToken())}" alt="${esc(c.name)}"><div class="lbl"><span class="dot"></span>${esc(c.name)} · ${esc(c.location || '')}</div></div>`;
+        $('grid-info').innerText = `Solo view: ${c.name}`;
+      };
+      grid.appendChild(tile);
+    });
+  } catch (e) { toast('Camera grid failed', e.message, 'err'); }
+}
+
+function stopCameraGrid() {
+  const grid = $('cam-grid');
+  if (!grid) return;
+  grid.querySelectorAll('img').forEach(img => { img.src = ''; });
+  if (State.view === 'cameras') { renderCamGridPlaceholder(); const gi = $('grid-info'); if (gi) gi.innerText = 'Streams stopped.'; }
+  else grid.innerHTML = '';
+}
+$('grid-start').onclick = startCameraGrid;
+$('grid-stop').onclick = stopCameraGrid;
+
+/* =====================================================================
+   VIDEO ANALYTICS — upload · playback · polygon zones
+===================================================================== */
+LOADERS.analytics = function () {
+  if (State.role === 'principal' && !$('video-shell').style.display.includes('block')) showAnalyticsLiveFeed();
+  loadAnalyticsEvents();
+};
+
+function showAnalyticsLiveFeed(camId) {
+  const shell = $('video-shell');
+  $('video-player').style.display = 'none';
+  $('playback-row').style.display = 'none';
+  let img = document.querySelector('#video-shell img.feed');
+  if (!img) {
+    img = document.createElement('img');
+    img.className = 'feed'; img.alt = 'Live camera feed';
+    shell.appendChild(img);
+  }
+  const id = camId || (State.cameras[0] && State.cameras[0].id);
+  if (id == null) { img.alt = 'No cameras available'; return; }
+  img.src = `/api/cameras/${id}/stream?token=${encodeURIComponent(rawToken())}`;
+  shell.style.display = 'block';
+}
+$('ana-cam-go').onclick = () => showAnalyticsLiveFeed(parseInt($('ana-cam-select').value, 10));
+
+/* ---------- upload ---------- */
+const dropzone = $('dropzone'), fileInput = $('file-input');
+dropzone.onclick = () => fileInput.click();
+fileInput.onclick = (e) => e.stopPropagation();
+dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('over'); };
+dropzone.ondragleave = () => dropzone.classList.remove('over');
+dropzone.ondrop = (e) => { e.preventDefault(); dropzone.classList.remove('over'); if (e.dataTransfer.files.length) uploadVideo(e.dataTransfer.files[0]); };
+fileInput.onchange = () => { if (fileInput.files.length) uploadVideo(fileInput.files[0]); };
+
+function setProgress(pct, status) {
+  $('progress-wrap').style.display = 'block';
+  $('progress-fill').style.width = pct + '%';
+  $('progress-pct').innerText = Math.round(pct) + '%';
+  if (status) $('progress-status').innerText = status;
+}
+
+function uploadVideo(file) {
+  dropzone.style.display = 'none';
+  $('video-shell').style.display = 'none';
+  $('playback-row').style.display = 'none';
+  setProgress(0, `Uploading ${file.name}…`);
+  const form = new FormData();
+  form.append('file', file);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/upload');
+  xhr.setRequestHeader('Authorization', authHeader());
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress((e.loaded / e.total) * 100, `Uploading ${file.name}…`); };
+  xhr.onload = () => {
+    if (xhr.status === 401) { doLogout(false); return; }
+    if (xhr.status !== 200) { toast('Upload failed', 'HTTP ' + xhr.status, 'err'); resetUploadUI(); return; }
+    const data = JSON.parse(xhr.responseText);
+    if (data.status !== 'processing') { toast('Upload failed', data.message || 'unknown error', 'err'); resetUploadUI(); return; }
+    setProgress(0, 'AI pipeline: detecting & tracking…');
+    pollProcessing(data.output_url, data.db_video_path, data.video_url);
+  };
+  xhr.onerror = () => { toast('Upload failed', 'network error', 'err'); resetUploadUI(); };
+  xhr.send(form);
+}
+
+function resetUploadUI() {
+  $('progress-wrap').style.display = 'none';
+  if (State.role !== 'principal') dropzone.style.display = '';
+}
+
+function pollProcessing(outputUrl, dbVideoPath, originalUrl) {
+  const iv = setInterval(async () => {
+    try {
+      const d = await api(`/api/status?video_path=${encodeURIComponent(dbVideoPath)}`);
+      if (d.status === 'ready') {
+        clearInterval(iv);
+        setProgress(100, 'Processing complete!');
+        setTimeout(() => { $('progress-wrap').style.display = 'none'; }, 700);
+        onProcessed(outputUrl, dbVideoPath, originalUrl);
+      } else if (d.status === 'processing') {
+        setProgress(d.progress ?? 99, 'AI pipeline: detecting & tracking…');
+      } else if (String(d.status).startsWith('error')) {
+        clearInterval(iv);
+        toast('Processing failed', String(d.status), 'err');
+        resetUploadUI();
+      }
+    } catch (e) { /* transient poll errors are fine */ }
+  }, 2000);
+}
+
+function onProcessed(outputUrl, dbVideoPath, originalUrl) {
+  State.dbVideoPath = dbVideoPath;
+  State.annotatedUrl = outputUrl;
+  State.originalUrl = originalUrl || (dbVideoPath ? ('/static/uploads/' + dbVideoPath.split(/[\\/]/).pop()) : '');
+  const feedImg = document.querySelector('#video-shell img.feed');
+  if (feedImg) feedImg.remove();
+  const vp = $('video-player');
+  vp.style.display = '';
+  vp.src = outputUrl;
+  $('video-shell').style.display = 'block';
+  $('playback-row').style.display = 'flex';
+  switchSource('annotated');
+  toast('Footage processed', 'Annotated playback ready — events logged below.', 'ok');
+  loadAnalyticsEvents();
+  if (State.view === 'overview') LOADERS.overview();
+}
+
+function switchSource(which) {
+  const vp = $('video-player');
+  const t = vp.currentTime;
+  vp.src = which === 'original' ? State.originalUrl : State.annotatedUrl;
+  vp.currentTime = t;
+  vp.play().catch(() => {});
+  $('btn-annotated').classList.toggle('acc', which === 'annotated');
+  $('btn-original').classList.toggle('acc', which === 'original');
+}
+$('btn-annotated').onclick = () => switchSource('annotated');
+$('btn-original').onclick = () => switchSource('original');
+
+async function loadAnalyticsEvents() {
+  const el = $('ana-events');
+  try {
+    const d = await api('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: '' }) });
+    if (!(d.results || []).length) { el.innerHTML = '<div class="empty">No events logged yet — process a video first.</div>'; return; }
+    State.clips = normalizeClips(d.results);
+    el.innerHTML = State.clips.map((r, i) => resultCardHTML(r, i)).join('');
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+/* ---------- polygon zone editor (developer + admin only) ---------- */
+const zoneCanvas = $('zone-canvas');
+const zctx = zoneCanvas.getContext('2d');
+let polyPoints = [], mousePos = null, polyClosed = false;
+const CLOSE_RADIUS = 12;
+let canvasMode = 'poly';   // 'poly' (zone) | 'line' (counting tripwire)
+let linePts = [];          // up to 2 points for a counting line
+
+$('btn-edit-zone').onclick = () => {
+  if (State.role === 'principal') return;
+  const vp = $('video-player');
+  vp.pause();
+  zoneCanvas.width = vp.clientWidth;
+  zoneCanvas.height = vp.clientHeight;
+  zoneCanvas.style.display = 'block';
+  canvasMode = 'poly';
+  $('btn-edit-zone').style.display = 'none';
+  $('btn-draw-line').style.display = 'none';
+  $('btn-save-zone').style.display = '';
+  $('btn-cancel-zone').style.display = '';
+  $('zone-hint').style.display = 'block';
+  polyPoints = []; mousePos = null; polyClosed = false;
+  drawZoneCanvas();
+};
+
+$('btn-draw-line').onclick = () => {
+  if (State.role === 'principal') return;
+  const vp = $('video-player');
+  vp.pause();
+  zoneCanvas.width = vp.clientWidth;
+  zoneCanvas.height = vp.clientHeight;
+  zoneCanvas.style.display = 'block';
+  canvasMode = 'line'; linePts = []; mousePos = null;
+  $('btn-edit-zone').style.display = 'none';
+  $('btn-draw-line').style.display = 'none';
+  $('btn-save-line').style.display = '';
+  $('btn-cancel-zone').style.display = '';
+  drawZoneCanvas();
+};
+
+function handleLineClick(p) {
+  if (linePts.length >= 2) linePts = [];
+  linePts.push(p);
+  drawZoneCanvas();
+}
+
+function drawLineCanvas() {
+  const W = zoneCanvas.width, H = zoneCanvas.height;
+  zctx.clearRect(0, 0, W, H);
+  zctx.fillStyle = 'rgba(0,0,0,0.45)';
+  zctx.fillRect(0, 0, W, H);
+  const pts = linePts.slice();
+  if (pts.length === 1 && mousePos) pts.push(mousePos);
+  if (pts.length >= 2) {
+    zctx.strokeStyle = '#22d3ee'; zctx.lineWidth = 3;
+    zctx.beginPath(); zctx.moveTo(pts[0].x, pts[0].y); zctx.lineTo(pts[1].x, pts[1].y); zctx.stroke();
+    const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+    const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    zctx.font = '12px Outfit'; zctx.textAlign = 'center';
+    zctx.fillStyle = '#34d399'; zctx.fillText('▲ in', mx + nx * 24, my + ny * 24);
+    zctx.fillStyle = '#f87171'; zctx.fillText('out ▼', mx - nx * 24, my - ny * 24);
+  }
+  linePts.forEach(p => { zctx.beginPath(); zctx.arc(p.x, p.y, 5, 0, Math.PI * 2); zctx.fillStyle = '#22d3ee'; zctx.fill(); });
+  zctx.fillStyle = '#e8ecf6'; zctx.font = '13px Outfit'; zctx.textAlign = 'left';
+  zctx.fillText(linePts.length < 2 ? 'Click two points to place a counting line across a doorway/corridor' : 'Line placed — press “Save line”', 10, 22);
+}
+
+function drawZoneCanvas() {
+  if (canvasMode === 'line') { drawLineCanvas(); return; }
+  const W = zoneCanvas.width, H = zoneCanvas.height;
+  zctx.clearRect(0, 0, W, H);
+  zctx.fillStyle = 'rgba(0,0,0,0.55)';
+  zctx.fillRect(0, 0, W, H);
+  if (polyPoints.length >= 3) {
+    zctx.save();
+    zctx.beginPath();
+    zctx.moveTo(polyPoints[0].x, polyPoints[0].y);
+    for (let i = 1; i < polyPoints.length; i++) zctx.lineTo(polyPoints[i].x, polyPoints[i].y);
+    zctx.closePath(); zctx.clip();
+    zctx.clearRect(0, 0, W, H);
+    zctx.restore();
+  }
+  if (polyPoints.length > 0) {
+    zctx.strokeStyle = '#6366f1'; zctx.lineWidth = 2;
+    zctx.beginPath();
+    zctx.moveTo(polyPoints[0].x, polyPoints[0].y);
+    for (let i = 1; i < polyPoints.length; i++) zctx.lineTo(polyPoints[i].x, polyPoints[i].y);
+    if (polyClosed) zctx.closePath(); else if (mousePos) zctx.lineTo(mousePos.x, mousePos.y);
+    zctx.stroke();
+    polyPoints.forEach((p, i) => {
+      zctx.beginPath();
+      zctx.arc(p.x, p.y, i === 0 ? 6 : 4, 0, Math.PI * 2);
+      zctx.fillStyle = (i === 0 && polyPoints.length >= 3 && !polyClosed) ? '#34d399' : '#6366f1';
+      zctx.fill();
+    });
+    zctx.fillStyle = '#e8ecf6'; zctx.font = '13px Outfit'; zctx.textAlign = 'left';
+    zctx.fillText(polyClosed ? `Polygon: ${polyPoints.length} points — ready to save` : `${polyPoints.length} point(s) — click the green dot to close`, 10, 22);
+  } else {
+    zctx.fillStyle = '#e8ecf6'; zctx.font = '15px Outfit'; zctx.textAlign = 'center';
+    zctx.fillText('Click to drop polygon points around the detection area', W / 2, H / 2);
+    zctx.textAlign = 'left';
+  }
+}
+
+function canvasPt(e) {
+  const r = zoneCanvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+zoneCanvas.addEventListener('click', (e) => {
+  if (canvasMode === 'line') { handleLineClick(canvasPt(e)); return; }
+  if (polyClosed) return;
+  const p = canvasPt(e);
+  if (polyPoints.length >= 3) {
+    const f = polyPoints[0];
+    if (Math.hypot(p.x - f.x, p.y - f.y) <= CLOSE_RADIUS) { polyClosed = true; drawZoneCanvas(); return; }
+  }
+  polyPoints.push(p);
+  drawZoneCanvas();
+});
+zoneCanvas.addEventListener('mousemove', (e) => {
+  if (canvasMode === 'line') { if (linePts.length === 1) { mousePos = canvasPt(e); drawZoneCanvas(); } return; }
+  if (polyClosed || !polyPoints.length) return;
+  mousePos = canvasPt(e);
+  drawZoneCanvas();
+});
+
+function exitZoneEditor() {
+  zoneCanvas.style.display = 'none';
+  $('btn-edit-zone').style.display = '';
+  $('btn-draw-line').style.display = '';
+  $('btn-save-zone').style.display = 'none';
+  $('btn-save-line').style.display = 'none';
+  $('btn-cancel-zone').style.display = 'none';
+  $('zone-hint').style.display = 'none';
+  zctx.clearRect(0, 0, zoneCanvas.width, zoneCanvas.height);
+  polyPoints = []; mousePos = null; polyClosed = false;
+  canvasMode = 'poly'; linePts = [];
+}
+$('btn-cancel-zone').onclick = exitZoneEditor;
+
+$('btn-save-line').onclick = async () => {
+  if (linePts.length < 2) { toast('Line invalid', 'Click two points across the passage first.', 'warn'); return; }
+  const W = zoneCanvas.width, H = zoneCanvas.height;
+  const name = prompt('Name this counting line (e.g. "Main Door"):', 'Door tripwire');
+  if (name === null) return;
+  const p1 = [linePts[0].x / W, linePts[0].y / H], p2 = [linePts[1].x / W, linePts[1].y / H];
+  try {
+    await api('/api/lines', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camera_id: 1, name: name || 'Line', p1, p2, in_label: 'in', out_label: 'out' }) });
+    toast('Counting line saved', 'Reprocess the video to populate its in/out counts.', 'ok');
+    exitZoneEditor();
+  } catch (e) { toast('Save failed', e.message, 'err'); }
+};
+
+$('btn-save-zone').onclick = async () => {
+  if (polyPoints.length < 3) { toast('Zone invalid', 'Draw at least 3 polygon points.', 'warn'); return; }
+  const W = zoneCanvas.width, H = zoneCanvas.height;
+  const points = polyPoints.map(p => [p.x / W, p.y / H]);
+  setProgress(0, 'Saving polygon zone…');
+  $('video-shell').style.display = 'none';
+  $('playback-row').style.display = 'none';
+  try {
+    await api('/api/zones', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 1, camera_id: 1, name: 'Custom Zone', points, max_occupancy: 3 }) });
+    setProgress(5, 'Re-processing with new zone…');
+    const d = await api('/api/reprocess', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_path: State.dbVideoPath }) });
+    exitZoneEditor();
+    if (d.status === 'processing') pollProcessing(d.output_url, d.db_video_path, d.video_url);
+    else if (d.status === 'ready') onProcessed(d.output_url, d.db_video_path, d.video_url);
+    else throw new Error(d.message || 'reprocess failed');
+  } catch (e) {
+    toast('Zone save failed', e.message, 'err');
+    exitZoneEditor();
+    $('progress-wrap').style.display = 'none';
+    $('video-shell').style.display = 'block';
+    $('playback-row').style.display = 'flex';
+  }
+};
+
+/* =====================================================================
+   AI SEARCH + CLIP MODAL
+===================================================================== */
+LOADERS.search = function () {};
+
+function resultCardHTML(r, i) {
+  const label = r.why_logged || `${r.object_type || 'person'} in zone ${r.zone_id}`;
+  const durVal = r.duration_seconds != null ? r.duration_seconds : r.duration;
+  const dur = durVal != null ? `${Number(durVal).toFixed(1)}s` : '';
+  const stay = dur ? `<span class="tag">⏱ ${dur} dwell</span>` : '';
+  return `<div class="result-card" onclick="openClip(${i})">
+    <div class="result-num">${i + 1}</div>
+    <div class="result-main">
+      <b>${esc(label)} ${stay}</b>
+      <div class="d">🆔 GID ${esc(r.global_id ?? '-')} · 📷 cam ${esc(r.camera_id ?? '-')} · 📍 zone ${esc(r.zone_id ?? '-')} · ${esc(fmtT(r.logged_at || r.entry_time || ''))}</div>
+    </div>
+    <div style="display:flex; gap:6px; flex:none;">
+      <button class="btn sm acc" onclick="event.stopPropagation(); openClip(${i}, 'clip')" title="Just the event, nothing more">▶ Clip</button>
+      <button class="btn sm" onclick="event.stopPropagation(); openClip(${i}, 'full')" title="Full recording; box only during the event">⏵ Full clip</button>
+    </div>
+  </div>`;
+}
+
+async function runSearch(q) {
+  const el = $('search-results');
+  el.innerHTML = '<div class="skel"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:60%"></div>';
+  try {
+    const d = await api('/api/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q }) });
+    State.clips = normalizeClips(d.results);
+    $('search-title').innerText = `Results (${d.results_count})`;
+    const intentBits = Object.entries(d.intent || {}).filter(([, v]) => v != null && v !== false)
+      .map(([k, v]) => `${k}: ${v === true ? 'yes' : v}`).join(' · ');
+    $('search-intent').innerText = intentBits ? `parsed intent → ${intentBits}` : '';
+    el.innerHTML = State.clips.length
+      ? State.clips.map((r, i) => resultCardHTML(r, i)).join('')
+      : '<div class="empty">No matching events. Try a different phrase or empty search for everything.</div>';
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('search-btn').onclick = () => runSearch($('search-input').value.trim());
+$('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch($('search-input').value.trim()); });
+document.querySelectorAll('.sugg .chip[data-q]').forEach(ch => ch.onclick = () => { $('search-input').value = ch.dataset.q; runSearch(ch.dataset.q); });
+$('gid-chip').onclick = () => {
+  const gid = prompt('Enter a Global ID (GID) to find every event for that person/object:');
+  if (gid == null) return;
+  const n = String(gid).replace(/\D/g, '');
+  if (!n) { toast('Invalid GID', 'Enter a numeric global ID.', 'warn'); return; }
+  $('search-input').value = 'GID ' + n;
+  runSearch('GID ' + n);
+};
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+    e.preventDefault(); navigate('search'); setTimeout(() => $('search-input').focus(), 60);
+  }
+});
+
+/* ---------- clip modal with subject-highlight overlay ---------- */
+let clipBoxes = [], clipRaf = null, clipInfo = null, clipRunners = [];
+
+// mode = 'clip' → play ONLY the event window (bounded, auto-pause at end)
+// mode = 'full' → play the whole recording from the event start, free scrub
+//                 both ways, but the highlight box shows ONLY during the event.
+function openClip(i, mode = 'clip') {
+  const c = State.clips[i];
+  if (!c || !c.video_path) { toast('No clip', 'This event has no playable source video.', 'warn'); return; }
+  clipInfo = c;
+  State.clipIndex = i;
+  State.clipMode = mode;
+  const v = $('clip-video');
+  const start = c.event_start_seconds != null ? c.event_start_seconds : (c.clip_start_seconds || 0);
+  const end = c.event_end_seconds != null ? c.event_end_seconds : (c.clip_end_seconds || (start + 1));
+  State.eventBounds = { start, end };     // box is only drawn inside this range
+  State.clipStart = start;                // both modes begin here
+  State.clipWindow = (mode === 'clip') ? { start, end } : null; // bound playback only in clip mode
+  const frag = (mode === 'clip') ? `#t=${start},${end}` : `#t=${start}`;
+  v.src = `/api/clip/video?path=${encodeURIComponent(c.video_path)}&token=${encodeURIComponent(rawToken())}${frag}`;
+  try { v.currentTime = start; } catch (e) {}
+  $('clip-title').innerText = c.why_logged || 'Event clip';
+  $('clip-mode-clip').classList.toggle('acc', mode === 'clip');
+  $('clip-mode-full').classList.toggle('acc', mode === 'full');
+  const durVal = c.duration_seconds != null ? c.duration_seconds : c.duration;
+  const stayedTxt = durVal != null ? `<b>${Number(durVal).toFixed(1)}s</b>` : '—';
+  const modeNote = mode === 'full'
+    ? 'Full recording — scrub freely; the highlight box appears only while the event is happening.'
+    : 'Event clip — plays exactly the event window and nothing more.';
+  $('clip-meta').innerHTML =
+    `<b>Mode:</b> ${esc(modeNote)}<br>` +
+    `<b>Why logged:</b> ${esc(c.why_logged || '-')}<br>` +
+    `<b>Logged at:</b> ${esc(fmtT(c.logged_at || ''))}<br>` +
+    `<b>Event window:</b> ${Number(start).toFixed(1)}s → ${Number(end).toFixed(1)}s @ ${esc(c.source_fps || '?')} fps<br>` +
+    `<b>Dwell time:</b> ${stayedTxt}<br>` +
+    `<b>Details:</b> ${esc(c.details || '-')}<br>` +
+    `<span style="color:var(--text-faint); font-size:12px;">← / → arrow keys jump 2s</span><br>` +
+    `<span id="clip-note" style="color:var(--danger);"></span>`;
+  $('clip-modal').classList.add('on');
+  v.play().catch(() => {});
+  loadClipTrack(c);
+  loadTrajectory(c.global_id);
+  startClipOverlay();
+}
+$('clip-mode-clip').onclick = () => { if (State.clipIndex != null) openClip(State.clipIndex, 'clip'); };
+$('clip-mode-full').onclick = () => { if (State.clipIndex != null) openClip(State.clipIndex, 'full'); };
+
+async function loadClipTrack(c) {
+  clipBoxes = [];
+  // Running events highlight EVERY runner in the window, not just the subject.
+  loadRunningTracks(c);
+  const hasTrack = c.track_id != null;
+  if (!hasTrack && c.global_id == null) return;
+  // Highlight the event's OWN tracklet (track_id) within its frame range. A
+  // track_id is a single continuous tracked object, so the box stays on one
+  // person and can't jump to someone else who happens to share the global id.
+  // Restricting to [frame_start, frame_end] also means the box only exists
+  // while the event is happening — so it vanishes once the event ends.
+  const pad = 15;
+  const p = new URLSearchParams({
+    video_path: c.video_path,
+    start_frame: Math.max(0, (c.frame_start != null ? c.frame_start : 0) - pad),
+    end_frame: (c.frame_end != null ? c.frame_end : (c.frame_start || 0)) + pad,
+  });
+  if (hasTrack) p.set('track_id', c.track_id);
+  else p.set('global_id', c.global_id);
+  if (c.camera_id != null) p.set('camera_id', c.camera_id);
+  try {
+    const d = await api('/api/clip/track?' + p.toString());
+    clipBoxes = (d.boxes || []).sort((a, b) => a.t - b.t);
+    const note = $('clip-note');
+    if (note) note.innerText = clipBoxes.length
+      ? `▉ highlighting ${hasTrack ? 'track ' + c.track_id : 'GID ' + c.global_id} · GID ${c.global_id} (${clipBoxes.length} frames, single subject)`
+      : 'no tracked boxes stored for this subject';
+  } catch (e) {}
+}
+
+// For a running event, box every person flagged running during the clip window
+// (not just the logged subject). Each runner keeps its own sorted box track.
+async function loadRunningTracks(c) {
+  clipRunners = [];
+  if ((c.event_type || '') !== 'running_detected') return;
+  const fps = Number(c.source_fps) || 29.97;
+  const s = c.event_start_seconds != null ? c.event_start_seconds : (c.clip_start_seconds || 0);
+  const e = c.event_end_seconds != null ? c.event_end_seconds : (c.clip_end_seconds || (s + 6));
+  const p = new URLSearchParams({
+    video_path: c.video_path,
+    start_frame: Math.max(0, Math.floor(s * fps)),
+    end_frame: Math.ceil(e * fps),
+  });
+  if (c.camera_id != null) p.set('camera_id', c.camera_id);
+  try {
+    const d = await api('/api/clip/running-tracks?' + p.toString());
+    clipRunners = (d.subjects || []).map(su => ({
+      global_id: su.global_id,
+      boxes: (su.boxes || []).sort((a, b) => a.t - b.t),
+    })).filter(su => su.boxes.length);
+    const note = $('clip-note');
+    if (note && clipRunners.length) {
+      note.innerText = `🏃 boxing ${clipRunners.length} runner(s): ` +
+        clipRunners.map(su => 'GID ' + su.global_id).join(', ');
+    }
+  } catch (e) {}
+}
+
+async function loadTrajectory(gid) {
+  const el = $('clip-traj');
+  el.innerHTML = '<div class="skel"></div>';
+  if (gid == null) { el.innerHTML = '<div class="empty" style="padding:16px;">No global ID for this event.</div>'; return; }
+  try {
+    const d = await api(`/api/trajectory/${gid}`);
+    const steps = d.timeline || [];
+    $('traj-sub').innerText = `GID ${gid} · ${steps.length} step(s)`;
+    el.innerHTML = steps.length
+      ? steps.map((s, i) => `<div class="traj-step"><div class="n">${i + 1}</div><div>📷 cam ${esc(s.camera_id)} · 📍 zone ${esc(s.zone_id)} · ⏱ ${esc(Number(s.duration || 0).toFixed(1))}s dwell<br><span style="color:var(--text-faint); font-family:var(--mono); font-size:11px;">${esc(fmtT(s.entry_time))} → ${esc(fmtT(s.exit_time))}</span></div></div>`).join('')
+      : '<div class="empty" style="padding:16px;">No trajectory recorded.</div>';
+  } catch (e) { el.innerHTML = `<div class="empty" style="padding:16px;">${esc(e.message)}</div>`; }
+}
+
+function startClipOverlay() {
+  const v = $('clip-video'), canvas = $('clip-canvas'), ctx = canvas.getContext('2d');
+  cancelAnimationFrame(clipRaf);
+  const draw = () => {
+    if (!$('clip-modal').classList.contains('on')) return;
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (vw && vh) {
+      const dw = v.clientWidth, dh = v.clientHeight;
+      if (canvas.width !== dw || canvas.height !== dh) { canvas.width = dw; canvas.height = dh; }
+      ctx.clearRect(0, 0, dw, dh);
+      const sx = dw / vw, sy = dh / vh, t = v.currentTime;
+      const eb = State.eventBounds;
+      const insideEvent = !eb || (t >= eb.start - 0.15 && t <= eb.end + 0.15);
+      // pick the box at (or just before) the current time from a sorted track
+      const boxAt = (boxes) => {
+        let b = null;
+        for (let i = 0; i < boxes.length; i++) { if (boxes[i].t <= t + 0.05) b = boxes[i]; else break; }
+        return (b && Math.abs(b.t - t) <= 0.4) ? b : null;
+      };
+      const paint = (box, color, label) => {
+        const [x1, y1, x2, y2] = box.bbox;
+        const rx = x1 * sx, ry = y1 * sy, rw = (x2 - x1) * sx, rh = (y2 - y1) * sy;
+        ctx.lineWidth = 3; ctx.strokeStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 12;
+        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.shadowBlur = 0;
+        ctx.font = '13px sans-serif';
+        const tw = ctx.measureText(label).width + 10;
+        ctx.fillStyle = color; ctx.fillRect(rx, Math.max(0, ry - 18), tw, 18);
+        ctx.fillStyle = '#fff'; ctx.fillText(label, rx + 5, Math.max(12, ry - 5));
+      };
+      if (insideEvent && clipRunners.length) {
+        // Running event → box every runner in the window (amber).
+        for (const su of clipRunners) {
+          const box = boxAt(su.boxes);
+          if (box) paint(box, '#ffb020', `GID ${su.global_id} — running`);
         }
+      } else if (insideEvent) {
+        // Any other event → highlight only the logged subject (red).
+        const box = boxAt(clipBoxes);
+        if (box) paint(box, '#ff2d2d', `GID ${clipInfo ? clipInfo.global_id : ''} — subject`);
+      }
+    }
+    clipRaf = requestAnimationFrame(draw);
+  };
+  clipRaf = requestAnimationFrame(draw);
+}
 
-        function getRole() {
-            return localStorage.getItem('sentinel_role') || '';
+function closeClip() {
+  const v = $('clip-video');
+  v.pause(); v.removeAttribute('src'); v.load();
+  cancelAnimationFrame(clipRaf); clipRaf = null; clipBoxes = []; clipRunners = [];
+  State.clipWindow = null; State.eventBounds = null; State.clipStart = null; State.clipIndex = null;
+  const c = $('clip-canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  $('clip-modal').classList.remove('on');
+}
+$('clip-close').onclick = closeClip;
+$('clip-modal').addEventListener('click', e => { if (e.target === $('clip-modal')) closeClip(); });
+
+// Keep playback inside the event window: seek to the start once metadata is
+// ready, pause when the event ends, and rewind to the start if the user hits
+// play again after it finished.
+(function bindClipWindow() {
+  const v = $('clip-video');
+  v.addEventListener('loadedmetadata', () => { if (State.clipStart != null) { try { v.currentTime = State.clipStart; } catch (e) {} } });
+  v.addEventListener('timeupdate', () => {
+    const w = State.clipWindow;
+    if (w && v.currentTime >= w.end - 0.02) { v.pause(); v.currentTime = w.end; }
+  });
+  v.addEventListener('play', () => {
+    const w = State.clipWindow;
+    if (w && v.currentTime >= w.end - 0.05) { try { v.currentTime = w.start; } catch (e) {} }
+  });
+})();
+
+// While the clip is open, ← / → seek 2s (clamped to the event window).
+document.addEventListener('keydown', (e) => {
+  if (!$('clip-modal').classList.contains('on')) return;
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  e.preventDefault();
+  const v = $('clip-video');
+  const w = State.clipWindow || { start: 0, end: v.duration || 1e9 };
+  const delta = e.key === 'ArrowRight' ? 2 : -2;
+  v.currentTime = Math.max(w.start, Math.min(w.end, v.currentTime + delta));
+});
+
+/* =====================================================================
+   NOTIFICATIONS (principal + developer)
+===================================================================== */
+LOADERS.notifications = loadNotifications;
+
+async function refreshUnreadBadge() {
+  try {
+    const d = await api('/api/notifications?unread_only=true&limit=99');
+    State.unread = (d.notifications || []).length;
+    const b = $('nav-badge-notifications');
+    if (b) { b.style.display = State.unread ? 'flex' : 'none'; b.innerText = State.unread > 99 ? '99+' : State.unread; }
+  } catch (e) {}
+}
+
+async function loadNotifications() {
+  const list = $('notif-list');
+  list.innerHTML = '<div class="skel"></div><div class="skel" style="width:80%"></div>';
+  try {
+    const d = await api('/api/notifications?limit=50');
+    const notes = d.notifications || [];
+    if (!notes.length) { list.innerHTML = '<div class="empty">No notifications — restricted-zone, after-hours and fall alerts land here with snapshots.</div>'; return; }
+    list.innerHTML = '';
+    notes.forEach(n => {
+      const el = document.createElement('div');
+      el.className = 'feed-item' + (n.read ? '' : ' alert');
+      el.innerHTML =
+        `<div class="row1">${n.read ? '' : '<span class="unread-dot"></span>'}<b>${esc(n.title || 'Notification')}</b><span class="when">${esc(fmtT(n.timestamp))}</span></div>` +
+        `<div class="msg">${esc(n.message || '')}</div>` +
+        `<div class="meta">📷 cam ${esc(n.camera_id ?? '-')} · 📍 ${esc(n.zone_name || '-')} · ${esc(n.object_type || '')} GID ${esc(n.global_id ?? '-')}</div>` +
+        (n.snapshot_path && n.alert_id ? `<button class="btn sm" style="margin-top:9px;" data-alert="${n.alert_id}">📸 View snapshot</button><img class="snap" alt="snapshot">` : '');
+      const btn = el.querySelector('button[data-alert]');
+      if (btn) btn.onclick = () => toggleSnapshot(btn);
+      list.appendChild(el);
+    });
+    refreshUnreadBadge();
+  } catch (e) { list.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function toggleSnapshot(btn) {
+  const img = btn.nextElementSibling;
+  if (!img) return;
+  if (img.style.display === 'block') { img.style.display = 'none'; btn.innerText = '📸 View snapshot'; return; }
+  if (!img.src) {
+    btn.innerText = 'Loading…';
+    try {
+      const res = await fetch(`/api/alerts/${btn.dataset.alert}/snapshot`, { headers: { 'Authorization': authHeader() } });
+      if (!res.ok) throw new Error();
+      img.src = URL.createObjectURL(await res.blob());
+    } catch (e) { btn.innerText = '⚠ Snapshot unavailable'; return; }
+  }
+  img.style.display = 'block';
+  btn.innerText = '🙈 Hide snapshot';
+}
+$('notif-refresh').onclick = loadNotifications;
+$('notif-read').onclick = async () => {
+  try {
+    await api('/api/notifications/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    toast('Inbox cleared', 'All notifications marked as read.', 'ok');
+    loadNotifications();
+  } catch (e) { toast('Failed', e.message, 'err'); }
+};
+
+/* =====================================================================
+   REPORTS
+===================================================================== */
+LOADERS.reports = function () { loadSummary(); loadPeriodic(); loadCharts(); loadLineCounts(); };
+
+async function loadLineCounts() {
+  const el = $('line-counts');
+  try {
+    const d = await api('/api/lines/counts');
+    const rows = d.counts || [];
+    if (!rows.length) { el.innerHTML = '<div class="empty">No counting lines yet — draw one in Video Analytics → 📏 Counting line.</div>'; return; }
+    el.innerHTML = rows.map(r => `
+      <div class="zone-row">
+        <div class="zone-info">
+          <b>🚪 ${esc(r.name)}</b> <span class="tag blue">cam ${esc(r.camera_id ?? '-')}</span>
+          <div style="font-size:12px; color:var(--text-faint); margin-top:4px;">net flow ${r.net >= 0 ? '+' : ''}${esc(r.net)} · ${esc(r.total)} total crossings</div>
+        </div>
+        <div style="display:flex; gap:22px; align-items:center;">
+          <div style="text-align:center;"><div class="mono" style="font-size:24px; color:var(--success);">${esc(r.in)}</div><div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">${esc(r.in_label)}</div></div>
+          <div style="text-align:center;"><div class="mono" style="font-size:24px; color:var(--danger);">${esc(r.out)}</div><div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">${esc(r.out_label)}</div></div>
+        </div>
+      </div>`).join('');
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('lc-refresh').onclick = loadLineCounts;
+
+async function loadLinesList() {
+  const el = $('lines-list');
+  if (!el) return;
+  try {
+    const d = await api('/api/lines');
+    const lines = d.lines || [];
+    el.innerHTML = lines.length
+      ? lines.map(l => `<div class="kv"><span>📏 <b>${esc(l.name)}</b> <span class="tag blue">cam ${esc(l.camera_id)}</span> <span style="color:var(--text-faint); font-size:12px;">${esc(l.in_label)} / ${esc(l.out_label)}</span></span><button class="btn sm danger" data-line="${l.id}">Delete</button></div>`).join('')
+      : '<div class="empty" style="padding:14px;">No counting lines configured.</div>';
+    el.querySelectorAll('button[data-line]').forEach(b => b.onclick = async () => {
+      try { await api('/api/lines/' + b.dataset.line, { method: 'DELETE' }); toast('Line deleted', '', 'ok'); loadLinesList(); }
+      catch (e) { toast('Delete failed', e.message, 'err'); }
+    });
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('lines-refresh').onclick = loadLinesList;
+
+// ---- lightweight inline SVG bar chart (no external deps) ----
+function barChartSVG(data, { height = 170, color = '#6366f1', showEvery = 1 } = {}) {
+  const W = 620, H = height, padB = 26, padL = 10, padT = 14;
+  const n = Math.max(1, data.length);
+  const step = (W - padL * 2) / n;
+  const bw = step * 0.66;
+  const max = Math.max(1, ...data.map(d => d.value));
+  let out = '';
+  data.forEach((d, i) => {
+    const bh = (d.value / max) * (H - padB - padT);
+    const x = padL + i * step + (step - bw) / 2;
+    const y = H - padB - bh;
+    out += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, bh).toFixed(1)}" rx="2.5" fill="${color}"><title>${esc(d.title || d.label)}: ${d.value}</title></rect>`;
+    if (d.value > 0) out += `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" font-size="10.5" fill="var(--text-dim)" text-anchor="middle">${d.value}</text>`;
+    if (i % showEvery === 0) out += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 9}" font-size="9.5" fill="var(--text-faint)" text-anchor="middle">${esc(d.label)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto;">${out}</svg>`;
+}
+
+async function loadCharts() {
+  try {
+    const d = await api('/api/analytics/headcount-series');
+    const series = (d.series || []).map(s => ({ label: s.hour, value: s.count, title: `${s.hour}:00` }));
+    $('chart-headcount').innerHTML = barChartSVG(series, { color: '#22d3ee', showEvery: 2 });
+  } catch (e) { $('chart-headcount').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  try {
+    const d = await api('/api/zones/flow');
+    const rows = d.zones_flow || [];
+    const data = rows.map(r => ({
+      label: 'Z' + r.zone_id, value: r.total_entries,
+      title: `Zone ${r.zone_id} — ${r.total_entries} entries, ${r.total_exits} exits, ${r.active_occupants} active, ${r.avg_dwell_time_seconds}s avg dwell`
+    }));
+    $('chart-zoneflow').innerHTML = data.length ? barChartSVG(data, { color: '#6366f1' }) : '<div class="empty">No zone traffic yet.</div>';
+  } catch (e) { $('chart-zoneflow').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+// ---- spatial heatmap ----
+LOADERS.heatmap = loadHeatmap;
+
+function heatColor(t) {
+  const stops = [[30, 60, 190], [30, 190, 160], [240, 210, 60], [240, 60, 60]];
+  const seg = t * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(seg)), f = seg - i;
+  const a = stops[i], b = stops[i + 1];
+  return [Math.round(a[0] + (b[0] - a[0]) * f), Math.round(a[1] + (b[1] - a[1]) * f), Math.round(a[2] + (b[2] - a[2]) * f)];
+}
+
+function drawHeatmap(canvas, data, bg) {
+  const aspect = (data.frame_w && data.frame_h) ? data.frame_h / data.frame_w : 9 / 16;
+  const W = canvas.width = canvas.clientWidth || 640;
+  const H = canvas.height = Math.round(W * aspect);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  if (bg) { ctx.globalAlpha = 0.5; ctx.drawImage(bg, 0, 0, W, H); ctx.globalAlpha = 1; }
+  else { ctx.fillStyle = '#05070d'; ctx.fillRect(0, 0, W, H); }
+  const cw = W / data.grid_w, ch = H / data.grid_h, max = Math.max(1, data.max);
+  ctx.filter = 'blur(9px)';
+  (data.cells || []).forEach(c => {
+    const t = Math.min(1, c.v / max), col = heatColor(t);
+    ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${(0.12 + 0.66 * t).toFixed(3)})`;
+    ctx.fillRect(c.x * cw - cw, c.y * ch - ch, cw * 3, ch * 3);
+  });
+  ctx.filter = 'none';
+}
+
+async function loadHeatmap() {
+  const canvas = $('heat-canvas');
+  $('heat-info').innerText = 'Loading…';
+  try {
+    const base = await api('/api/heatmap');
+    let data = base;
+    const portion = $('heat-portion').value;
+    if (portion !== 'all' && base.max_frame) {
+      const mid = Math.floor(base.max_frame / 2);
+      data = await api('/api/heatmap' + (portion === 'first' ? `?end_frame=${mid}` : `?start_frame=${mid}`));
+    }
+    // background frame (auth via header → blob)
+    let bg = null;
+    try {
+      const res = await fetch('/api/heatmap/frame', { headers: { Authorization: authHeader() } });
+      if (res.ok) {
+        bg = new Image();
+        bg.src = URL.createObjectURL(await res.blob());
+        await new Promise(r => { bg.onload = r; bg.onerror = r; });
+      }
+    } catch (e) {}
+    drawHeatmap(canvas, data, (bg && bg.naturalWidth) ? bg : null);
+    $('heat-info').innerText = data.samples
+      ? `${data.samples.toLocaleString()} position samples · ${data.cells.length} active cells · densest spot = ${data.max} hits`
+      : 'No tracking data for this video yet — process a video first.';
+  } catch (e) { $('heat-info').innerText = e.message; }
+}
+$('heat-refresh').onclick = loadHeatmap;
+$('heat-portion').onchange = loadHeatmap;
+
+async function loadSummary() {
+  const body = $('sum-body');
+  body.innerHTML = '<div class="skel"></div><div class="skel" style="width:75%"></div>';
+  try {
+    const d = await api(`/api/reports/summary?period=${$('sum-period').value}`);
+    const zones = Object.entries(d.zone_headcount || {});
+    const susp = (d.suspicious_activities || []).slice(0, 6);
+    body.innerHTML =
+      `<div class="kv"><span>👥 Unique people (headcount)</span><b style="color:var(--accent-2); font-size:19px;">${esc(d.headcount)}</b></div>` +
+      `<div class="kv"><span>🚶 Total visits (incl. re-entries)</span><b>${esc(d.total_people_visits)}</b></div>` +
+      `<div class="kv"><span>🚗 Vehicles</span><b>${esc(d.total_vehicles)}</b></div>` +
+      `<div style="margin-top:12px; font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">Headcount by zone</div>` +
+      (zones.length ? zones.map(([z, c]) => `<div class="kv"><span>📍 Zone ${esc(z)}</span><b>${esc(c)}</b></div>`).join('') : '<div class="empty" style="padding:12px;">No zone activity in this period.</div>') +
+      `<div style="margin-top:12px; font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">Longest dwells</div>` +
+      (susp.length ? susp.map(a => `<div class="kv"><span>${esc(a.object)} · zone ${esc(a.zone)} · ${esc(fmtT(a.time))}</span><b class="tag">${esc(a.duration)}</b></div>`).join('') : '<div class="empty" style="padding:12px;">No notable dwells.</div>');
+  } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function loadPeriodic() {
+  const body = $('per-body');
+  body.innerHTML = '<div class="skel"></div><div class="skel" style="width:75%"></div>';
+  try {
+    const d = await api(`/api/reports/periodic?period=${$('per-period').value}`);
+    body.innerHTML = `<pre class="report">${esc(d.report_text || JSON.stringify(d, null, 2))}</pre>`;
+  } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('sum-period').onchange = loadSummary;
+$('per-period').onchange = loadPeriodic;
+
+/* =====================================================================
+   ZONES & RULES + HOLIDAYS (developer + admin)
+===================================================================== */
+LOADERS.zones = function () { loadZones(); loadHolidays(); loadLinesList(); };
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+function zonePolySVG(points) {
+  if (!points || points.length < 3) return '';
+  const pts = points.map(([x, y]) => `${(x * 100).toFixed(1)},${(y * 56).toFixed(1)}`).join(' ');
+  return `<svg class="zone-poly" viewBox="0 0 100 56" preserveAspectRatio="none"><polygon points="${pts}" fill="rgba(99,102,241,0.25)" stroke="#6366f1" stroke-width="1.5"/></svg>`;
+}
+
+async function loadZones() {
+  const el = $('zones-list');
+  el.innerHTML = '<div class="skel"></div><div class="skel" style="width:70%"></div>';
+  try {
+    const d = await api('/api/zones');
+    const zones = d.zones || [];
+    if (!zones.length) { el.innerHTML = '<div class="empty">No zones yet. Draw one on a processed video in <b>Video Analytics</b>.</div>'; return; }
+    el.innerHTML = '';
+    zones.forEach(z => {
+      const row = document.createElement('div');
+      row.className = 'zone-row';
+      const days = z.school_days || [];
+      row.innerHTML =
+        zonePolySVG(z.points) +
+        `<div class="zone-info">
+          <b>${esc(z.name || ('Zone ' + z.id))}</b> <span class="tag blue">cam ${esc(z.camera_id)} · zone ${esc(z.id)}</span>
+          ${z.restricted ? '<span class="tag red">⛔ RESTRICTED</span>' : '<span class="tag">open</span>'}
+          <div style="font-size:12px; color:var(--text-faint); margin-top:5px;">
+            ${z.active_hours ? `🕐 ${esc(z.active_hours.start)}–${esc(z.active_hours.end)}` : 'no hour rules'} · ${esc(z.points ? z.points.length : 0)} vertices
+          </div>
+        </div>
+        <div class="zone-ctrl">
+          <label><input type="checkbox" data-f="restricted" ${z.restricted ? 'checked' : ''}> Restricted</label>
+          <input type="time" class="inp" data-f="start" value="${esc(z.active_hours ? z.active_hours.start : '')}">
+          <input type="time" class="inp" data-f="end" value="${esc(z.active_hours ? z.active_hours.end : '')}">
+          <span style="display:flex; gap:4px;">${DAYS.map(dd => `<span class="daychip ${days.includes(dd) ? 'on' : ''}" data-day="${dd}">${dd}</span>`).join('')}</span>
+          <button class="btn sm acc" data-act="save">Save</button>
+          <button class="btn sm danger" data-act="del">Delete</button>
+        </div>`;
+      row.querySelectorAll('.daychip').forEach(dc => dc.onclick = () => dc.classList.toggle('on'));
+      row.querySelector('[data-act="save"]').onclick = async (ev) => {
+        const btn = ev.target;
+        const payload = { camera_id: z.camera_id, zone_id: z.id, restricted: row.querySelector('[data-f="restricted"]').checked };
+        const start = row.querySelector('[data-f="start"]').value, end = row.querySelector('[data-f="end"]').value;
+        if (start && end) {
+          payload.active_hours = { start, end };
+          payload.school_days = [...row.querySelectorAll('.daychip.on')].map(x => x.dataset.day);
+          if (!payload.school_days.length) payload.school_days = ['mon', 'tue', 'wed', 'thu', 'fri'];
         }
-
-        function clearSession() {
-            localStorage.removeItem('sentinel_token');
-            localStorage.removeItem('sentinel_role');
-            localStorage.removeItem('sentinel_user');
-        }
-
-        function checkAuth() {
-            if (!getAuthHeader()) {
-                loginOverlay.style.display = 'flex';
-                return;
-            }
-            fetch('/api/me', {
-                headers: { 'Authorization': getAuthHeader() }
-            }).then(res => {
-                if (res.status === 401) {
-                    clearSession();
-                    loginOverlay.style.display = 'flex';
-                } else {
-                    loginOverlay.style.display = 'none';
-                    initAppAfterAuth();
-                }
-            }).catch(() => {
-                loginOverlay.style.display = 'none';
-            });
-        }
-
-        loginBtnSubmit.addEventListener('click', () => {
-            const user = loginUsernameInput.value.trim();
-            const pass = loginPasswordInput.value.trim();
-            if (!user || !pass) return;
-
-            fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: user, password: pass })
-            }).then(res => {
-                if (res.status === 200) return res.json();
-                throw new Error('bad-credentials');
-            }).then(data => {
-                localStorage.setItem('sentinel_token', data.token);
-                localStorage.setItem('sentinel_role', data.role);
-                localStorage.setItem('sentinel_user', data.username);
-                loginOverlay.style.display = 'none';
-                loginErrorMsg.style.display = 'none';
-                initAppAfterAuth();
-            }).catch(err => {
-                if (err.message === 'bad-credentials') {
-                    loginErrorMsg.innerText = "Invalid username or password.";
-                } else {
-                    loginErrorMsg.innerText = "Connection error. Is backend server running?";
-                }
-                loginErrorMsg.style.display = 'block';
-            });
+        try {
+          await api('/api/zones/rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          btn.innerText = '✓ Saved'; toast('Zone rules updated', `${z.name || 'Zone ' + z.id}`, 'ok');
+          setTimeout(loadZones, 900);
+        } catch (e) { toast('Save failed', e.message, 'err'); }
+      };
+      row.querySelector('[data-act="del"]').onclick = () => {
+        confirmDlg('Delete zone?', `Zone ${z.id} (${z.name || ''}) on camera ${z.camera_id} will be removed. Events already logged stay in the database.`, async () => {
+          try {
+            await api(`/api/zones/${z.id}`, { method: 'DELETE' });
+            toast('Zone deleted', `Zone ${z.id} removed.`, 'ok');
+            loadZones();
+          } catch (e) { toast('Delete failed', e.message, 'err'); }
         });
+      };
+      el.appendChild(row);
+    });
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('zones-refresh').onclick = loadZones;
 
-        loginPasswordInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') loginBtnSubmit.click();
-        });
+async function loadHolidays() {
+  const el = $('holiday-list');
+  try {
+    const d = await api('/api/holidays');
+    const hs = d.holidays || [];
+    el.innerHTML = hs.length
+      ? hs.map(h => `<div class="kv"><span>📅 ${esc(h)}</span><button class="btn sm danger" data-d="${esc(h)}">Remove</button></div>`).join('')
+      : '<div class="empty" style="padding:14px;">No holidays — every weekday counts as a school day.</div>';
+    el.querySelectorAll('button[data-d]').forEach(b => b.onclick = async () => {
+      try { await api(`/api/holidays/${b.dataset.d}`, { method: 'DELETE' }); loadHolidays(); toast('Holiday removed', b.dataset.d, 'ok'); }
+      catch (e) { toast('Failed', e.message, 'err'); }
+    });
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('holiday-add').onclick = async () => {
+  const date = $('holiday-date').value;
+  if (!date) return;
+  try {
+    await api('/api/holidays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date }) });
+    toast('Holiday added', date, 'ok');
+    loadHolidays();
+  } catch (e) { toast('Failed', e.message, 'err'); }
+};
 
-        // Try to trigger auth check on load
-        window.addEventListener('DOMContentLoaded', checkAuth);
+/* =====================================================================
+   AUDIT LOG (view: dev/tech/principal · clear: dev only)
+===================================================================== */
+LOADERS.audit = loadAudit;
 
-        function initAppAfterAuth() {
-            const role = getRole();
-            const username = localStorage.getItem('sentinel_user') || '';
-            console.log(`Authenticated as ${username} (${role}).`);
+async function loadAudit() {
+  const el = $('audit-body');
+  el.innerHTML = '<div class="skel"></div><div class="skel" style="width:80%"></div>';
+  const p = new URLSearchParams({ limit: 200 });
+  if ($('audit-user').value.trim()) p.set('username', $('audit-user').value.trim());
+  if ($('audit-action').value.trim()) p.set('action', $('audit-action').value.trim());
+  try {
+    const d = await api('/api/audit?' + p.toString());
+    const rows = d.entries || [];
+    el.innerHTML = rows.length
+      ? `<table class="tbl"><thead><tr><th>When</th><th>User</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead><tbody>` +
+        rows.map(e =>
+          `<tr><td class="mono" style="white-space:nowrap;">${esc(e.timestamp)}</td>` +
+          `<td>${esc(e.username)} <span style="color:var(--text-faint);">(${esc(e.role)})</span></td>` +
+          `<td><span class="tag ${e.action.includes('fail') || e.action.includes('clear') ? 'red' : 'blue'}">${esc(e.action)}</span></td>` +
+          `<td>${esc(e.target || '-')}</td><td style="color:var(--text-faint);">${esc(e.details || '')}</td>` +
+          `<td class="mono" style="color:var(--text-faint);">${esc(e.ip || '')}</td></tr>`).join('') +
+        `</tbody></table>`
+      : '<div class="empty">No audit entries match.</div>';
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('audit-refresh').onclick = loadAudit;
+$('audit-user').addEventListener('keydown', e => { if (e.key === 'Enter') loadAudit(); });
+$('audit-action').addEventListener('keydown', e => { if (e.key === 'Enter') loadAudit(); });
+$('audit-clear').onclick = () => {
+  confirmDlg('Purge the audit trail?', 'Every entry will be permanently deleted. The purge itself is recorded with your username. Developer only — this cannot be undone.', async () => {
+    try {
+      const d = await api('/api/audit', { method: 'DELETE' });
+      toast('Audit log cleared', `${d.removed} entries purged.`, 'ok');
+      loadAudit();
+    } catch (e) { toast('Clear failed', e.message, 'err'); }
+  });
+};
 
-            const roleBadge = document.getElementById('role-badge');
-            if (roleBadge) {
-                roleBadge.style.display = 'flex';
-                roleBadge.querySelector('span:last-child').innerText = `${username} · ${role.toUpperCase()}`;
-            }
+/* =====================================================================
+   LICENSE — issue & govern licenses (developer only)
+===================================================================== */
+let licOptions = null;
 
-            // Role-based section visibility (developer sees everything)
-            document.querySelectorAll('[data-roles]').forEach(el => {
-                const allowed = el.getAttribute('data-roles').split(',');
-                el.style.display = (role === 'developer' || allowed.includes(role)) ? '' : 'none';
-            });
+LOADERS.license = async function () {
+  loadLicenseCurrent();
+  await loadLicenseOptions();
+};
 
-            if (role === 'principal') {
-                // Principal keeps playback (jump-to-footage) but cannot upload/reconfigure.
-                const uz = document.getElementById('upload-zone');
-                if (uz) uz.style.display = 'none';
-                const zc = document.getElementById('zone-controls');
-                if (zc) zc.dataset.locked = '1';
-            }
+async function loadLicenseCurrent() {
+  const el = $('lic-current');
+  try {
+    const d = await api('/api/license');
+    const color = d.mode === 'licensed' ? 'var(--success)' : (d.mode === 'evaluation' ? 'var(--warning)' : 'var(--danger)');
+    el.innerHTML =
+      `<div class="kv"><span>Status</span><b style="color:${color}; text-transform:uppercase;">${esc(d.mode)}</b></div>` +
+      `<div class="kv"><span>Client</span><b>${esc(d.client_id || '-')}</b></div>` +
+      `<div class="kv"><span>Camera limit</span><b style="color:var(--accent-2); font-size:17px;">${esc(d.max_cameras)}</b></div>` +
+      `<div class="kv"><span>Cameras configured</span><b>${esc(d.cameras_configured)}</b></div>` +
+      `<div class="kv"><span>Expires</span><b>${esc(d.expiration || 'never')}</b></div>` +
+      `<div class="kv"><span>Hardware lock</span><b>${d.hardware_locked ? 'ON' : 'OFF'}</b></div>` +
+      `<div style="margin:12px 0 6px; font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">This machine's fingerprint</div>` +
+      `<div class="mono" style="color:var(--accent-2); word-break:break-all;">${esc(d.hardware_fingerprint)}</div>` +
+      `<div style="margin:12px 0 8px; font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">Licensed features</div>` +
+      `<div style="display:flex; gap:6px; flex-wrap:wrap;">${(d.features || []).map(f => `<span class="tag blue">${esc(f)}</span>`).join('') || '<em>none</em>'}</div>`;
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
 
-            if (role === 'developer') loadLicensePanel();
-            if (role === 'developer' || role === 'tech') { loadZoneRulesPanel(); loadHolidaysPanel(); }
-            if (role === 'developer' || role === 'principal') { loadNotifications(); loadHeadcountReport(); }
-            connectAlertSocket();
-        }
+async function loadLicenseOptions() {
+  try {
+    licOptions = await api('/api/license/options');
+  } catch (e) { licOptions = null; return; }
+  // one checkbox per grantable feature (all ticked by default)
+  $('lic-features').innerHTML = licOptions.all_features.map(f =>
+    `<label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">` +
+    `<input type="checkbox" class="lic-feat" value="${esc(f)}" checked> ${esc(f)}</label>`).join('');
+  // minting needs the private key — disable + warn if it isn't on this machine
+  const warn = $('lic-signing-warn');
+  const canSign = !!licOptions.signing_key_available;
+  warn.style.display = canSign ? 'none' : '';
+  if (!canSign) warn.innerText = '⚠ Private signing key not found on this machine — you can fill the form but minting is disabled. Run on a developer machine that holds dev_keys/.';
+  $('lic-generate').disabled = !canSign;
+  $('lic-generate-apply').disabled = !canSign;
+  // sensible default expiry: today + 1 year
+  if (!$('lic-expiry').value) {
+    const dt = new Date(); dt.setDate(dt.getDate() + 365);
+    $('lic-expiry').value = dt.toISOString().slice(0, 10);
+  }
+}
 
-        document.addEventListener('click', (e) => {
-            if (e.target && e.target.id === 'logout-btn') {
-                clearSession();
-                location.reload();
-            }
-        });
+function licSelectedFeatures() {
+  return Array.from(document.querySelectorAll('.lic-feat:checked')).map(c => c.value);
+}
+function licResolveFingerprint() {
+  const mode = $('lic-hwmode').value;
+  if (mode === 'ANY') return 'ANY';
+  if (mode === 'machine') return (licOptions && licOptions.machine_fingerprint) || '';
+  return $('lic-hw-custom').value.trim();
+}
+function licApplyPreset(name) {
+  const p = licOptions && licOptions.presets && licOptions.presets[name];
+  if (!p) return;
+  $('lic-cameras').value = p.max_cameras;
+  const dt = new Date(); dt.setDate(dt.getDate() + (p.days_valid || 365));
+  $('lic-expiry').value = dt.toISOString().slice(0, 10);
+  const all = (p.features || []).includes('all');
+  document.querySelectorAll('.lic-feat').forEach(c => c.checked = all || (p.features || []).includes(c.value));
+}
 
-        // Prevent click events on the file input from bubbling up to the upload zone (avoiding loop)
-        fileInput.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
+async function licGenerate(apply) {
+  const body = {
+    client_id: $('lic-client').value.trim(),
+    max_cameras: parseInt($('lic-cameras').value, 10) || 0,
+    expiry: $('lic-expiry').value,
+    features: licSelectedFeatures(),
+    fingerprint: licResolveFingerprint(),
+    apply: !!apply,
+  };
+  if (!body.client_id) { toast('Missing client', 'Enter a client ID.', 'warn'); return; }
+  if (!body.features.length) { toast('No features', 'Select at least one feature.', 'warn'); return; }
+  if ($('lic-hwmode').value === 'custom' && !body.fingerprint) { toast('Missing fingerprint', 'Enter the client fingerprint or pick ANY.', 'warn'); return; }
+  try {
+    const d = await api('/api/license/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    $('lic-result').style.display = '';
+    $('lic-key-out').value = d.license_key;
+    const inf = d.info || {};
+    $('lic-result-info').innerHTML =
+      `<span class="tag ${inf.mode === 'licensed' ? 'blue' : 'amber'}">${esc((inf.mode || '').toUpperCase())}</span> ` +
+      `<span class="tag">${esc(inf.max_cameras)} cams</span> ` +
+      `<span class="tag">exp ${esc(inf.expiration || 'never')}</span> ` +
+      `<span class="tag">${(inf.features || []).length} features</span>`;
+    $('lic-apply-generated').style.display = d.applied ? 'none' : '';
+    if (d.applied) { toast('License activated', `${body.client_id} is now live on this server.`, 'ok'); loadLicenseCurrent(); loadLicensePill(); }
+    else { toast('Key generated', 'Copy it, or activate it on this server.', 'ok'); }
+  } catch (e) { toast('Generation failed', e.message, 'err'); }
+}
 
-        // Click to upload
-        uploadZone.addEventListener('click', () => {
-            fileInput.click();
-        });
+async function licActivate(key, clearEl) {
+  if (!key) { toast('Empty', 'Paste a license key first.', 'warn'); return; }
+  try {
+    await api('/api/license/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ license_key: key }) });
+    toast('Activated', 'license.key replaced on this server.', 'ok');
+    if (clearEl) clearEl.value = '';
+    $('lic-apply-generated').style.display = 'none';
+    loadLicenseCurrent(); loadLicensePill();
+  } catch (e) { toast('Activate failed', e.message, 'err'); }
+}
 
-        // Drag & drop handlers
-        uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
-        });
+$('lic-hwmode').onchange = () => { $('lic-hw-custom-wrap').style.display = $('lic-hwmode').value === 'custom' ? '' : 'none'; };
+$('lic-feat-all').onclick = () => document.querySelectorAll('.lic-feat').forEach(c => c.checked = true);
+$('lic-feat-none').onclick = () => document.querySelectorAll('.lic-feat').forEach(c => c.checked = false);
+$('lic-preset-trial').onclick = () => licApplyPreset('trial');
+$('lic-preset-full').onclick = () => licApplyPreset('full');
+$('lic-generate').onclick = () => licGenerate(false);
+$('lic-generate-apply').onclick = () => licGenerate(true);
+$('lic-copy').onclick = () => navigator.clipboard.writeText($('lic-key-out').value).then(() => toast('Copied', 'License key copied to clipboard.', 'ok'));
+$('lic-apply-generated').onclick = () => licActivate($('lic-key-out').value, null);
+$('lic-paste-apply').onclick = () => licActivate($('lic-paste').value.trim(), $('lic-paste'));
 
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
+/* =====================================================================
+   ADMIN — license + users (developer only)
+===================================================================== */
+LOADERS.admin = function () { loadLicense(); loadUsers(); };
 
-        uploadZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                handleFileUpload(e.dataTransfer.files[0]);
-            }
-        });
+async function loadLicense() {
+  const body = $('license-body');
+  try {
+    const d = await api('/api/license');
+    const color = d.mode === 'licensed' ? 'var(--success)' : (d.mode === 'evaluation' ? 'var(--warning)' : 'var(--danger)');
+    body.innerHTML =
+      `<div class="kv"><span>Status</span><b style="color:${color}; text-transform:uppercase;">${esc(d.mode)}</b></div>` +
+      `<div class="kv"><span>Client</span><b>${esc(d.client_id || '-')}</b></div>` +
+      `<div class="kv"><span>Camera limit</span><b style="color:var(--accent-2); font-size:17px;">${esc(d.max_cameras)}</b></div>` +
+      `<div class="kv"><span>Cameras configured</span><b>${esc(d.cameras_configured)}</b></div>` +
+      `<div class="kv"><span>Expires</span><b>${esc(d.expiration || 'never')}</b></div>` +
+      `<div style="margin:12px 0 6px; font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">Hardware fingerprint</div>` +
+      `<div class="mono" style="color:var(--accent-2); word-break:break-all;">${esc(d.hardware_fingerprint)}</div>` +
+      `<div style="margin:12px 0 8px; font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:1px;">Licensed features</div>` +
+      `<div style="display:flex; gap:6px; flex-wrap:wrap;">${(d.features || []).map(f => `<span class="tag blue">${esc(f)}</span>`).join('') || '<em>none</em>'}</div>` +
+      `<div style="margin-top:14px; font-size:12px; color:var(--text-faint); line-height:1.6;">To extend this client, run <code class="mono">generate_key.py</code> with the fingerprint above and replace <code class="mono">license.key</code>. Expired keys revoke all camera access automatically.</div>`;
+  } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFileUpload(e.target.files[0]);
-            }
-        });
+async function loadUsers() {
+  const el = $('users-list');
+  try {
+    const d = await api('/api/users');
+    el.innerHTML = `<table class="tbl"><thead><tr><th>Username</th><th>Role</th><th>Created</th></tr></thead><tbody>` +
+      (d.users || []).map(u => `<tr><td><b>${esc(u.username)}</b></td><td><span class="tag ${u.role === 'developer' ? 'red' : u.role === 'tech' ? 'amber' : 'blue'}">${esc(u.role)}</span></td><td class="mono" style="color:var(--text-faint);">${esc(fmtT(u.created_at || ''))}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+$('nu-save').onclick = async () => {
+  const username = $('nu-user').value.trim(), password = $('nu-pass').value.trim(), role = $('nu-role').value;
+  if (!username || !password) { toast('Missing fields', 'Username and password are required.', 'warn'); return; }
+  try {
+    await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, role }) });
+    toast('User saved', `${username} (${role})`, 'ok');
+    $('nu-user').value = ''; $('nu-pass').value = '';
+    loadUsers();
+  } catch (e) { toast('Save failed', e.message, 'err'); }
+};
 
-        function handleFileUpload(file) {
-            uploadZone.style.display = 'none';
-            progressContainer.style.display = 'block';
-            progressFill.style.width = '0%';
-            progressPercent.innerText = '0%';
-            progressStatus.innerText = 'Uploading video...';
+/* =====================================================================
+   BOOT
+===================================================================== */
+window.addEventListener('hashchange', () => {
+  const want = (location.hash || '').replace('#/', '');
+  if (want && want !== State.view && $('app').classList.contains('on')) navigate(want);
+});
 
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/upload', true);
-            xhr.setRequestHeader('Authorization', getAuthHeader());
-
-            xhr.upload.onprogress = function(e) {
-                if (e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 100);
-                    progressFill.style.width = percent + '%';
-                    progressPercent.innerText = percent + '%';
-                }
-            };
-
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    const res = JSON.parse(xhr.responseText);
-                    if (res.status === 'processing') {
-                        progressFill.style.width = '99%';
-                        progressPercent.innerText = '99%';
-                        pollProcessingStatus(res.output_url, res.db_video_path);
-                    } else if (res.status === 'ready') {
-                        progressFill.style.width = '100%';
-                        progressPercent.innerText = '100%';
-                        progressStatus.innerText = 'Processing complete! Loading dashboard...';
-                        fetchEventsAndPlay(res.output_url, res.db_video_path);
-                    } else {
-                        alert('Processing failed: ' + (res.message || 'unknown error'));
-                        resetUpload();
-                    }
-                } else if (xhr.status === 401) {
-                    alert('Session expired. Please sign in again.');
-                    localStorage.removeItem('sentinel_auth');
-                    location.reload();
-                } else {
-                    alert('Upload failed.');
-                    resetUpload();
-                }
-            };
-
-            xhr.onerror = function() {
-                alert('Upload network error occurred.');
-                resetUpload();
-            };
-
-            xhr.ontimeout = function() {
-                alert('Upload request timed out.');
-                resetUpload();
-            };
-
-            xhr.send(formData);
-        }
-
-        function resetUpload() {
-            uploadZone.style.display = 'block';
-            progressContainer.style.display = 'none';
-            videoContainer.style.display = 'none';
-            document.getElementById('zone-controls').style.display = 'none';
-        }
-
-        let allDatabaseEvents = [];
-
-        function fetchEventsAndPlay(videoUrl, dbVideoPath) {
-            progressContainer.style.display = 'none';
-            videoContainer.style.display = 'block';
-            document.getElementById('zone-controls').style.display = 'flex';
-            window.currentDbVideoPath = dbVideoPath;
-            window.currentVideoUrl = videoUrl;
-            videoPlayer.src = videoUrl;
-            
-            // Fetch all database events for this specific video once
-            const eventsUrl = dbVideoPath ? `/api/events?video_path=${encodeURIComponent(dbVideoPath)}` : '/api/events';
-            fetch(eventsUrl, {
-                headers: { 'Authorization': getAuthHeader() }
-            })
-                .then(res => {
-                    if (res.status === 401) {
-                        localStorage.removeItem('sentinel_auth');
-                        location.reload();
-                        return { results: [] };
-                    }
-                    return res.json();
-                })
-                .then(data => {
-                    if (data && data.results) {
-                        allDatabaseEvents = data.results;
-                    }
-                    videoPlayer.play();
-                });
-        }
-
-        // Sync events to video time
-        videoPlayer.addEventListener('timeupdate', () => {
-            const currentTime = videoPlayer.currentTime;
-            renderEventsUpToTime(currentTime);
-        });
-
-        function renderEventsUpToTime(currentTime) {
-            alertsList.innerHTML = '';
-            
-            // Filter events that happened on or before the current video time
-            const visibleEvents = allDatabaseEvents.filter(e => (e.video_time || 0) <= currentTime);
-            
-            if (visibleEvents.length > 0) {
-                visibleEvents.forEach(event => {
-                            const dateStr = new Date(event.entry_time || event.timestamp).toLocaleTimeString();
-                            let eventClass = '';
-                            let badgeClass = '';
-                            let desc = '';
-
-                            if (event.event_type === 'fall_detected') {
-                                eventClass = 'fall';
-                                badgeClass = 'fall';
-                                desc = `GID ${event.global_id}: Fall detected in Zone ${event.zone_id}`;
-                            } else if (event.event_type === 'running_detected') {
-                                eventClass = 'running';
-                                badgeClass = 'running';
-                                desc = `GID ${event.global_id}: Running speed violation`;
-                            } else if (event.event_type === 'dress_code_violation') {
-                                eventClass = 'violation';
-                                badgeClass = 'violation';
-                                desc = `GID ${event.global_id}: Dress code compliance violation`;
-                            } else {
-                                desc = `GID ${event.global_id}: ${event.event_type}`;
-                            }
-
-                            const item = document.createElement('div');
-                            item.className = `alert-item ${eventClass}`;
-                            item.innerHTML = `
-                                <div class="alert-header">
-                                    <span class="alert-badge ${badgeClass}">${event.event_type.replace('_', ' ')}</span>
-                                    <span class="alert-time">${dateStr}</span>
-                                </div>
-                                <div class="alert-desc">${desc}</div>
-                            `;
-                            alertsList.appendChild(item);
-                        });
-                    }
-        }
-
-        // Search trigger
-        searchBtn.addEventListener('click', executeSearch);
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') executeSearch();
-        });
-
-        function executeSearch() {
-            const query = searchInput.value.trim();
-            if (!query) return;
-
-            searchResultsList.innerHTML = '<div style="color: var(--text-muted);">Searching...</div>';
-
-            fetch('/api/query', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': getAuthHeader() },
-                body: JSON.stringify({ query: query })
-            })
-            .then(res => res.json())
-            .then(data => {
-                searchResultsList.innerHTML = '';
-                if (data.results && data.results.length > 0) {
-                    data.results.forEach(r => {
-                        const item = document.createElement('div');
-                        item.className = 'result-item';
-                        item.innerHTML = `
-                            <div class="result-meta">
-                                <div class="result-title">${r.display_label || r.event_type}</div>
-                                <div class="result-details">
-                                    <span>GID: ${r.global_id || '-'}</span>
-                                    <span>Zone: ${r.zone_id || '-'}</span>
-                                    <span>Time: ${r.video_time ? r.video_time.toFixed(1) + 's' : '-'}</span>
-                                </div>
-                            </div>
-                            <button class="result-play-btn" onclick="seekToEvent('${(r.video_path || '').replace(/\\/g, '\\\\')}', ${r.video_time || 0})">Seek Video</button>
-                        `;
-                        searchResultsList.appendChild(item);
-                    });
-                } else {
-                    searchResultsList.innerHTML = '<div style="color: var(--text-muted); font-size: 14px;">No matching incidents found.</div>';
-                }
-            })
-            .catch(() => {
-                searchResultsList.innerHTML = '<div style="color: var(--alert-danger);">Failed to execute search.</div>';
-            });
-        }
-
-        function getWebVideoUrl(videoPath) {
-            if (!videoPath) return '';
-            const parts = videoPath.split(/[\\/]/);
-            const filename = parts[parts.length - 1];
-            return `/static/outputs/processed_${filename}`;
-        }
-
-        function seekToEvent(videoPath, time) {
-            const videoUrl = getWebVideoUrl(videoPath);
-            if (videoUrl && (!videoPlayer.src || !videoPlayer.src.includes(videoUrl))) {
-                fetchEventsAndPlay(videoUrl, videoPath);
-                videoPlayer.addEventListener('loadedmetadata', () => {
-                    videoPlayer.currentTime = time;
-                    videoPlayer.play();
-                }, { once: true });
-            } else if (videoPlayer.src) {
-                videoPlayer.currentTime = time;
-                videoPlayer.play();
-            }
-        }
-
-        // Zone Editor Configuration
-        const zoneCanvas = document.getElementById('zone-canvas');
-        const ctx = zoneCanvas.getContext('2d');
-        const btnEditZone = document.getElementById('btn-edit-zone');
-        const btnSaveZone = document.getElementById('btn-save-zone');
-        const btnCancelZone = document.getElementById('btn-cancel-zone');
-
-        let isDrawing = false;
-        let startX = 0;
-        let startY = 0;
-        let endX = 0;
-        let endY = 0;
-
-        btnEditZone.addEventListener('click', () => {
-            videoPlayer.pause();
-            
-            // Sync canvas display size to video element size
-            zoneCanvas.width = videoPlayer.clientWidth;
-            zoneCanvas.height = videoPlayer.clientHeight;
-            
-            zoneCanvas.style.display = 'block';
-            btnEditZone.style.display = 'none';
-            btnSaveZone.style.display = 'inline-block';
-            btnCancelZone.style.display = 'inline-block';
-            
-            drawCanvasState();
-        });
-
-        function drawCanvasState() {
-            ctx.clearRect(0, 0, zoneCanvas.width, zoneCanvas.height);
-            
-            // Draw transparent background overlay
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(0, 0, zoneCanvas.width, zoneCanvas.height);
-            
-            if (isDrawing || (startX !== endX && startY !== endY)) {
-                const x = Math.min(startX, endX);
-                const y = Math.min(startY, endY);
-                const w = Math.abs(startX - endX);
-                const h = Math.abs(startY - endY);
-                
-                ctx.clearRect(x, y, w, h);
-                
-                // Draw border for the selection rectangle
-                ctx.strokeStyle = '#0096ff';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(x, y, w, h);
-                
-                // Draw coordinates/info text
-                ctx.fillStyle = '#f5f5fa';
-                ctx.font = '14px Outfit';
-                ctx.fillText(`Detection Zone Selection: ${Math.round(w)}x${Math.round(h)}`, x + 5, y - 8);
-            } else {
-                ctx.fillStyle = '#f5f5fa';
-                ctx.font = '16px Outfit';
-                ctx.textAlign = 'center';
-                ctx.fillText('Click & Drag to define custom detection zone', zoneCanvas.width / 2, zoneCanvas.height / 2);
-            }
-        }
-
-        zoneCanvas.addEventListener('mousedown', (e) => {
-            const rect = zoneCanvas.getBoundingClientRect();
-            startX = e.clientX - rect.left;
-            startY = e.clientY - rect.top;
-            endX = startX;
-            endY = startY;
-            isDrawing = true;
-            drawCanvasState();
-        });
-
-        zoneCanvas.addEventListener('mousemove', (e) => {
-            if (!isDrawing) return;
-            const rect = zoneCanvas.getBoundingClientRect();
-            endX = e.clientX - rect.left;
-            endY = e.clientY - rect.top;
-            drawCanvasState();
-        });
-
-        zoneCanvas.addEventListener('mouseup', () => {
-            isDrawing = false;
-        });
-
-        btnCancelZone.addEventListener('click', () => {
-            zoneCanvas.style.display = 'none';
-            btnEditZone.style.display = 'inline-block';
-            btnSaveZone.style.display = 'none';
-            btnCancelZone.style.display = 'none';
-            ctx.clearRect(0, 0, zoneCanvas.width, zoneCanvas.height);
-            startX = startY = endX = endY = 0;
-        });
-
-        btnSaveZone.addEventListener('click', () => {
-            if (startX === endX || startY === endY) {
-                alert('Please draw a valid rectangular detection zone.');
-                return;
-            }
-            
-            // Normalize points coordinates
-            const cw = zoneCanvas.width;
-            const ch = zoneCanvas.height;
-            const x1 = Math.min(startX, endX) / cw;
-            const y1 = Math.min(startY, endY) / ch;
-            const x2 = Math.max(startX, endX) / cw;
-            const y2 = Math.max(startY, endY) / ch;
-            
-            const points = [
-                [x1, y1],
-                [x2, y1],
-                [x2, y2],
-                [x1, y2]
-            ];
-            
-            progressStatus.innerText = 'Updating detection zone...';
-            progressPercent.innerText = '';
-            progressContainer.style.display = 'block';
-            videoContainer.style.display = 'none';
-            document.getElementById('zone-controls').style.display = 'none';
-            
-            fetch('/api/zones', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': getAuthHeader()
-                },
-                body: JSON.stringify({
-                    id: 1,
-                    camera_id: 1,
-                    name: 'Custom Zone',
-                    points: points,
-                    max_occupancy: 3
-                })
-            })
-            .then(res => {
-                if (res.status === 403) {
-                    throw new Error('License limit reached or invalid license.');
-                }
-                return res.json();
-            })
-            .then(data => {
-                progressStatus.innerText = 'Re-processing video with new zone...';
-                return fetch('/api/reprocess', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': getAuthHeader()
-                    },
-                    body: JSON.stringify({
-                        video_path: window.currentDbVideoPath
-                    })
-                });
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'processing') {
-                    zoneCanvas.style.display = 'none';
-                    btnEditZone.style.display = 'inline-block';
-                    btnSaveZone.style.display = 'none';
-                    btnCancelZone.style.display = 'none';
-                    startX = startY = endX = endY = 0;
-                    
-                    pollProcessingStatus(data.output_url, data.db_video_path);
-                } else if (data.status === 'ready') {
-                    zoneCanvas.style.display = 'none';
-                    btnEditZone.style.display = 'inline-block';
-                    btnSaveZone.style.display = 'none';
-                    btnCancelZone.style.display = 'none';
-                    startX = startY = endX = endY = 0;
-                    
-                    fetchEventsAndPlay(data.output_url, data.db_video_path);
-                } else {
-                    alert('Reprocessing failed: ' + (data.message || 'unknown error'));
-                    resetUpload();
-                }
-            })
-            .catch(err => {
-                alert('Error: ' + err.message);
-                resetUpload();
-            });
-        });
-
-        // Background Processing Status Poller
-        function pollProcessingStatus(videoUrl, dbVideoPath) {
-            progressStatus.innerText = 'Server is processing video, please wait...';
-            
-            const interval = setInterval(() => {
-                fetch(`/api/status?video_path=${encodeURIComponent(dbVideoPath)}`, {
-                    headers: { 'Authorization': getAuthHeader() }
-                })
-                .then(res => {
-                    if (res.status === 401) {
-                        clearInterval(interval);
-                        localStorage.removeItem('sentinel_auth');
-                        location.reload();
-                    }
-                    return res.json();
-                })
-                .then(data => {
-                    if (data.status === 'ready') {
-                        clearInterval(interval);
-                        progressFill.style.width = '100%';
-                        progressPercent.innerText = '100%';
-                        progressStatus.innerText = 'Processing complete! Loading dashboard...';
-                        fetchEventsAndPlay(videoUrl, dbVideoPath);
-                    } else if (data.status === 'processing') {
-                        const progress = data.progress !== undefined ? data.progress : 99;
-                        progressFill.style.width = progress + '%';
-                        progressPercent.innerText = progress + '%';
-                    } else if (data.status && data.status.startsWith('error')) {
-                        clearInterval(interval);
-                        alert('Video processing failed on server: ' + data.status);
-                        resetUpload();
-                    }
-                })
-                .catch(err => {
-                    console.warn('Polling error:', err);
-                });
-            }, 2000);
-        }
-
-        // ------------------------------------------------------------------
-        // Role panels
-        // ------------------------------------------------------------------
-
-        function authFetch(url, options = {}) {
-            options.headers = Object.assign({}, options.headers, { 'Authorization': getAuthHeader() });
-            return fetch(url, options).then(res => {
-                if (res.status === 401) { clearSession(); location.reload(); throw new Error('unauthorized'); }
-                return res;
-            });
-        }
-
-        // --- Principal: notifications inbox ---
-        function loadNotifications() {
-            const list = document.getElementById('notifications-list');
-            authFetch('/api/notifications?limit=50')
-                .then(res => res.json())
-                .then(data => {
-                    const notes = data.notifications || [];
-                    if (!notes.length) {
-                        list.innerHTML = '<div style="color: var(--text-muted); font-size: 14px;">No notifications yet. Alerts from restricted zones, after-hours entries, and falls will appear here with snapshot photos.</div>';
-                        return;
-                    }
-                    list.innerHTML = '';
-                    notes.forEach(n => {
-                        const item = document.createElement('div');
-                        item.className = 'result-item';
-                        item.style.cssText = 'display:block; padding: 12px; margin-bottom: 10px; border: 1px solid ' + (n.read ? 'var(--border-muted)' : 'var(--border-glow)') + '; border-radius: 10px; background: var(--bg-card);';
-                        const snapshotHtml = n.snapshot_path && n.alert_id
-                            ? `<img data-alert-id="${n.alert_id}" alt="snapshot"
-                                    style="display:none; width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border-muted);">`
-                            : '';
-                        item.innerHTML = `
-                            <div style="display:flex; justify-content: space-between; gap: 8px;">
-                                <strong style="color: ${n.read ? 'var(--text-muted)' : 'var(--text-main)'};">${n.read ? '' : '🔵 '}${n.title}</strong>
-                                <span style="color: var(--text-muted); font-size: 12px; white-space: nowrap;">${(n.timestamp || '').replace('T', ' ')}</span>
-                            </div>
-                            <div style="color: var(--text-muted); font-size: 13px; margin-top: 6px;">${n.message || ''}</div>
-                            <div style="color: var(--text-muted); font-size: 12px; margin-top: 6px;">
-                                Camera ${n.camera_id ?? '-'} · Zone ${n.zone_name || '-'} · ${n.object_type || ''} GID ${n.global_id ?? '-'}
-                            </div>
-                            ${n.snapshot_path && n.alert_id ? `<button class="result-play-btn" style="margin-top: 8px; font-size: 12px;" onclick="toggleSnapshot(this)">📸 View snapshot</button>` : ''}
-                            ${snapshotHtml}
-                        `;
-                        list.appendChild(item);
-                    });
-                })
-                .catch(err => {
-                    if (err.message !== 'unauthorized')
-                        list.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Notifications unavailable (feature not licensed or server error).</div>';
-                });
-        }
-
-        function toggleSnapshot(btn) {
-            const img = btn.nextElementSibling;
-            if (!img) return;
-            const showing = img.style.display !== 'none';
-            if (showing) {
-                img.style.display = 'none';
-                btn.innerText = '📸 View snapshot';
-                return;
-            }
-            // <img> can't send Authorization headers — fetch the snapshot as a blob.
-            if (!img.src) {
-                btn.innerText = 'Loading…';
-                authFetch(`/api/alerts/${img.dataset.alertId}/snapshot`)
-                    .then(res => { if (!res.ok) throw new Error('no-snapshot'); return res.blob(); })
-                    .then(blob => {
-                        img.src = URL.createObjectURL(blob);
-                        img.style.display = 'block';
-                        btn.innerText = '🙈 Hide snapshot';
-                    })
-                    .catch(() => { btn.innerText = '⚠ Snapshot unavailable'; });
-            } else {
-                img.style.display = 'block';
-                btn.innerText = '🙈 Hide snapshot';
-            }
-        }
-
-        document.addEventListener('click', (e) => {
-            if (e.target && e.target.id === 'notif-mark-read') {
-                authFetch('/api/notifications/read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
-                }).then(() => loadNotifications());
-            }
-        });
-
-        // --- Principal: headcount report ---
-        function loadHeadcountReport() {
-            const period = document.getElementById('report-period').value;
-            const body = document.getElementById('report-body');
-            authFetch(`/api/reports/summary?period=${period}`)
-                .then(res => res.json())
-                .then(d => {
-                    const zoneRows = Object.entries(d.zone_headcount || {})
-                        .map(([z, c]) => `<div>&nbsp;&nbsp;• Zone ${z}: <strong style="color: var(--text-main);">${c}</strong> unique people</div>`)
-                        .join('') || '<div>&nbsp;&nbsp;• No zone activity in this period.</div>';
-                    const suspicious = (d.suspicious_activities || []).slice(0, 5)
-                        .map(a => `<div>&nbsp;&nbsp;• ${a.object} in zone ${a.zone} for ${a.duration} (${(a.time || '').replace('T', ' ')})</div>`)
-                        .join('') || '<div>&nbsp;&nbsp;• All clear — no prolonged stays.</div>';
-                    body.innerHTML = `
-                        <div>👥 Unique people (headcount): <strong style="color: var(--primary); font-size: 20px;">${d.headcount}</strong></div>
-                        <div>🚶 Total visits (incl. re-entries): <strong style="color: var(--text-main);">${d.total_people_visits}</strong></div>
-                        <div>🚗 Vehicles: <strong style="color: var(--text-main);">${d.total_vehicles}</strong></div>
-                        <div style="margin-top: 8px;">📍 Headcount by zone:</div>${zoneRows}
-                        <div style="margin-top: 8px;">⚠️ Prolonged stays:</div>${suspicious}
-                    `;
-                })
-                .catch(err => {
-                    if (err.message !== 'unauthorized')
-                        body.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Reports unavailable (feature not licensed or server error).</div>';
-                });
-        }
-
-        document.addEventListener('change', (e) => {
-            if (e.target && e.target.id === 'report-period') loadHeadcountReport();
-        });
-
-        // --- Tech: zone alert rules ---
-        function loadZoneRulesPanel() {
-            const container = document.getElementById('zone-rules-list');
-            authFetch('/api/zones')
-                .then(res => res.json())
-                .then(data => {
-                    const zones = data.zones || [];
-                    if (!zones.length) {
-                        container.innerHTML = '<div style="color: var(--text-muted);">No zones configured yet. Upload a video and configure a detection zone first.</div>';
-                        return;
-                    }
-                    container.innerHTML = '';
-                    zones.forEach(z => {
-                        const row = document.createElement('div');
-                        row.style.cssText = 'padding: 12px; margin-bottom: 10px; border: 1px solid var(--border-muted); border-radius: 10px; background: var(--bg-card);';
-                        const hours = z.active_hours ? `${z.active_hours.start}–${z.active_hours.end}` : '';
-                        row.innerHTML = `
-                            <div style="display:flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                <div>
-                                    <strong>${z.name}</strong>
-                                    <span style="color: var(--text-muted); font-size: 12px;">(camera ${z.camera_id}, zone ${z.id})</span>
-                                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                                        ${z.restricted ? '<span style="color: var(--alert-danger);">⛔ RESTRICTED</span>' : 'Open zone'}
-                                        ${hours ? ` · 🕐 ${hours} (${(z.school_days || []).join(', ') || 'mon-fri'})` : ''}
-                                    </div>
-                                </div>
-                                <div style="display:flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                                    <label style="font-size: 12px; color: var(--text-muted);"><input type="checkbox" ${z.restricted ? 'checked' : ''} data-zr="restricted"> Restricted</label>
-                                    <input type="time" data-zr="start" value="${z.active_hours ? z.active_hours.start : ''}" style="background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 6px; padding: 3px 6px;">
-                                    <input type="time" data-zr="end" value="${z.active_hours ? z.active_hours.end : ''}" style="background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-muted); border-radius: 6px; padding: 3px 6px;">
-                                    <button class="result-play-btn" style="font-size: 12px;" onclick="saveZoneRules(this, ${z.camera_id}, ${z.id})">Save</button>
-                                </div>
-                            </div>
-                        `;
-                        container.appendChild(row);
-                    });
-                })
-                .catch(() => { container.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Could not load zones.</div>'; });
-        }
-
-        function saveZoneRules(btn, cameraId, zoneId) {
-            const row = btn.closest('div[style*="border"]') || btn.parentElement.parentElement;
-            const restricted = row.querySelector('[data-zr="restricted"]').checked;
-            const start = row.querySelector('[data-zr="start"]').value;
-            const end = row.querySelector('[data-zr="end"]').value;
-            const payload = { camera_id: cameraId, zone_id: zoneId, restricted: restricted };
-            if (start && end) {
-                payload.active_hours = { start: start, end: end };
-                payload.school_days = ['mon', 'tue', 'wed', 'thu', 'fri'];
-            }
-            authFetch('/api/zones/rules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(res => {
-                btn.innerText = res.ok ? '✓ Saved' : '⚠ Failed';
-                setTimeout(() => { btn.innerText = 'Save'; loadZoneRulesPanel(); }, 1200);
-            });
-        }
-
-        // --- Tech: holidays ---
-        function loadHolidaysPanel() {
-            const list = document.getElementById('holidays-list');
-            authFetch('/api/holidays')
-                .then(res => res.json())
-                .then(data => {
-                    const holidays = data.holidays || [];
-                    if (!holidays.length) {
-                        list.innerHTML = '<div>No holidays configured. Zone-hours alerts treat every weekday as a school day.</div>';
-                        return;
-                    }
-                    list.innerHTML = holidays.map(h => `
-                        <div style="display:flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-muted);">
-                            <span>📅 ${h}</span>
-                            <button class="result-play-btn" style="font-size: 11px;" onclick="removeHoliday('${h}')">Remove</button>
-                        </div>`).join('');
-                })
-                .catch(() => { list.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Could not load holidays.</div>'; });
-        }
-
-        function removeHoliday(date) {
-            authFetch(`/api/holidays/${date}`, { method: 'DELETE' }).then(() => loadHolidaysPanel());
-        }
-
-        document.addEventListener('click', (e) => {
-            if (e.target && e.target.id === 'holiday-add') {
-                const date = document.getElementById('holiday-date').value;
-                if (!date) return;
-                authFetch('/api/holidays', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ date: date })
-                }).then(() => loadHolidaysPanel());
-            }
-        });
-
-        // --- Developer: license panel ---
-        function loadLicensePanel() {
-            const body = document.getElementById('license-body');
-            authFetch('/api/license')
-                .then(res => res.json())
-                .then(d => {
-                    const featureChips = (d.features || []).map(f =>
-                        `<span style="display:inline-block; background: rgba(0,150,255,0.12); border: 1px solid var(--border-glow); color: var(--primary); border-radius: 12px; padding: 2px 10px; font-size: 11px; margin: 2px;">${f}</span>`
-                    ).join('');
-                    const modeColor = d.mode === 'licensed' ? 'var(--alert-success)' : (d.mode === 'evaluation' ? 'var(--alert-warning)' : 'var(--alert-danger)');
-                    body.innerHTML = `
-                        <div>Status: <strong style="color: ${modeColor}; text-transform: uppercase;">${d.mode}</strong> — ${d.message}</div>
-                        <div>Client: <strong style="color: var(--text-main);">${d.client_id || '-'}</strong></div>
-                        <div>Camera limit: <strong style="color: var(--primary); font-size: 18px;">${d.max_cameras}</strong>
-                             &nbsp;(currently configured: <strong style="color: var(--text-main);">${d.cameras_configured}</strong>)</div>
-                        <div>Expires: <strong style="color: var(--text-main);">${d.expiration || 'never'}</strong></div>
-                        <div>Hardware fingerprint (for issuing keys): <code style="font-family: 'JetBrains Mono', monospace; color: var(--secondary);">${d.hardware_fingerprint}</code></div>
-                        <div style="margin-top: 6px;">Licensed features:<br>${featureChips || '<em>none</em>'}</div>
-                        <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
-                            To extend the client (e.g. trial 20 → contract 10,000 cameras), run <code>generate_key.py</code> on the dev machine with the fingerprint above and replace <code>license.key</code>. Expired keys automatically revoke all camera access.
-                        </div>
-                    `;
-                })
-                .catch(() => { body.innerHTML = '<div style="color: var(--alert-warning); font-size: 13px;">Could not load license status.</div>'; });
-        }
-
-        // --- Live alert stream over WebSocket ---
-        let alertSocket = null;
-        function connectAlertSocket() {
-            const token = localStorage.getItem('sentinel_token') || '';
-            if (!token || alertSocket) return;
-            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-            alertSocket = new WebSocket(`${proto}://${location.host}/ws/alerts?token=${encodeURIComponent(token)}`);
-            alertSocket.onopen = () => {
-                const dot = document.getElementById('live-dot');
-                if (dot) dot.style.display = 'inline';
-            };
-            alertSocket.onmessage = (msg) => {
-                try {
-                    const payload = JSON.parse(msg.data);
-                    if (payload.type === 'alert') {
-                        prependLiveAlert(payload.data);
-                        if (getRole() !== 'tech') loadNotifications();
-                    }
-                } catch (e) { /* ignore malformed frames */ }
-            };
-            alertSocket.onclose = () => {
-                alertSocket = null;
-                const dot = document.getElementById('live-dot');
-                if (dot) dot.style.display = 'none';
-                setTimeout(connectAlertSocket, 5000);
-            };
-        }
-
-        function prependLiveAlert(a) {
-            const item = document.createElement('div');
-            item.className = 'result-item';
-            item.style.cssText = 'padding: 10px; margin-bottom: 8px; border: 1px solid var(--alert-danger); border-radius: 10px; background: rgba(255,59,48,0.08); animation: fadeIn 0.4s;';
-            item.innerHTML = `
-                <div style="font-weight: 600; color: var(--alert-danger); font-size: 13px;">🚨 ${(a.alert_type || 'alert').replace(/_/g, ' ').toUpperCase()}</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${a.message || ''}</div>
-            `;
-            const placeholder = alertsList.querySelector('div[style*="text-align: center"]');
-            if (placeholder) placeholder.remove();
-            alertsList.prepend(item);
-        }
-    </script>
+(async function boot() {
+  if (!State.token) { $('login-screen').style.display = 'flex'; return; }
+  try {
+    const res = await fetch('/api/me', { headers: { 'Authorization': authHeader() } });
+    if (!res.ok) throw new Error();
+    const me = await res.json();
+    State.user = me.username; State.role = me.role;
+    localStorage.setItem('sentinel_user', me.username);
+    localStorage.setItem('sentinel_role', me.role);
+    enterApp();
+  } catch (e) {
+    doLogout(false);
+  }
+})();
+</script>
 </body>
 </html>

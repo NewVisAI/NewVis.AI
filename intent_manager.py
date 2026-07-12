@@ -18,43 +18,79 @@ class IntentManager:
 
     OBJECT_ALIAS = {
         "person": "person",
+        "persons": "person",
         "people": "person",
         "man": "person",
+        "men": "person",
         "woman": "person",
+        "women": "person",
         "car": "car",
+        "cars": "car",
         "truck": "truck",
+        "trucks": "truck",
         "bus": "bus",
+        "buses": "bus",
+        "busses": "bus",
         "bike": "motorcycle",
+        "bikes": "motorcycle",
         "bicycle": "motorcycle",
+        "bicycles": "motorcycle",
         "motorcycle": "motorcycle",
+        "motorcycles": "motorcycle",
+        "motorbike": "motorcycle",
+        "motorbikes": "motorcycle",
     }
 
     EVENT_ALIAS = {
         "enter": "entering",
+        "enters": "entering",
         "entered": "entering",
         "entering": "entering",
         "stay": "staying",
+        "stays": "staying",
         "stayed": "staying",
         "staying": "staying",
         "exit": "leaving",
+        "exits": "leaving",
         "leave": "leaving",
+        "leaves": "leaving",
         "leaving": "leaving",
         "uniform": "dress_code_violation",
+        "uniforms": "dress_code_violation",
         "dress": "dress_code_violation",
         "violation": "dress_code_violation",
         "violations": "dress_code_violation",
         "run": "running_detected",
+        "runs": "running_detected",
+        "ran": "running_detected",
         "running": "running_detected",
         "fall": "fall_detected",
+        "falls": "fall_detected",
         "fell": "fall_detected",
         "fallen": "fall_detected",
         "falling": "fall_detected",
         "collapse": "fall_detected",
+        "collapses": "fall_detected",
         "collapsed": "fall_detected",
         "slip": "fall_detected",
+        "slips": "fall_detected",
         "hazard": "fall_detected",
+        "hazards": "fall_detected",
+        "violence": "violence_detected",
+        "violent": "violence_detected",
+        "fight": "violence_detected",
+        "fights": "violence_detected",
+        "fighting": "violence_detected",
+        "altercation": "violence_detected",
+        "altercations": "violence_detected",
+        "anomaly": "violence_detected",
+        "anomalies": "violence_detected",
+        "scuffle": "violence_detected",
+        "brawl": "violence_detected",
         "intrusion": "restricted_zone_entry",
+        "intrusions": "restricted_zone_entry",
         "trespass": "restricted_zone_entry",
+        "trespasses": "restricted_zone_entry",
         "trespassing": "restricted_zone_entry",
     }
 
@@ -227,7 +263,9 @@ class IntentManager:
         return None
 
     def _extract_global_id(self, query: str) -> Optional[int]:
-        match = re.search(r"global(?:_?id)?\s*[:=#]?\s*(\d+)", query)
+        # Accept "global id 5", "global_id=5", and the "GID 5" abbreviation the
+        # dashboard shows everywhere ("gid 5", "gid#5", "g id 5").
+        match = re.search(r"(?:global(?:[_\s]?id)?|g\s?id)\s*[:=#]?\s*(\d+)", query)
         if match:
             return int(match.group(1))
         return None

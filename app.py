@@ -32,6 +32,7 @@ from event import (
 )
 from running import check_running, is_currently_running, reset_running_state
 from fall_detector import check_fall, is_currently_fallen, reset_fall_state
+from anomaly_detector import check_anomaly, reset_anomaly_state
 from alerts import init_alerts_db, raise_fall_alert, get_notifications, mark_notifications_read, get_alert_playback_entry
 from school_calendar import configure_holidays_interactive
 from zone_manager import configure_zone_rules_interactive
@@ -72,7 +73,10 @@ TRACKED_CLASSES = {"person", "bicycle", "car", "motorcycle", "bus", "truck"}
 DEFAULT_FPS = 25.0
 TARGET_PROCESS_FPS = 20.0
 MIN_FRAME_STRIDE = 2
-MAX_FRAME_STRIDE = 3
+# Lowered from 3: processing every 2nd frame (was every 3rd) keeps ByteTrack
+# continuous through occlusions so it re-links tracks itself before ReID is
+# needed — the biggest lever against one person fragmenting into many GIDs.
+MAX_FRAME_STRIDE = 2
 PLAYBACK_JUMP_SECONDS = 2
 LEFT_ARROW_KEYS = {81, 2424832, 65361}
 RIGHT_ARROW_KEYS = {83, 2555904, 65363}
@@ -102,6 +106,7 @@ class CameraRuntime:
     prev_gray_frame: Optional[np.ndarray] = None
     last_tracked_objects: List[Tuple] = field(default_factory=list)
     sv_zones: Optional[Dict[int, sv.PolygonZone]] = None
+    line_counter: Optional[object] = None
 
     def close(self) -> None:
         self.cap.release()
@@ -345,6 +350,14 @@ def _create_camera_runtime(camera_config: Dict[str, object]) -> Optional[CameraR
         if s_lower.startswith(("rtsp://", "rtmp://", "http://", "https://")) or s_lower.isdigit():
             is_live = True
 
+    # Directional line-crossing tripwires (turnstile-style counting).
+    from line_counter import get_camera_lines, build_pixel_lines, LineCrossingCounter
+    frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+    frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    line_defs = get_camera_lines(camera_config["camera_id"])
+    pixel_lines = build_pixel_lines(line_defs, (frame_h, frame_w)) if (frame_w and frame_h) else []
+    line_counter = LineCrossingCounter(pixel_lines)
+
     return CameraRuntime(
         camera_id=int(camera_config["camera_id"]),
         name=str(camera_config["name"]),
@@ -356,6 +369,7 @@ def _create_camera_runtime(camera_config: Dict[str, object]) -> Optional[CameraR
         total_frames=total_frames,
         zone_defs=zone_defs,
         is_live_stream=is_live,
+        line_counter=line_counter,
     )
 
 
@@ -452,6 +466,7 @@ def _process_camera_frame(
 
     active_tracked_objects = []
     custom_labels = []
+    people_this_frame = []
 
     for (x1, y1, x2, y2, track_id, cls_id) in tracked_objects:
         object_type = detector.model.names[cls_id]
@@ -487,6 +502,19 @@ def _process_camera_frame(
             camera_state.camera_id,
             camera_state.source,
         )
+
+        # Directional line-crossing: feed the object's centroid to the counter.
+        if camera_state.line_counter is not None:
+            camera_state.line_counter.update(
+                camera_id=camera_state.camera_id,
+                track_id=track_id,
+                global_id=global_id,
+                object_type=locked_type,
+                centroid=((x1 + x2) / 2.0, (y1 + y2) / 2.0),
+                frame_number=camera_state.current_frame_number,
+                video_time=video_time,
+                video_path=camera_state.source,
+            )
 
         assigned_zone_id = track_to_zone_id.get(track_id)
 
@@ -566,7 +594,14 @@ def _process_camera_frame(
                 )
 
         active_tracked_objects.append((x1, y1, x2, y2, track_id, cls_id))
-        
+
+        if locked_type == "person":
+            people_this_frame.append({
+                "track_id": track_id, "global_id": global_id,
+                "cx": (x1 + x2) / 2.0, "cy": (y1 + y2) / 2.0,
+                "w": (x2 - x1), "h": (y2 - y1), "bbox": (x1, y1, x2, y2),
+            })
+
         label = f"{locked_type} GID {global_id}"
         if global_id in active_uniform_violations:
             label += " | UNIFORM VIOLATION"
@@ -580,6 +615,17 @@ def _process_camera_frame(
             label += " | FALL DETECTED"
             
         custom_labels.append(label)
+
+    # Heuristic violence / anomaly check across all people in this frame.
+    if len(people_this_frame) >= 2:
+        check_anomaly(
+            camera_id=camera_state.camera_id,
+            people=people_this_frame,
+            video_time=video_time,
+            video_path=camera_state.source,
+            frame=frame,
+            frame_number=camera_state.current_frame_number,
+        )
 
     if active_tracked_objects:
         xyxy = np.array([[obj[0], obj[1], obj[2], obj[3]] for obj in active_tracked_objects], dtype=np.float32)
@@ -602,13 +648,11 @@ def _process_camera_frame(
         frame = label_annotator.annotate(scene=frame, detections=sv_detections, labels=custom_labels)
 
     draw_zone_overlays(frame, camera_state.pixel_zones)
-    check_occupancy_alerts(
-        camera_id=camera_state.camera_id,
-        pixel_zones=camera_state.pixel_zones,
-        frame_number=camera_state.current_frame_number,
-        video_time=video_time,
-        video_path=camera_state.source
-    )
+    # Crowd/occupancy alerts are intentionally NOT logged: in a school setting
+    # zones are routinely crowded (class changes, assemblies), so per-zone
+    # occupancy-limit alerts are pure noise. Live headcount and peak-concurrency
+    # density are still reported; we just don't raise "occupancy_alert" events.
+    # (check_occupancy_alerts remains available in event.py if ever needed.)
     camera_state.display_frame = frame
 
 
@@ -719,6 +763,10 @@ def process_video_headless(video_path: str, output_path: Optional[str] = None, p
 
     # Initialize detectors/managers
     init_alerts_db()
+    from line_counter import init_lines_db, ensure_default_line, clear_line_crossings
+    init_lines_db()
+    ensure_default_line(1)
+    clear_line_crossings(video_path)
     detector = HumanDetector(model_type="yolo", weights="yolov8s.pt")
     identity_manager = GlobalIdentityManager()
     incident_manager = IncidentManager()
@@ -751,6 +799,7 @@ def process_video_headless(video_path: str, output_path: Optional[str] = None, p
     reset_runtime_state()
     reset_running_state()
     reset_fall_state()
+    reset_anomaly_state()
 
     print(f"🎬 Processing video headless: {video_path}")
     total_frames = max(1, camera_state.total_frames)
@@ -773,10 +822,76 @@ def process_video_headless(video_path: str, output_path: Optional[str] = None, p
     finally:
         finalize_camera_sessions(camera_state.camera_id, camera_state.source)
         flush_tracking_data()
+        if camera_state.line_counter is not None:
+            camera_state.line_counter.flush()
         camera_state.close()
         if writer:
             writer.release()
         print("✅ Headless video processing finished.")
+
+
+def process_multi_camera_headless(camera_configs, progress_cb=None) -> None:
+    """Process several cameras together through ONE identity manager in MULTI
+    mode. Cameras are stepped in lockstep so re-identification sees them
+    concurrently, letting a person keep a single global id as they move from
+    one camera to an adjacent one (gated by the cameras.json topology graph)."""
+    from line_counter import init_lines_db, ensure_default_line, clear_line_crossings
+
+    license_key = load_license_key()
+    is_valid, msg = verify_license(license_key, len(camera_configs))
+    if not is_valid:
+        print(f"❌ [LICENSING ERROR] {msg}")
+        return
+
+    init_alerts_db()
+    init_lines_db()
+    detector = HumanDetector(model_type="yolo", weights="yolov8s.pt")
+    identity_manager = GlobalIdentityManager()
+    incident_manager = IncidentManager()
+    reset_runtime_state()
+    reset_running_state()
+    reset_fall_state()
+    reset_anomaly_state()
+
+    runtimes = []
+    for cfg in camera_configs:
+        ensure_default_line(cfg["camera_id"])
+        clear_line_crossings(cfg["source"])
+        rt = _create_camera_runtime(cfg)
+        if rt is not None:
+            identity_manager.clear_camera_track_mappings(rt.camera_id)
+            runtimes.append(rt)
+
+    if not runtimes:
+        print("❌ No camera runtimes could be opened for multi-camera processing.")
+        return
+
+    total = max(1, max(r.total_frames for r in runtimes))
+    active = list(runtimes)
+    steps = 0
+    print(f"🎬 Multi-camera processing: {[r.camera_id for r in runtimes]} (multi mode)")
+    try:
+        while active:
+            for rt in list(active):
+                _process_camera_frame(rt, detector, identity_manager, incident_manager, "multi")
+                nxt = rt.current_frame_number + rt.frame_skip
+                if rt.total_frames > 0 and nxt >= rt.total_frames:
+                    rt.finished = True
+                    active.remove(rt)
+                else:
+                    _seek_frame(rt.cap, nxt, rt.total_frames)
+                    rt.display_frame = None
+            steps += 1
+            if progress_cb:
+                progress_cb(min(total, steps * runtimes[0].frame_skip), total)
+    finally:
+        for rt in runtimes:
+            finalize_camera_sessions(rt.camera_id, rt.source)
+            if rt.line_counter is not None:
+                rt.line_counter.flush()
+            rt.close()
+        flush_tracking_data()
+        print("✅ Multi-camera processing finished.")
 
 
 def _view_notification_snapshot(snapshot_path: str) -> None:

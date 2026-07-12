@@ -27,6 +27,7 @@ RESTRICTED_ZONE_ENTRY = "restricted_zone_entry"
 AFTER_HOURS_ENTRY = "after_hours_entry"
 FALL_DETECTED = "fall_detected"
 RUNNING_DETECTED = "running_detected"
+VIOLENCE_DETECTED = "violence_detected"
 
 WEEKDAY_CODES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 PRINCIPAL_RECIPIENT = "principal"
@@ -284,6 +285,8 @@ def _alert_title(alert_type: str) -> str:
         return "Possible fall detected"
     if alert_type == RUNNING_DETECTED:
         return "Running detected"
+    if alert_type == VIOLENCE_DETECTED:
+        return "Possible altercation / anomaly"
     return alert_type.replace("_", " ").title()
 
 
@@ -411,6 +414,36 @@ def raise_fall_alert(
         "global_id": global_id,
         "object_type": "person",
         "message": f"Possible fall detected for person (GID {global_id}) on camera {camera_id}{detail_note}",
+        "track_id": track_id,
+        "video_path": video_path,
+        "frame_number": frame_number,
+    }
+    return record_alert(alert, frame=frame, bbox=bbox)
+
+
+def raise_violence_alert(
+    camera_id: Optional[int],
+    global_id: int,
+    other_global_id: Optional[int] = None,
+    track_id: Optional[int] = None,
+    video_path: Optional[str] = None,
+    frame_number: Optional[int] = None,
+    frame=None,
+    bbox=None,
+    details: Optional[Dict] = None,
+) -> Optional[int]:
+    who = f"GID {global_id}" + (f" & GID {other_global_id}" if other_global_id is not None else "")
+    note = ""
+    if details:
+        note = f" (proximity {details.get('distance_px')}px, combined motion {details.get('energy')}px/s)"
+    alert = {
+        "alert_type": VIOLENCE_DETECTED,
+        "zone_id": None,
+        "zone_name": None,
+        "camera_id": camera_id,
+        "global_id": global_id,
+        "object_type": "person",
+        "message": f"Possible altercation between {who} on camera {camera_id}{note}",
         "track_id": track_id,
         "video_path": video_path,
         "frame_number": frame_number,

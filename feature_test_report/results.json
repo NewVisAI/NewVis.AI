@@ -1,0 +1,1434 @@
+{
+  "generated_at": "2026-07-02T21:23:32.812942",
+  "video": {
+    "path": "D:\\Downloads\\view-IP2 (1).mp4",
+    "opened": true,
+    "width": 1920,
+    "height": 1080,
+    "fps": 29.97,
+    "frame_count": 5457,
+    "duration_sec": 182.1
+  },
+  "pipeline": {
+    "processed_frames": 910,
+    "annotated_video": "D:\\COLLEGE\\Sentinel\\feature_test_report\\annotated_output.mp4",
+    "snapshots": [
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000000.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_000000.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000066.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000180.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000186.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000204.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000246.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000372.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000378.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000396.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000414.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000426.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000438.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000450.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000474.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000480.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000498.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000504.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000528.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000546.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000564.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000576.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000594.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_000678.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000702.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000720.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000726.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000738.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000750.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000768.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000774.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000804.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000846.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000894.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000906.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_000978.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001032.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001050.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001056.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001290.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001332.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_001356.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001374.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001380.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001428.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001482.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001500.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001560.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001752.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001824.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001830.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_001974.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_002034.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002064.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002070.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002088.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002232.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002274.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002286.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002370.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002388.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002472.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002604.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002700.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_002712.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002730.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002760.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_002982.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003162.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003354.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_003390.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003474.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003570.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003618.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003642.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003792.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_003840.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004014.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_004068.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004074.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004302.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004566.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004650.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_004746.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004758.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004764.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004770.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004788.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_004800.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\alert_frame_005064.jpg",
+      "D:\\COLLEGE\\Sentinel\\feature_test_report\\frames\\periodic_frame_005424.jpg"
+    ]
+  },
+  "database": {
+    "event_type_counts": {
+      "leaving": 63,
+      "occupancy_alert": 44
+    },
+    "object_type_counts": {
+      "person": 63
+    },
+    "zone_sessions_sample": [
+      {
+        "global_id": 5,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:54:21",
+        "exit_time": "2026-07-02T15:59:33",
+        "duration": 140.34,
+        "stayed": 1
+      },
+      {
+        "global_id": 25,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 1,
+        "entry_time": "2026-07-02T15:54:18",
+        "exit_time": "2026-07-02T15:59:21",
+        "duration": 136.34,
+        "stayed": 1
+      },
+      {
+        "global_id": 30,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 1,
+        "entry_time": "2026-07-02T15:54:37",
+        "exit_time": "2026-07-02T15:59:19",
+        "duration": 125.33,
+        "stayed": 1
+      },
+      {
+        "global_id": 28,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:56:11",
+        "exit_time": "2026-07-02T15:59:20",
+        "duration": 81.68,
+        "stayed": 1
+      },
+      {
+        "global_id": 17,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:56:18",
+        "exit_time": "2026-07-02T15:59:26",
+        "duration": 80.88,
+        "stayed": 1
+      },
+      {
+        "global_id": 27,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:56:25",
+        "exit_time": "2026-07-02T15:59:28",
+        "duration": 77.28,
+        "stayed": 1
+      },
+      {
+        "global_id": 32,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:56:33",
+        "exit_time": "2026-07-02T15:59:31",
+        "duration": 74.27,
+        "stayed": 1
+      },
+      {
+        "global_id": 3,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 1,
+        "entry_time": "2026-07-02T15:54:37",
+        "exit_time": "2026-07-02T15:57:22",
+        "duration": 73.87,
+        "stayed": 1
+      },
+      {
+        "global_id": 38,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:56:07",
+        "exit_time": "2026-07-02T15:58:33",
+        "duration": 61.66,
+        "stayed": 1
+      },
+      {
+        "global_id": 27,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:54:21",
+        "exit_time": "2026-07-02T15:55:55",
+        "duration": 45.45,
+        "stayed": 1
+      },
+      {
+        "global_id": 48,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 1,
+        "entry_time": "2026-07-02T15:58:10",
+        "exit_time": "2026-07-02T15:59:29",
+        "duration": 38.04,
+        "stayed": 1
+      },
+      {
+        "global_id": 17,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:54:24",
+        "exit_time": "2026-07-02T15:55:44",
+        "duration": 37.24,
+        "stayed": 1
+      },
+      {
+        "global_id": 34,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:55:33",
+        "exit_time": "2026-07-02T15:56:40",
+        "duration": 34.03,
+        "stayed": 1
+      },
+      {
+        "global_id": 32,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:54:53",
+        "exit_time": "2026-07-02T15:56:06",
+        "duration": 32.63,
+        "stayed": 1
+      },
+      {
+        "global_id": 39,
+        "object_type": "person",
+        "camera_id": 1,
+        "zone_id": 2,
+        "entry_time": "2026-07-02T15:55:33",
+        "exit_time": "2026-07-02T15:56:36",
+        "duration": 31.23,
+        "stayed": 1
+      }
+    ],
+    "staying_loitering": [
+      {
+        "global_id": 5,
+        "zone_id": 2,
+        "duration": 140.34,
+        "entry_time": "2026-07-02T15:54:21"
+      },
+      {
+        "global_id": 25,
+        "zone_id": 1,
+        "duration": 136.34,
+        "entry_time": "2026-07-02T15:54:18"
+      },
+      {
+        "global_id": 30,
+        "zone_id": 1,
+        "duration": 125.33,
+        "entry_time": "2026-07-02T15:54:37"
+      },
+      {
+        "global_id": 28,
+        "zone_id": 2,
+        "duration": 81.68,
+        "entry_time": "2026-07-02T15:56:11"
+      },
+      {
+        "global_id": 17,
+        "zone_id": 2,
+        "duration": 80.88,
+        "entry_time": "2026-07-02T15:56:18"
+      },
+      {
+        "global_id": 27,
+        "zone_id": 2,
+        "duration": 77.28,
+        "entry_time": "2026-07-02T15:56:25"
+      },
+      {
+        "global_id": 32,
+        "zone_id": 2,
+        "duration": 74.27,
+        "entry_time": "2026-07-02T15:56:33"
+      },
+      {
+        "global_id": 3,
+        "zone_id": 1,
+        "duration": 73.87,
+        "entry_time": "2026-07-02T15:54:37"
+      },
+      {
+        "global_id": 38,
+        "zone_id": 2,
+        "duration": 61.66,
+        "entry_time": "2026-07-02T15:56:07"
+      },
+      {
+        "global_id": 27,
+        "zone_id": 2,
+        "duration": 45.45,
+        "entry_time": "2026-07-02T15:54:21"
+      },
+      {
+        "global_id": 48,
+        "zone_id": 1,
+        "duration": 38.04,
+        "entry_time": "2026-07-02T15:58:10"
+      },
+      {
+        "global_id": 17,
+        "zone_id": 2,
+        "duration": 37.24,
+        "entry_time": "2026-07-02T15:54:24"
+      },
+      {
+        "global_id": 34,
+        "zone_id": 2,
+        "duration": 34.03,
+        "entry_time": "2026-07-02T15:55:33"
+      },
+      {
+        "global_id": 32,
+        "zone_id": 2,
+        "duration": 32.63,
+        "entry_time": "2026-07-02T15:54:53"
+      },
+      {
+        "global_id": 39,
+        "zone_id": 2,
+        "duration": 31.23,
+        "entry_time": "2026-07-02T15:55:33"
+      }
+    ],
+    "occupancy_alerts": [
+      {
+        "camera_id": 1,
+        "zone_id": 1,
+        "current_count": 3.0,
+        "limit_val": 2,
+        "video_time": 6.806806806806807,
+        "timestamp": "2026-07-02T15:53:47"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 1,
+        "current_count": 3.0,
+        "limit_val": 2,
+        "video_time": 7.607607607607608,
+        "timestamp": "2026-07-02T15:53:48"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 1,
+        "current_count": 3.0,
+        "limit_val": 2,
+        "video_time": 8.208208208208209,
+        "timestamp": "2026-07-02T15:53:50"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 1,
+        "current_count": 3.0,
+        "limit_val": 2,
+        "video_time": 11.411411411411413,
+        "timestamp": "2026-07-02T15:53:54"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 1,
+        "current_count": 3.0,
+        "limit_val": 2,
+        "video_time": 12.412412412412413,
+        "timestamp": "2026-07-02T15:53:55"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 18.21821821821822,
+        "timestamp": "2026-07-02T15:54:07"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 20.22022022022022,
+        "timestamp": "2026-07-02T15:54:09"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 20.62062062062062,
+        "timestamp": "2026-07-02T15:54:10"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 25.825825825825827,
+        "timestamp": "2026-07-02T15:54:21"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 5.0,
+        "limit_val": 3,
+        "video_time": 26.426426426426428,
+        "timestamp": "2026-07-02T15:54:21"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 26.826826826826828,
+        "timestamp": "2026-07-02T15:54:22"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 27.227227227227228,
+        "timestamp": "2026-07-02T15:54:23"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 28.22822822822823,
+        "timestamp": "2026-07-02T15:54:24"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 2,
+        "current_count": 4.0,
+        "limit_val": 3,
+        "video_time": 29.22922922922923,
+        "timestamp": "2026-07-02T15:54:26"
+      },
+      {
+        "camera_id": 1,
+        "zone_id": 1,
+        "current_count": 3.0,
+        "limit_val": 2,
+        "video_time": 29.82982982982983,
+        "timestamp": "2026-07-02T15:54:27"
+      }
+    ],
+    "dress_code_violations": [],
+    "running_events": [],
+    "alert_type_counts": {
+      "after_hours_entry": 56,
+      "restricted_zone_entry": 36
+    },
+    "alerts_sample": [
+      {
+        "id": 1,
+        "alert_type": "after_hours_entry",
+        "zone_name": "Monitored Entrance (East half)",
+        "camera_id": 1,
+        "global_id": 1,
+        "frame_number": 0,
+        "snapshot_path": "alert_snapshots\\alert_1.jpg",
+        "message": "Person (GID 1) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)"
+      },
+      {
+        "id": 2,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 2,
+        "frame_number": 160,
+        "snapshot_path": "alert_snapshots\\alert_2.jpg",
+        "message": "Person (GID 2) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 3,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 3,
+        "frame_number": 200,
+        "snapshot_path": "alert_snapshots\\alert_3.jpg",
+        "message": "Person (GID 3) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 4,
+        "alert_type": "after_hours_entry",
+        "zone_name": "Monitored Entrance (East half)",
+        "camera_id": 1,
+        "global_id": 1,
+        "frame_number": 0,
+        "snapshot_path": "alert_snapshots\\alert_4.jpg",
+        "message": "Person (GID 1) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)"
+      },
+      {
+        "id": 5,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 2,
+        "frame_number": 66,
+        "snapshot_path": "alert_snapshots\\alert_5.jpg",
+        "message": "Person (GID 2) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 6,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 3,
+        "frame_number": 180,
+        "snapshot_path": "alert_snapshots\\alert_6.jpg",
+        "message": "Person (GID 3) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 7,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 4,
+        "frame_number": 186,
+        "snapshot_path": "alert_snapshots\\alert_7.jpg",
+        "message": "Person (GID 4) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 8,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 5,
+        "frame_number": 204,
+        "snapshot_path": "alert_snapshots\\alert_8.jpg",
+        "message": "Person (GID 5) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 9,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 6,
+        "frame_number": 246,
+        "snapshot_path": "alert_snapshots\\alert_9.jpg",
+        "message": "Person (GID 6) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 10,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 7,
+        "frame_number": 372,
+        "snapshot_path": "alert_snapshots\\alert_10.jpg",
+        "message": "Person (GID 7) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 11,
+        "alert_type": "after_hours_entry",
+        "zone_name": "Monitored Entrance (East half)",
+        "camera_id": 1,
+        "global_id": 8,
+        "frame_number": 372,
+        "snapshot_path": "alert_snapshots\\alert_11.jpg",
+        "message": "Person (GID 8) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)"
+      },
+      {
+        "id": 12,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 9,
+        "frame_number": 378,
+        "snapshot_path": "alert_snapshots\\alert_12.jpg",
+        "message": "Person (GID 9) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 13,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 10,
+        "frame_number": 396,
+        "snapshot_path": "alert_snapshots\\alert_13.jpg",
+        "message": "Person (GID 10) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 14,
+        "alert_type": "after_hours_entry",
+        "zone_name": "Monitored Entrance (East half)",
+        "camera_id": 1,
+        "global_id": 4,
+        "frame_number": 414,
+        "snapshot_path": "alert_snapshots\\alert_14.jpg",
+        "message": "Person (GID 4) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)"
+      },
+      {
+        "id": 15,
+        "alert_type": "after_hours_entry",
+        "zone_name": "Monitored Entrance (East half)",
+        "camera_id": 1,
+        "global_id": 11,
+        "frame_number": 426,
+        "snapshot_path": "alert_snapshots\\alert_15.jpg",
+        "message": "Person (GID 11) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)"
+      },
+      {
+        "id": 16,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 12,
+        "frame_number": 438,
+        "snapshot_path": "alert_snapshots\\alert_16.jpg",
+        "message": "Person (GID 12) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 17,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 3,
+        "frame_number": 450,
+        "snapshot_path": "alert_snapshots\\alert_17.jpg",
+        "message": "Person (GID 3) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 18,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 13,
+        "frame_number": 474,
+        "snapshot_path": "alert_snapshots\\alert_18.jpg",
+        "message": "Person (GID 13) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      },
+      {
+        "id": 19,
+        "alert_type": "after_hours_entry",
+        "zone_name": "Monitored Entrance (East half)",
+        "camera_id": 1,
+        "global_id": 14,
+        "frame_number": 480,
+        "snapshot_path": "alert_snapshots\\alert_19.jpg",
+        "message": "Person (GID 14) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)"
+      },
+      {
+        "id": 20,
+        "alert_type": "restricted_zone_entry",
+        "zone_name": "Restricted Zone (West half)",
+        "camera_id": 1,
+        "global_id": 15,
+        "frame_number": 498,
+        "snapshot_path": "alert_snapshots\\alert_20.jpg",
+        "message": "Person (GID 15) entered restricted zone 'Restricted Zone (West half)' on camera 1"
+      }
+    ],
+    "notifications_sample": [
+      {
+        "id": 1,
+        "title": "After-hours / non-school-day entry",
+        "message": "Person (GID 1) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_1.jpg"
+      },
+      {
+        "id": 2,
+        "title": "Restricted area entry",
+        "message": "Person (GID 2) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_2.jpg"
+      },
+      {
+        "id": 3,
+        "title": "Restricted area entry",
+        "message": "Person (GID 3) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_3.jpg"
+      },
+      {
+        "id": 4,
+        "title": "After-hours / non-school-day entry",
+        "message": "Person (GID 1) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_4.jpg"
+      },
+      {
+        "id": 5,
+        "title": "Restricted area entry",
+        "message": "Person (GID 2) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_5.jpg"
+      },
+      {
+        "id": 6,
+        "title": "Restricted area entry",
+        "message": "Person (GID 3) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_6.jpg"
+      },
+      {
+        "id": 7,
+        "title": "Restricted area entry",
+        "message": "Person (GID 4) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_7.jpg"
+      },
+      {
+        "id": 8,
+        "title": "Restricted area entry",
+        "message": "Person (GID 5) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_8.jpg"
+      },
+      {
+        "id": 9,
+        "title": "Restricted area entry",
+        "message": "Person (GID 6) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_9.jpg"
+      },
+      {
+        "id": 10,
+        "title": "Restricted area entry",
+        "message": "Person (GID 7) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_10.jpg"
+      },
+      {
+        "id": 11,
+        "title": "After-hours / non-school-day entry",
+        "message": "Person (GID 8) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_11.jpg"
+      },
+      {
+        "id": 12,
+        "title": "Restricted area entry",
+        "message": "Person (GID 9) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_12.jpg"
+      },
+      {
+        "id": 13,
+        "title": "Restricted area entry",
+        "message": "Person (GID 10) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_13.jpg"
+      },
+      {
+        "id": 14,
+        "title": "After-hours / non-school-day entry",
+        "message": "Person (GID 4) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_14.jpg"
+      },
+      {
+        "id": 15,
+        "title": "After-hours / non-school-day entry",
+        "message": "Person (GID 11) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_15.jpg"
+      },
+      {
+        "id": 16,
+        "title": "Restricted area entry",
+        "message": "Person (GID 12) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_16.jpg"
+      },
+      {
+        "id": 17,
+        "title": "Restricted area entry",
+        "message": "Person (GID 3) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_17.jpg"
+      },
+      {
+        "id": 18,
+        "title": "Restricted area entry",
+        "message": "Person (GID 13) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_18.jpg"
+      },
+      {
+        "id": 19,
+        "title": "After-hours / non-school-day entry",
+        "message": "Person (GID 14) entered 'Monitored Entrance (East half)' on camera 1 while outside allowed hours (07:00-09:00)",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_19.jpg"
+      },
+      {
+        "id": 20,
+        "title": "Restricted area entry",
+        "message": "Person (GID 15) entered restricted zone 'Restricted Zone (West half)' on camera 1",
+        "read": 0,
+        "snapshot_path": "alert_snapshots\\alert_20.jpg"
+      }
+    ],
+    "tracking_data": {
+      "rows": 7262,
+      "distinct_global_ids": 53,
+      "distinct_track_ids": 81
+    }
+  },
+  "nl_search": {
+    "show me people who entered the restricted zone": {
+      "parsed_intent": {
+        "object": "person",
+        "event": "entering",
+        "zone": 1
+      },
+      "result_count": 26,
+      "sample": [
+        {
+          "global_id": 48,
+          "camera_id": 1,
+          "zone_id": 1,
+          "duration": 38.038038038038025,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:58:10"
+        },
+        {
+          "global_id": 25,
+          "camera_id": 1,
+          "zone_id": 1,
+          "duration": 136.33633633633633,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:54:18"
+        },
+        {
+          "global_id": 30,
+          "camera_id": 1,
+          "zone_id": 1,
+          "duration": 125.32532532532532,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:54:37"
+        },
+        {
+          "global_id": 51,
+          "camera_id": 1,
+          "zone_id": 1,
+          "duration": 3.6036036036036023,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:59:06"
+        },
+        {
+          "global_id": 44,
+          "camera_id": 1,
+          "zone_id": 1,
+          "duration": 1.2012012012012008,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:58:29"
+        }
+      ]
+    },
+    "intrusion": {
+      "parsed_intent": {
+        "event": "restricted_zone_entry"
+      },
+      "result_count": 36,
+      "sample": [
+        {
+          "zone_id": 1,
+          "camera_id": 1,
+          "global_id": 44,
+          "object_type": "person",
+          "display_label": "timestamp",
+          "display_value": "2026-07-02T21:29:18",
+          "event_type": "restricted_zone_entry"
+        },
+        {
+          "zone_id": 1,
+          "camera_id": 1,
+          "global_id": 51,
+          "object_type": "person",
+          "display_label": "timestamp",
+          "display_value": "2026-07-02T21:29:07",
+          "event_type": "restricted_zone_entry"
+        },
+        {
+          "zone_id": 1,
+          "camera_id": 1,
+          "global_id": 44,
+          "object_type": "person",
+          "display_label": "timestamp",
+          "display_value": "2026-07-02T21:28:29",
+          "event_type": "restricted_zone_entry"
+        },
+        {
+          "zone_id": 1,
+          "camera_id": 1,
+          "global_id": 44,
+          "object_type": "person",
+          "display_label": "timestamp",
+          "display_value": "2026-07-02T21:28:10",
+          "event_type": "restricted_zone_entry"
+        },
+        {
+          "zone_id": 1,
+          "camera_id": 1,
+          "global_id": 48,
+          "object_type": "person",
+          "display_label": "timestamp",
+          "display_value": "2026-07-02T21:28:10",
+          "event_type": "restricted_zone_entry"
+        }
+      ]
+    },
+    "falls": {
+      "parsed_intent": {
+        "query": "falls"
+      },
+      "result_count": 107,
+      "sample": [
+        {
+          "global_id": 5,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 140.34034034034036,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:54:21"
+        },
+        {
+          "global_id": 32,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 74.27427427427426,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:33"
+        },
+        {
+          "global_id": 48,
+          "camera_id": 1,
+          "zone_id": 1,
+          "duration": 38.038038038038025,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:58:10"
+        },
+        {
+          "global_id": 27,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 77.27727727727728,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:25"
+        },
+        {
+          "global_id": 17,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 80.88088088088088,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:18"
+        }
+      ]
+    },
+    "running": {
+      "parsed_intent": {
+        "event": "running_detected"
+      },
+      "result_count": 0,
+      "sample": []
+    },
+    "uniform violations": {
+      "parsed_intent": {
+        "event": "dress_code_violation"
+      },
+      "result_count": 0,
+      "sample": []
+    },
+    "people in zone 2": {
+      "parsed_intent": {
+        "object": "person",
+        "zone": 2
+      },
+      "result_count": 37,
+      "sample": [
+        {
+          "global_id": 5,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 140.34034034034036,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:54:21"
+        },
+        {
+          "global_id": 32,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 74.27427427427426,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:33"
+        },
+        {
+          "global_id": 27,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 77.27727727727728,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:25"
+        },
+        {
+          "global_id": 17,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 80.88088088088088,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:18"
+        },
+        {
+          "global_id": 50,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 4.2042042042041885,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:59:17"
+        }
+      ]
+    },
+    "cars": {
+      "parsed_intent": {
+        "query": "cars"
+      },
+      "result_count": 107,
+      "sample": [
+        {
+          "global_id": 5,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 140.34034034034036,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:54:21"
+        },
+        {
+          "global_id": 32,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 74.27427427427426,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:33"
+        },
+        {
+          "global_id": 48,
+          "camera_id": 1,
+          "zone_id": 1,
+          "duration": 38.038038038038025,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:58:10"
+        },
+        {
+          "global_id": 27,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 77.27727727727728,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:25"
+        },
+        {
+          "global_id": 17,
+          "camera_id": 1,
+          "zone_id": 2,
+          "duration": 80.88088088088088,
+          "object_type": "person",
+          "event_type": "leaving",
+          "display_label": "entry_time",
+          "display_value": "2026-07-02T15:56:18"
+        }
+      ]
+    }
+  },
+  "headcount": {
+    "report_text": "\n==================================================\n\ud83e\udd16 AI SECURITY SUMMARY\n\ud83d\udcc5 Period: All Time\n==================================================\n\ud83d\udc65 Headcount (unique people): 45\n\ud83d\udccd ZONE-SPECIFIC ACTIVITY REPORT\n\nHeadcount by zone:\n \u2022 Zone 1: 20 unique people\n \u2022 Zone 2: 26 unique people\n\n--- Zone 1 ---\n \u2022 Person detected for 12.4s starting at 2026-07-02T15:53:47\n \u2022 Person detected for 15.4s starting at 2026-07-02T15:53:56\n \u2022 Person detected for 15.4s starting at 2026-07-02T15:54:01\n \u2022 Person detected for 15.8s starting at 2026-07-02T15:54:05\n \u2022 Person detected for 29.2s starting at 2026-07-02T15:53:50\n \u2022 Person detected for 10.2s starting at 2026-07-02T15:55:00\n \u2022 Person detected for 12.8s starting at 2026-07-02T15:55:09\n \u2022 Person detected for 73.9s starting at 2026-07-02T15:54:37\n \u2022 Person detected for 125.3s starting at 2026-07-02T15:54:37\n \u2022 Person detected for 136.3s starting at 2026-07-02T15:54:18\n \u2022 Person detected for 38.0s starting at 2026-07-02T15:58:10\n\n--- Zone 2 ---\n \u2022 Person detected for 26.6s starting at 2026-07-02T15:53:38\n \u2022 Person detected for 21.4s starting at 2026-07-02T15:54:15\n \u2022 Person detected for 37.2s starting at 2026-07-02T15:54:24\n \u2022 Person detected for 45.4s starting at 2026-07-02T15:54:21\n \u2022 Person detected for 32.6s starting at 2026-07-02T15:54:53\n \u2022 Person detected for 12.2s starting at 2026-07-02T15:55:45\n \u2022 Person detected for 17.0s starting at 2026-07-02T15:55:52\n \u2022 Person detected for 31.2s starting at 2026-07-02T15:55:33\n \u2022 Person detected for 34.0s starting at 2026-07-02T15:55:33\n \u2022 Person detected for 14.6s starting at 2026-07-02T15:56:31\n \u2022 Person detected for 61.7s starting at 2026-07-02T15:56:07\n \u2022 Person detected for 18.0s starting at 2026-07-02T15:58:12\n \u2022 Person detected for 16.4s starting at 2026-07-02T15:58:46\n \u2022 Person detected for 81.7s starting at 2026-07-02T15:56:11\n \u2022 Person detected for 140.3s starting at 2026-07-02T15:54:21\n \u2022 Person detected for 80.9s starting at 2026-07-02T15:56:18\n \u2022 Person detected for 77.3s starting at 2026-07-02T15:56:25\n \u2022 Person detected for 74.3s starting at 2026-07-02T15:56:33\n\n==================================================\n",
+    "summary": {
+      "time_frame": "all",
+      "headcount": 45,
+      "total_vehicles": 0,
+      "total_people_visits": 63,
+      "vehicle_types": {},
+      "suspicious_activities": [
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:53:47",
+          "duration": "12.4s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:53:38",
+          "duration": "26.6s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:53:56",
+          "duration": "15.4s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:54:01",
+          "duration": "15.4s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:54:05",
+          "duration": "15.8s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:53:50",
+          "duration": "29.2s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:54:15",
+          "duration": "21.4s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:55:00",
+          "duration": "10.2s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:55:09",
+          "duration": "12.8s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:54:24",
+          "duration": "37.2s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:54:21",
+          "duration": "45.4s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:54:53",
+          "duration": "32.6s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:55:45",
+          "duration": "12.2s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:55:52",
+          "duration": "17.0s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:55:33",
+          "duration": "31.2s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:55:33",
+          "duration": "34.0s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:56:31",
+          "duration": "14.6s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:54:37",
+          "duration": "73.9s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:56:07",
+          "duration": "61.7s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:58:12",
+          "duration": "18.0s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:54:37",
+          "duration": "125.3s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:58:46",
+          "duration": "16.4s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:56:11",
+          "duration": "81.7s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:54:18",
+          "duration": "136.3s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:54:21",
+          "duration": "140.3s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:56:18",
+          "duration": "80.9s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:56:25",
+          "duration": "77.3s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 2,
+          "time": "2026-07-02T15:56:33",
+          "duration": "74.3s"
+        },
+        {
+          "type": "Prolonged Stay",
+          "object": "person",
+          "zone": 1,
+          "time": "2026-07-02T15:58:10",
+          "duration": "38.0s"
+        }
+      ],
+      "zone_headcount": {
+        "1": 20,
+        "2": 26
+      }
+    }
+  },
+  "licensing": {
+    "hardware_fingerprint": "5D391588E3BF5FA3",
+    "evaluation_mode": {
+      "mode": "evaluation",
+      "max_cameras": 1,
+      "features": [
+        "core_tracking",
+        "nl_search"
+      ],
+      "one_camera_ok": true,
+      "one_camera_msg": "Evaluation mode (no license): limited to 1 camera and core features only.",
+      "two_cameras_ok": false,
+      "two_cameras_msg": "Camera limit exceeded. Licensed for 1 camera(s), but 2 are configured. Contact the developers to extend."
+    },
+    "password_bypass_rejected": {
+      "123456789": {
+        "ok": false,
+        "msg": "License signature verification failed (tampered or malformed key)."
+      },
+      "SentinelDemo2026": {
+        "ok": false,
+        "msg": "License signature verification failed (tampered or malformed key)."
+      },
+      "AdivaDemo2026": {
+        "ok": false,
+        "msg": "License signature verification failed (tampered or malformed key)."
+      }
+    },
+    "dev_signing_key_present": false,
+    "note": "dev_keys/license_signing_key.pem absent \u2014 license minting checks skipped (developer-only). Signature verification, evaluation mode, and bypass rejection still validated above."
+  },
+  "unit_tests": {
+    "test_fall": {
+      "returncode": 0,
+      "tail": [
+        "test_normal_standing_and_walking_does_not_trigger (test_fall.FallDetectorTests.test_normal_standing_and_walking_does_not_trigger) ... ok",
+        "test_rapid_fall_triggers_fall_detected (test_fall.FallDetectorTests.test_rapid_fall_triggers_fall_detected) ... ok",
+        "test_reset_clears_history (test_fall.FallDetectorTests.test_reset_clears_history) ... ok",
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 5 tests in 0.001s",
+        "",
+        "OK"
+      ]
+    },
+    "test_licensing": {
+      "returncode": 1,
+      "tail": [
+        "    return codecs.charmap_encode(input,self.errors,encoding_table)[0]",
+        "           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+        "UnicodeEncodeError: 'charmap' codec can't encode character '\\u274c' in position 0: character maps to <undefined>",
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 9 tests in 0.033s",
+        "",
+        "FAILED (errors=7)"
+      ]
+    },
+    "test_reid": {
+      "returncode": 0,
+      "tail": [
+        "test_same_track_keeps_same_global_id (test_reid.GlobalIdentityManagerTests.test_same_track_keeps_same_global_id) ... ok",
+        "test_get_playback_segments_uses_session_window_for_global_id (test_reid.PlaybackSessionTests.test_get_playback_segments_uses_session_window_for_global_id) ... ok",
+        "test_global_event_merges_cameras_for_same_global_id (test_reid.PlaybackSessionTests.test_global_event_merges_cameras_for_same_global_id) ... ok",
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 11 tests in 8.916s",
+        "",
+        "OK"
+      ]
+    }
+  }
+}

@@ -13,9 +13,9 @@ for _stream in (sys.stdout, sys.stderr):
         except (ValueError, OSError):
             pass
 from typing import List, Set, Optional, Dict
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, BackgroundTasks, Depends, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, BackgroundTasks, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -24,6 +24,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import alerts
 import school_calendar
+import camera_registry
+import camera_stream
+import clip_service
+import periodic_report
+from audit_log import init_audit_db, record_audit, get_audit_log, clear_audit_log
 from backend.auth import (
     ROLES,
     authenticate,
@@ -40,7 +45,13 @@ from query_engine import QueryEngine
 from search_service import SearchService
 from event import register_event_callback, clear_event_logs
 from zone_manager import get_all_zones, get_camera_zones, overwrite_zones, set_zone_alert_rules
+import line_counter
 from license_validator import (
+    ALL_FEATURES,
+    EVALUATION_FEATURES,
+    EVALUATION_MAX_CAMERAS,
+    LICENSE_FILE,
+    decode_license_payload,
     get_hardware_fingerprint,
     get_license_info,
     is_feature_enabled,
@@ -128,17 +139,34 @@ async def storage_cleanup_loop():
         await asyncio.sleep(86400)  # sleep 24 hours
 
 
+async def daily_report_loop():
+    """Emit an automated daily summary once every 24h (works off whatever the
+    ingest pipeline has logged, live feed or processed video alike)."""
+    while True:
+        try:
+            report = periodic_report.generate("daily")
+            print("\n" + periodic_report.render_text(report) + "\n")
+            record_audit("system", "system", "auto_daily_report",
+                         target="daily", details=f"headcount={report['headcount']}")
+        except Exception as exc:
+            print(f"[REPORT SCHEDULER ERROR] {exc}")
+        await asyncio.sleep(86400)
+
+
 @app.on_event("startup")
 async def startup_tasks():
     global _main_loop
     _main_loop = asyncio.get_running_loop()
 
-    # 1. Auth + alert storage
+    # 1. Auth + alert + audit storage
     init_users_db()
     alerts.init_alerts_db()
+    init_audit_db()
+    line_counter.init_lines_db()
 
-    # 2. Background maintenance daemon
+    # 2. Background maintenance + automated daily summary
     asyncio.create_task(storage_cleanup_loop())
+    asyncio.create_task(daily_report_loop())
 
     # 3. Licensing check (empty key = evaluation mode: 1 camera, core features)
     license_key = load_license_key()
@@ -201,6 +229,19 @@ class UserRequest(BaseModel):
     role: str
 
 
+class LicenseGenerateRequest(BaseModel):
+    client_id: str
+    max_cameras: int
+    expiry: str                       # YYYY-MM-DD
+    features: List[str]               # subset of ALL_FEATURES, or ["all"]
+    fingerprint: str = "ANY"          # "ANY" = no hardware lock; else the target machine's fingerprint
+    apply: bool = False               # also write the key to license.key (activate now)
+
+
+class LicenseApplyRequest(BaseModel):
+    license_key: str
+
+
 class NLQueryRequest(BaseModel):
     query: str
     session_mode: str = "single"
@@ -241,12 +282,28 @@ class ZoneRulesModel(BaseModel):
 # Auth
 # ---------------------------------------------------------------------------
 
+def _client_ip(request: Optional[Request]) -> Optional[str]:
+    if request is None or request.client is None:
+        return None
+    return request.client.host
+
+
+def _user_from_query_token(token: str) -> Optional[dict]:
+    """Resolve a login token passed as a query param (for <img>/<video> tags
+    that cannot send an Authorization header)."""
+    from backend.auth import _resolve_token
+    return _resolve_token(token)
+
+
 @app.post("/api/login")
-def login(request: LoginRequest):
+def login(request: LoginRequest, http_request: Request = None):
     user = authenticate(request.username, request.password)
+    ip = _client_ip(http_request)
     if user is None:
+        record_audit(request.username, "-", "login_failed", target="auth", ip=ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
     token = create_token(user["username"], user["role"])
+    record_audit(user["username"], user["role"], "login", target="auth", ip=ip)
     return {"token": token, "username": user["username"], "role": user["role"]}
 
 
@@ -286,6 +343,90 @@ def license_status():
     zones = get_all_zones()
     info["cameras_configured"] = len(set(z.get("camera_id") for z in zones))
     return info
+
+
+@app.get("/api/license/options", dependencies=[Depends(require_roles())])
+def license_options():
+    """Everything the developer's License panel needs to render the mint form:
+    the full feature catalogue, evaluation defaults, the presets from
+    generate_key.py, this machine's fingerprint, and whether the private signing
+    key is present (minting only works on a developer machine that holds it)."""
+    import generate_key
+    return {
+        "all_features": list(ALL_FEATURES),
+        "evaluation_features": list(EVALUATION_FEATURES),
+        "evaluation_max_cameras": EVALUATION_MAX_CAMERAS,
+        "presets": {name: {"max_cameras": c, "days_valid": d, "features": f}
+                    for name, (c, d, f) in generate_key.PRESETS.items()},
+        "machine_fingerprint": get_hardware_fingerprint(),
+        "signing_key_available": os.path.exists(generate_key.PRIVATE_KEY_PATH),
+    }
+
+
+@app.post("/api/license/generate", dependencies=[Depends(require_roles())])
+def license_generate(req: LicenseGenerateRequest, http_request: Request = None,
+                     user: dict = Depends(require_roles())):
+    """Mint a signed license key (developer only). Optionally activate it by
+    writing license.key. Requires the private signing key on this machine."""
+    import generate_key
+    if not os.path.exists(generate_key.PRIVATE_KEY_PATH):
+        raise HTTPException(status_code=409, detail=(
+            "Private signing key not found on this machine — license minting is "
+            "only available on a developer machine that holds dev_keys/."))
+
+    # validate features
+    requested = [f.strip() for f in req.features if f.strip()]
+    unknown = [f for f in requested if f != "all" and f not in ALL_FEATURES]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown feature(s): {', '.join(unknown)}")
+    if not requested:
+        raise HTTPException(status_code=400, detail="Select at least one feature (or 'all').")
+    if req.max_cameras < 1:
+        raise HTTPException(status_code=400, detail="max_cameras must be at least 1.")
+    from datetime import datetime
+    try:
+        datetime.strptime(req.expiry, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="expiry must be YYYY-MM-DD.")
+
+    fingerprint = (req.fingerprint or "ANY").strip() or "ANY"
+    try:
+        key = generate_key.generate_license(
+            req.client_id, req.max_cameras, req.expiry, fingerprint, requested)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"License generation failed: {exc}")
+
+    applied = False
+    if req.apply:
+        with open(LICENSE_FILE, "w", encoding="utf-8") as handle:
+            handle.write(key)
+        applied = True
+
+    record_audit(user["username"], user["role"], "license_generate",
+                 target=f"{req.client_id} ({req.max_cameras} cams, {'applied' if applied else 'preview'})",
+                 ip=_client_ip(http_request))
+    return {
+        "license_key": key,
+        "applied": applied,
+        "info": get_license_info(key),
+    }
+
+
+@app.post("/api/license/apply", dependencies=[Depends(require_roles())])
+def license_apply(req: LicenseApplyRequest, http_request: Request = None,
+                  user: dict = Depends(require_roles())):
+    """Activate a pasted license key by writing it to license.key. Rejects a key
+    whose signature does not verify, so a bad paste can't disable the system."""
+    key = (req.license_key or "").strip()
+    if decode_license_payload(key) is None:
+        raise HTTPException(status_code=400, detail=(
+            "License signature verification failed — key is malformed, tampered, "
+            "or not signed by this deployment's key."))
+    with open(LICENSE_FILE, "w", encoding="utf-8") as handle:
+        handle.write(key)
+    record_audit(user["username"], user["role"], "license_apply",
+                 target="license.key replaced", ip=_client_ip(http_request))
+    return {"applied": True, "info": get_license_info(key)}
 
 
 # ---------------------------------------------------------------------------
@@ -436,20 +577,166 @@ def get_summary_report(period: str = "all"):
     return mode_manager.get_summary(time_frame=period)
 
 
-@app.post("/api/query", dependencies=[Depends(current_user)])
-def run_natural_language_query(request: NLQueryRequest):
+@app.post("/api/query")
+def run_natural_language_query(request: NLQueryRequest, http_request: Request = None,
+                              user: dict = Depends(current_user)):
     """
-    Translates natural language questions into filtered event/alert results.
+    Translates natural language questions into filtered event/alert results,
+    each enriched with one-click jump-to-clip metadata (why logged, timestamp,
+    clip start/end/duration, details).
     """
     _require_feature("nl_search")
-    results = search_service.search(request.query, session_mode=request.session_mode)
+    q = (request.query or "").strip()
+    if not q:
+        # Empty query = show every logged event, in the order it was logged.
+        results = query_engine.run_query(filters={}, session_mode=request.session_mode)
+        results.sort(key=lambda r: (r.get("entry_time") or r.get("timestamp") or ""))
+        intent = {"all_events": True}
+    else:
+        results = search_service.search(request.query, session_mode=request.session_mode)
+        intent = search_service.last_parsed_intent()
+    results = clip_service.enrich_results(results)
+    record_audit(user["username"], user["role"], "nl_search",
+                 target=(q or "(all events)"),
+                 details=f"{len(results)} results", ip=_client_ip(http_request))
     return {
         "query": request.query,
         "session_mode": request.session_mode,
-        "intent": search_service.last_parsed_intent(),
+        "intent": intent,
         "results_count": len(results),
         "results": results
     }
+
+
+# ---------------------------------------------------------------------------
+# One-click clip playback (byte-range seekable source video)
+# ---------------------------------------------------------------------------
+
+def _is_allowed_video(path: str) -> bool:
+    """Only serve files that are actually referenced by the system: an upload,
+    a registered camera source, or a video_path already in the events DB."""
+    if not path or not os.path.exists(path):
+        return False
+    norm = os.path.normcase(os.path.abspath(path))
+    if norm.startswith(os.path.normcase(os.path.abspath(UPLOAD_DIR))):
+        return True
+    if norm.startswith(os.path.normcase(os.path.abspath(OUTPUT_DIR))):
+        return True
+    for cam in camera_registry.list_cameras():
+        src = camera_registry.get_camera(cam["id"]).get("source")
+        if src and os.path.normcase(os.path.abspath(src)) == norm:
+            return True
+    try:
+        import sqlite3
+        from db_schema import get_db_path
+        conn = sqlite3.connect(get_db_path())
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM events WHERE video_path = ? LIMIT 1", (path,))
+        hit = cur.fetchone() is not None
+        conn.close()
+        if hit:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+@app.get("/api/clip/video")
+def clip_video(path: str, token: str = "", http_request: Request = None):
+    """Serve a source video (with HTTP range support so the browser <video>
+    can seek straight to the clip). Auth is via ?token= because media elements
+    can't send Authorization headers."""
+    user = _user_from_query_token(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid or missing token.")
+    if not _is_allowed_video(path):
+        raise HTTPException(status_code=404, detail="Video not found or not permitted.")
+    record_audit(user["username"], user["role"], "view_clip", target=os.path.basename(path),
+                 ip=_client_ip(http_request))
+    return FileResponse(path, media_type="video/mp4")
+
+
+@app.get("/api/clip/track", dependencies=[Depends(current_user)])
+def clip_track(video_path: str, global_id: int = None, track_id: int = None,
+               camera_id: int = None, start_frame: int = 0, end_frame: int = 0):
+    """Per-frame bounding boxes (in source pixels) of the exact subject whose
+    event was logged, so the clip player can highlight only that person. Boxes
+    come from the tracking_data the pipeline already stored per global id."""
+    if not _is_allowed_video(video_path):
+        raise HTTPException(status_code=404, detail="Video not found or not permitted.")
+    if global_id is None and track_id is None:
+        raise HTTPException(status_code=400, detail="global_id or track_id required.")
+    from event import get_tracking_data
+    if end_frame <= start_frame:
+        end_frame = start_frame + 1
+    try:
+        rows = get_tracking_data(video_path, track_id, start_frame, end_frame,
+                                 camera_id=camera_id, global_id=global_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    fps = clip_service._fps_for(video_path)
+    boxes = [
+        {"frame": r["frame_number"], "t": round(r["frame_number"] / max(1.0, fps), 3),
+         "bbox": [int(v) for v in r["bbox"]]}
+        for r in rows
+    ]
+    return {"video_path": video_path, "global_id": global_id, "fps": round(fps, 3),
+            "count": len(boxes), "boxes": boxes}
+
+
+@app.get("/api/clip/running-tracks", dependencies=[Depends(current_user)])
+def clip_running_tracks(video_path: str, start_frame: int = 0, end_frame: int = 0,
+                        camera_id: int = None):
+    """Per-frame bounding boxes for EVERY person flagged as running within the
+    clip window — so the player can box all runners, not just the logged subject.
+
+    Running events store their moment in `video_time` (their frame_* columns are
+    0), and one event marks a person running for a few seconds, so we select the
+    running global_ids by time (widened by the display window) and then pull each
+    runner's tracked boxes across the requested frame range."""
+    if not _is_allowed_video(video_path):
+        raise HTTPException(status_code=404, detail="Video not found or not permitted.")
+    from event import get_tracking_data
+    from db_schema import connect_db
+
+    fps = clip_service._fps_for(video_path)
+    if end_frame <= start_frame:
+        end_frame = start_frame + 1
+    start_t = start_frame / max(1.0, fps)
+    end_t = end_frame / max(1.0, fps)
+
+    conn = connect_db(validate_schema=False)
+    cursor = conn.cursor()
+    sql = ("SELECT DISTINCT global_id, camera_id FROM events "
+           "WHERE event_type = 'running_detected' AND video_path = ? "
+           "AND video_time >= ? AND video_time <= ?")
+    params = [video_path, start_t - 3.0, end_t + 0.5]
+    if camera_id is not None:
+        sql += " AND camera_id = ?"
+        params.append(camera_id)
+    runner_rows = cursor.execute(sql, params).fetchall()
+    conn.close()
+
+    subjects = []
+    for gid, cam in runner_rows:
+        if gid is None or gid == -1:
+            continue
+        try:
+            rows = get_tracking_data(video_path, None, start_frame, end_frame,
+                                     camera_id=cam, global_id=gid)
+        except ValueError:
+            continue
+        boxes = [
+            {"frame": r["frame_number"],
+             "t": round(r["frame_number"] / max(1.0, fps), 3),
+             "bbox": [int(v) for v in r["bbox"]]}
+            for r in rows
+        ]
+        if boxes:
+            subjects.append({"global_id": gid, "camera_id": cam, "boxes": boxes})
+
+    return {"video_path": video_path, "fps": round(fps, 3),
+            "subject_count": len(subjects), "subjects": subjects}
 
 
 @app.get("/api/events", dependencies=[Depends(current_user)])
@@ -486,12 +773,15 @@ def recent_alerts(limit: int = 50):
     return {"alerts": alerts.get_recent_alerts(limit=limit)}
 
 
-@app.get("/api/alerts/{alert_id}/snapshot", dependencies=[Depends(require_roles("principal"))])
-def alert_snapshot(alert_id: int):
+@app.get("/api/alerts/{alert_id}/snapshot")
+def alert_snapshot(alert_id: int, http_request: Request = None,
+                   user: dict = Depends(require_roles("principal"))):
     for alert in alerts.get_recent_alerts(limit=1000):
         if alert["id"] == alert_id:
             snapshot_path = alert.get("snapshot_path")
             if snapshot_path and os.path.exists(snapshot_path):
+                record_audit(user["username"], user["role"], "view_snapshot",
+                             target=f"alert {alert_id}", ip=_client_ip(http_request))
                 return FileResponse(snapshot_path, media_type="image/jpeg")
             raise HTTPException(status_code=404, detail="No snapshot stored for this alert.")
     raise HTTPException(status_code=404, detail="Alert not found.")
@@ -691,3 +981,297 @@ def get_zones_flow():
     return {
         "zones_flow": report
     }
+
+
+# ---------------------------------------------------------------------------
+# Live multi-camera grid (location-based)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/cameras", dependencies=[Depends(current_user)])
+def list_cameras():
+    """All cameras + floors for building the grid selector."""
+    return {"floors": camera_registry.list_floors(), "cameras": camera_registry.list_cameras()}
+
+
+@app.get("/api/cameras/by-location")
+def cameras_by_location(q: str = None, floor: str = None, http_request: Request = None,
+                        user: dict = Depends(current_user)):
+    """Cameras for a location/floor query (e.g. q='first floor') plus a
+    suggested grid layout (1 / 4 / 8 / more tiles)."""
+    cams = camera_registry.cameras_for_query(query=q, floor=floor)
+    record_audit(user["username"], user["role"], "view_grid",
+                 target=(floor or q or "all"), details=f"{len(cams)} cameras",
+                 ip=_client_ip(http_request))
+    return {
+        "query": q,
+        "floor": floor or camera_registry.resolve_floor(q or ""),
+        "count": len(cams),
+        "layout": camera_registry.suggested_layout(len(cams)),
+        "cameras": cams,
+    }
+
+
+@app.get("/api/cross-camera", dependencies=[Depends(current_user)])
+def cross_camera():
+    """Camera topology graph + identities (GIDs) seen on more than one camera —
+    i.e. people the system handed off across cameras."""
+    import sqlite3
+    from db_schema import get_db_path
+    conn = sqlite3.connect(get_db_path())
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT global_id, COUNT(DISTINCT camera_id) nc, GROUP_CONCAT(DISTINCT camera_id) "
+        "FROM events WHERE camera_id IS NOT NULL GROUP BY global_id HAVING nc > 1 ORDER BY nc DESC LIMIT 200"
+    )
+    rows = cur.fetchall()
+    conn.close()
+    identities = [{"global_id": r[0], "camera_count": r[1],
+                   "cameras": [c for c in str(r[2]).split(",")]} for r in rows]
+    return {
+        "topology": camera_registry.get_topology(),
+        "cross_camera_identities": identities,
+        "count": len(identities),
+    }
+
+
+@app.get("/api/cameras/{camera_id}/stream")
+def camera_stream_endpoint(camera_id: int, token: str = "", http_request: Request = None):
+    """Looping MJPEG live stream for one camera. Auth via ?token= (an <img>
+    tag can't send an Authorization header)."""
+    user = _user_from_query_token(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid or missing token.")
+    cam = camera_registry.get_camera(camera_id)
+    if cam is None:
+        raise HTTPException(status_code=404, detail="Camera not found.")
+    if not cam.get("source") or not os.path.exists(str(cam["source"])):
+        raise HTTPException(status_code=404, detail="Camera source video not available.")
+    record_audit(user["username"], user["role"], "view_camera",
+                 target=cam.get("name", f"cam {camera_id}"), ip=_client_ip(http_request))
+    return StreamingResponse(
+        camera_stream.mjpeg_generator(cam),
+        media_type=f"multipart/x-mixed-replace; boundary={camera_stream.BOUNDARY}",
+    )
+
+
+@app.get("/api/cameras/{camera_id}/snapshot")
+def camera_snapshot_endpoint(camera_id: int, token: str = "", http_request: Request = None):
+    """Single JPEG frame for a camera (grid thumbnail / preview)."""
+    user = _user_from_query_token(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid or missing token.")
+    cam = camera_registry.get_camera(camera_id)
+    if cam is None or not cam.get("source") or not os.path.exists(str(cam["source"])):
+        raise HTTPException(status_code=404, detail="Camera source not available.")
+    jpeg = camera_stream.grab_snapshot(cam)
+    if jpeg is None:
+        raise HTTPException(status_code=500, detail="Could not grab frame.")
+    from fastapi.responses import Response
+    return Response(content=jpeg, media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# Automated periodic summary reports (daily / monthly / yearly)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports/periodic")
+def periodic_summary(period: str = "daily", http_request: Request = None,
+                     user: dict = Depends(current_user)):
+    """Daily / monthly / yearly summary: headcount, crowd density, congestion,
+    dwell time, and a safety-alert breakdown."""
+    _require_feature("reports")
+    if period not in periodic_report.PERIODS:
+        raise HTTPException(status_code=400, detail=f"period must be one of {', '.join(periodic_report.PERIODS)}")
+    report = periodic_report.generate(period)
+    report["report_text"] = periodic_report.render_text(report)
+    record_audit(user["username"], user["role"], "generate_report", target=period,
+                 ip=_client_ip(http_request))
+    return report
+
+
+# ---------------------------------------------------------------------------
+# Spatial heatmap (where people dwell) + supporting chart data
+# ---------------------------------------------------------------------------
+
+def _latest_event_video() -> Optional[str]:
+    import sqlite3
+    from db_schema import get_db_path
+    conn = sqlite3.connect(get_db_path())
+    cur = conn.cursor()
+    cur.execute("SELECT video_path FROM events WHERE video_path IS NOT NULL ORDER BY id DESC LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+@app.get("/api/heatmap", dependencies=[Depends(current_user)])
+def heatmap(video_path: str = None, grid_w: int = 48, grid_h: int = 27,
+            start_frame: int = None, end_frame: int = None):
+    """Density grid of person positions (bbox centroids) from tracking_data,
+    binned into a grid_w x grid_h heatmap. Optional start/end frame windows it."""
+    import sqlite3
+    import cv2 as _cv2
+    from db_schema import get_db_path
+
+    grid_w = max(8, min(96, int(grid_w)))
+    grid_h = max(6, min(54, int(grid_h)))
+    if not video_path:
+        video_path = _latest_event_video()
+    if not video_path:
+        return {"grid_w": grid_w, "grid_h": grid_h, "cells": [], "max": 0, "samples": 0}
+
+    frame_w = frame_h = None
+    try:
+        cap = _cv2.VideoCapture(video_path)
+        if cap.isOpened():
+            frame_w = cap.get(_cv2.CAP_PROP_FRAME_WIDTH)
+            frame_h = cap.get(_cv2.CAP_PROP_FRAME_HEIGHT)
+        cap.release()
+    except Exception:
+        pass
+
+    conn = sqlite3.connect(get_db_path())
+    cur = conn.cursor()
+    sql = "SELECT bbox_x1, bbox_y1, bbox_x2, bbox_y2 FROM tracking_data WHERE video_path = ?"
+    params: list = [video_path]
+    if start_frame is not None:
+        sql += " AND frame_number >= ?"; params.append(int(start_frame))
+    if end_frame is not None:
+        sql += " AND frame_number <= ?"; params.append(int(end_frame))
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+    cur.execute("SELECT MAX(frame_number) FROM tracking_data WHERE video_path = ?", (video_path,))
+    db_max_frame = cur.fetchone()[0] or 0
+    conn.close()
+
+    if not frame_w or not frame_h:
+        frame_w = max((r[2] for r in rows), default=1) or 1
+        frame_h = max((r[3] for r in rows), default=1) or 1
+
+    grid = [[0] * grid_w for _ in range(grid_h)]
+    for x1, y1, x2, y2 in rows:
+        cx = (x1 + x2) / 2.0
+        cy = (y1 + y2) / 2.0
+        gx = min(grid_w - 1, max(0, int(cx / frame_w * grid_w)))
+        gy = min(grid_h - 1, max(0, int(cy / frame_h * grid_h)))
+        grid[gy][gx] += 1
+
+    mx = max((max(r) for r in grid), default=0)
+    cells = [{"x": x, "y": y, "v": grid[y][x]}
+             for y in range(grid_h) for x in range(grid_w) if grid[y][x] > 0]
+    return {
+        "grid_w": grid_w, "grid_h": grid_h, "cells": cells, "max": mx,
+        "samples": len(rows), "video_path": video_path,
+        "frame_w": int(frame_w), "frame_h": int(frame_h),
+        "max_frame": int(db_max_frame),
+    }
+
+
+@app.get("/api/heatmap/frame", dependencies=[Depends(current_user)])
+def heatmap_frame(video_path: str = None):
+    """A representative (mid) frame of the video, as a JPEG, to sit behind the heatmap."""
+    import cv2 as _cv2
+    from fastapi.responses import Response
+    if not video_path:
+        video_path = _latest_event_video()
+    if not video_path or not _is_allowed_video(video_path):
+        raise HTTPException(status_code=404, detail="Video not available.")
+    cap = _cv2.VideoCapture(video_path)
+    total = int(cap.get(_cv2.CAP_PROP_FRAME_COUNT) or 0)
+    cap.set(_cv2.CAP_PROP_POS_FRAMES, max(0, total // 2))
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None:
+        raise HTTPException(status_code=500, detail="Could not read a frame.")
+    ok, buf = _cv2.imencode(".jpg", frame)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Could not encode frame.")
+    return Response(content=buf.tobytes(), media_type="image/jpeg")
+
+
+@app.get("/api/analytics/headcount-series", dependencies=[Depends(current_user)])
+def headcount_series():
+    """Unique people per hour-of-day (00–23) from logged sessions — feeds the
+    headcount-over-time chart."""
+    import sqlite3
+    from db_schema import get_db_path
+    conn = sqlite3.connect(get_db_path())
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT substr(entry_time, 12, 2) AS hr, COUNT(DISTINCT global_id) "
+        "FROM events WHERE entry_time IS NOT NULL AND object_type='person' GROUP BY hr ORDER BY hr"
+    )
+    buckets = {f"{h:02d}": 0 for h in range(24)}
+    for hr, cnt in cur.fetchall():
+        if hr and hr.isdigit():
+            buckets[f"{int(hr):02d}"] = cnt
+    conn.close()
+    return {"series": [{"hour": h, "count": c} for h, c in buckets.items()]}
+
+
+# ---------------------------------------------------------------------------
+# Directional line-crossing counters (turnstile-style entry/exit counting)
+# ---------------------------------------------------------------------------
+
+class LineModel(BaseModel):
+    id: Optional[int] = None
+    camera_id: int
+    name: Optional[str] = None
+    p1: List[float]
+    p2: List[float]
+    in_label: Optional[str] = "in"
+    out_label: Optional[str] = "out"
+
+
+@app.get("/api/lines", dependencies=[Depends(current_user)])
+def list_lines(camera_id: int = None):
+    lines = line_counter.get_camera_lines(camera_id) if camera_id is not None else line_counter.get_all_lines()
+    return {"lines": lines}
+
+
+@app.get("/api/lines/counts", dependencies=[Depends(current_user)])
+def line_counts(video_path: str = None):
+    """Aggregated in/out crossing counts per tripwire line."""
+    return {"counts": line_counter.get_counts(video_path)}
+
+
+@app.post("/api/lines", dependencies=[Depends(require_roles("tech"))])
+def save_line_endpoint(line: LineModel):
+    saved = line_counter.save_line({
+        "id": line.id, "camera_id": line.camera_id, "name": line.name,
+        "p1": line.p1, "p2": line.p2,
+        "in_label": line.in_label or "in", "out_label": line.out_label or "out",
+    })
+    return {"status": "success", "line": saved}
+
+
+@app.delete("/api/lines/{line_id}", dependencies=[Depends(require_roles("tech"))])
+def delete_line_endpoint(line_id: int):
+    if not line_counter.delete_line(line_id):
+        raise HTTPException(status_code=404, detail="Line not found.")
+    return {"status": "success", "message": f"Line {line_id} deleted."}
+
+
+# ---------------------------------------------------------------------------
+# Audit trail (who viewed/did what, when)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/audit")
+def audit_trail(username: str = None, action: str = None, limit: int = 200,
+                http_request: Request = None,
+                user: dict = Depends(require_roles("principal", "tech"))):
+    """Trail of user actions. Viewable by developer / principal / tech (admin)."""
+    record_audit(user["username"], user["role"], "view_audit", target="audit_log",
+                 ip=_client_ip(http_request))
+    return {"entries": get_audit_log(username=username, action=action, limit=limit)}
+
+
+@app.delete("/api/audit", dependencies=[Depends(require_roles())])
+def clear_audit(http_request: Request = None, user: dict = Depends(current_user)):
+    """Purge the audit trail. Developer only — principal and tech (admin) can
+    view the log but cannot delete it (require_roles() with no args = developer)."""
+    removed = clear_audit_log()
+    # Record the purge itself so the now-empty trail still shows who cleared it.
+    record_audit(user["username"], user["role"], "clear_audit", target="audit_log",
+                 details=f"purged {removed} entries", ip=_client_ip(http_request))
+    return {"status": "cleared", "removed": removed}

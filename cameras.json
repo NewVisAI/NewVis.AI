@@ -1,0 +1,32 @@
+{
+  "_comment": "Camera registry for the live multi-camera grid. Each camera maps to a real video source and is grouped by floor/location. The four supplied clips are distributed round-robin across the ten cameras; 'start_offset_seconds' staggers the loop for cameras that share a source so their tiles look distinct.",
+  "floors": [
+    { "id": "first",  "label": "First Floor",  "aliases": ["first floor", "1st floor", "floor 1", "1", "level 1"] },
+    { "id": "second", "label": "Second Floor", "aliases": ["second floor", "2nd floor", "floor 2", "2", "level 2"] }
+  ],
+  "cameras": [
+    { "id": 1,  "name": "Cam 1 - Lobby",         "floor": "first",  "location": "First Floor Lobby",         "source": "/mnt/d/Downloads/view-IP2 (1).mp4", "start_offset_seconds": 0 },
+    { "id": 2,  "name": "Cam 2 - East Corridor", "floor": "first",  "location": "First Floor East Corridor", "source": "/mnt/d/Downloads/view-IP5 (1).mp4", "start_offset_seconds": 0 },
+    { "id": 3,  "name": "Cam 3 - West Corridor", "floor": "first",  "location": "First Floor West Corridor", "source": "/mnt/d/Downloads/view-HC4.mp4",     "start_offset_seconds": 0 },
+    { "id": 4,  "name": "Cam 4 - Cafeteria",     "floor": "first",  "location": "First Floor Cafeteria",     "source": "/mnt/d/Downloads/view-HC3 (1).mp4", "start_offset_seconds": 0 },
+    { "id": 5,  "name": "Cam 5 - Main Hall",     "floor": "first",  "location": "First Floor Main Hall",     "source": "/mnt/d/Downloads/view-IP2 (1).mp4", "start_offset_seconds": 60 },
+    { "id": 6,  "name": "Cam 6 - Library",       "floor": "second", "location": "Second Floor Library",      "source": "/mnt/d/Downloads/view-IP5 (1).mp4", "start_offset_seconds": 60 },
+    { "id": 7,  "name": "Cam 7 - Lab Wing",      "floor": "second", "location": "Second Floor Lab Wing",     "source": "/mnt/d/Downloads/view-HC4.mp4",     "start_offset_seconds": 60 },
+    { "id": 8,  "name": "Cam 8 - Classrooms",    "floor": "second", "location": "Second Floor Classrooms",   "source": "/mnt/d/Downloads/view-HC3 (1).mp4", "start_offset_seconds": 60 },
+    { "id": 9,  "name": "Cam 9 - Staff Room",    "floor": "second", "location": "Second Floor Staff Room",   "source": "/mnt/d/Downloads/view-IP2 (1).mp4", "start_offset_seconds": 120 },
+    { "id": 10, "name": "Cam 10 - Auditorium",   "floor": "second", "location": "Second Floor Auditorium",   "source": "/mnt/d/Downloads/view-IP5 (1).mp4", "start_offset_seconds": 120 }
+  ],
+  "_topology_comment": "Adjacency graph: which cameras a person can physically walk between, and the max plausible transit time (seconds). Cross-camera ReID hand-off is only allowed along these edges within the transit window (cams 5<->6 is the inter-floor stairwell).",
+  "topology": [
+    { "a": 1, "b": 2, "max_transit_seconds": 20 },
+    { "a": 1, "b": 3, "max_transit_seconds": 20 },
+    { "a": 2, "b": 5, "max_transit_seconds": 25 },
+    { "a": 3, "b": 5, "max_transit_seconds": 25 },
+    { "a": 4, "b": 5, "max_transit_seconds": 30 },
+    { "a": 5, "b": 6, "max_transit_seconds": 45 },
+    { "a": 6, "b": 7, "max_transit_seconds": 20 },
+    { "a": 6, "b": 8, "max_transit_seconds": 20 },
+    { "a": 7, "b": 9, "max_transit_seconds": 25 },
+    { "a": 8, "b": 10, "max_transit_seconds": 25 }
+  ]
+}

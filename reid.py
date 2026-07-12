@@ -9,8 +9,15 @@ import numpy as np
 from event import normalize_object_type
 
 STRONG_REID_THRESHOLD = 0.80
-MAX_TIME_DIFF_SECONDS = 10.0
+# Widened from 10s: lets a person keep their global id after a longer occlusion
+# gap (walking behind a pillar, leaving frame briefly) instead of being handed a
+# brand-new id, which is the main cause of one person fragmenting into many GIDs.
+MAX_TIME_DIFF_SECONDS = 20.0
 SOFT_MATCH_THRESHOLD = 0.45
+# A soft (score-based) match may only fire if appearance similarity clears this
+# floor. Stops the weak colour/time terms from ever merging two people who
+# simply don't look alike — the guard that keeps the widened time window safe.
+MIN_SOFT_REID_SIMILARITY = 0.55
 
 
 def _normalize_embedding(vector: np.ndarray) -> np.ndarray:
@@ -151,12 +158,37 @@ class NeuralReIDEmbedder:
         self.backend_name = "fallback"
         self.embedding_size = 84
         self._model = None
+        self._osnet = None
         self._device = "cpu"
         self._preprocess = None
         self._build_backend()
 
     def _build_backend(self) -> None:
-        # 1. Attempt FastReID first (if config and weights exist)
+        # 0. Attempt OSNet (torchreid) — a purpose-built person-ReID architecture,
+        #    far better at separating identities than a generic classification net.
+        #    Uses ImageNet-pretrained OSNet by default; drop in Market-1501 / campus
+        #    weights by setting OSNET_WEIGHTS to a .pth path (no code change needed).
+        try:
+            import torch
+            from torchreid.reid.utils import FeatureExtractor
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            weights = os.getenv("OSNET_WEIGHTS", "")
+            model_path = weights if weights and os.path.exists(weights) else ""
+            self._osnet = FeatureExtractor(
+                model_name=os.getenv("OSNET_MODEL", "osnet_x1_0"),
+                model_path=model_path,
+                device=device,
+            )
+            self.backend_name = "osnet"
+            self.embedding_size = 512
+            tag = "custom/market weights" if model_path else "imagenet-pretrained"
+            print(f"[NeuralReIDEmbedder] OSNet ReID initialized ({tag}).")
+            return
+        except Exception as e:
+            print(f"[NeuralReIDEmbedder] OSNet unavailable ({e}); falling back to ResNet50/FastReID.")
+
+        # 1. Attempt FastReID next (if config and weights exist)
         config_path = os.getenv("FASTREID_CONFIG")
         weights_path = os.getenv("FASTREID_WEIGHTS")
         if config_path and weights_path and os.path.exists(config_path) and os.path.exists(weights_path):
@@ -216,6 +248,17 @@ class NeuralReIDEmbedder:
         crop = frame[y1:y2, x1:x2]
         if crop.size == 0:
             return _extract_fallback_embedding(frame, bbox)
+
+        if self.backend_name == "osnet" and self._osnet is not None:
+            try:
+                # torchreid FeatureExtractor expects RGB numpy; our crop is BGR.
+                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                features = self._osnet([rgb_crop])
+                vector = features.detach().cpu().numpy().reshape(-1)
+                if vector.size > 0:
+                    return _normalize_embedding(vector)
+            except Exception:
+                pass
 
         if self.backend_name == "fastreid" and self._model is not None:
             try:
@@ -278,11 +321,11 @@ class GlobalIdentityManager:
         similarity_threshold: float = 0.80,
         spatial_threshold: float = 150.0,
         cross_camera_similarity_threshold: Optional[float] = None,
-        match_window_seconds: float = 10.0,
+        match_window_seconds: float = 20.0,
         embedding_cache_ttl_seconds: float = 0.75,
         embedding_cache_iou_threshold: float = 0.85,
         score_threshold: float = 0.45,
-        embedding_memory_size: int = 10,
+        embedding_memory_size: int = 16,
     ):
         self.similarity_threshold = similarity_threshold
         self.spatial_threshold = spatial_threshold
@@ -335,6 +378,25 @@ class GlobalIdentityManager:
         global_id = self.next_global_id
         self.next_global_id += 1
         return global_id
+
+    def _cross_camera_allowed(self, record_camera_id, camera_id, time_diff) -> bool:
+        """A cross-camera re-id match is only plausible if the two cameras are
+        adjacent in the topology graph AND the time gap is within that edge's
+        max transit time. Same camera is always allowed; if no topology is
+        configured we fail open (old single-graph behaviour)."""
+        try:
+            if int(record_camera_id) == int(camera_id):
+                return True
+        except (TypeError, ValueError):
+            return True
+        try:
+            from camera_registry import transit_seconds
+            allowed = transit_seconds(record_camera_id, camera_id)
+        except Exception:
+            return True
+        if allowed is None:
+            return False  # not adjacent — a person can't teleport between them
+        return abs(float(time_diff)) <= allowed
 
     def _is_valid_global_id(self, global_id: Optional[int]) -> bool:
         return isinstance(global_id, int) and global_id > 0
@@ -510,6 +572,11 @@ class GlobalIdentityManager:
             if global_id in assigned_in_same_camera_slot:
                 continue
 
+            # Topology gate: block physically impossible cross-camera hand-offs.
+            if not self._cross_camera_allowed(record.last_camera_id, camera_id,
+                                              float(current_time) - float(record.last_seen_time)):
+                continue
+
             reid_similarity = cosine_similarity(embedding, record.embedding)
             color_similarity = self._color_similarity(shirt_color, record.shirt_color)
             time_diff = float(current_time) - float(record.last_seen_time)
@@ -537,6 +604,20 @@ class GlobalIdentityManager:
                 print(f"[STRONG MATCH] GID {global_id}")
                 print(f"[MATCH FOUND] GID {global_id}")
                 return global_id
+
+            # Appearance floor: never let colour/time carry a soft match when the
+            # two crops don't actually look alike. Prevents different people from
+            # merging into one global id under the widened time window.
+            if reid_similarity < MIN_SOFT_REID_SIMILARITY:
+                self._log_match_attempt(
+                    candidate_gid=global_id,
+                    reid_similarity=reid_similarity,
+                    color_similarity=color_similarity,
+                    time_diff=abs(time_diff),
+                    final_score=float("-inf"),
+                    decision="new_id(below_reid_floor)",
+                )
+                continue
 
             time_penalty = min(abs(time_diff) / MAX_TIME_DIFF_SECONDS, 1.0)
             score = (

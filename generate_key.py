@@ -22,6 +22,15 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+# Windows consoles often default to a legacy code page that can't encode the
+# emoji used in the messages below; a failed print must never crash the tool.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 

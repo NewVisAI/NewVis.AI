@@ -96,7 +96,7 @@ class ModeManager:
         )
         for obj_type, zone_id, entry_time, duration in cursor.fetchall():
             summary["suspicious_activities"].append({
-                "type": "Prolonged Stay",
+                "type": "Extended Dwell",
                 "object": obj_type,
                 "zone": zone_id,
                 "time": entry_time,

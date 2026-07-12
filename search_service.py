@@ -10,6 +10,7 @@ ALERT_EVENT_TYPES = {
     alerts.FALL_DETECTED,
     alerts.RESTRICTED_ZONE_ENTRY,
     alerts.AFTER_HOURS_ENTRY,
+    alerts.VIOLENCE_DETECTED,
 }
 
 

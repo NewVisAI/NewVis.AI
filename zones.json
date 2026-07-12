@@ -1,21 +1,65 @@
 {
   "zones": [
     {
-      "id": 1,
-      "camera_id": 1,
-      "name": "Restricted Zone (West half)",
-      "points": [[0.0, 0.0], [0.5, 0.0], [0.5, 1.0], [0.0, 1.0]],
-      "max_occupancy": 2,
-      "restricted": true
-    },
-    {
       "id": 2,
       "camera_id": 1,
       "name": "Monitored Entrance (East half)",
-      "points": [[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.5, 1.0]],
+      "points": [
+        [
+          0.5,
+          0.0
+        ],
+        [
+          1.0,
+          0.0
+        ],
+        [
+          1.0,
+          1.0
+        ],
+        [
+          0.5,
+          1.0
+        ]
+      ],
       "max_occupancy": 3,
-      "active_hours": {"start": "07:00", "end": "09:00"},
-      "school_days": ["mon", "tue", "wed", "thu", "fri"]
+      "active_hours": {
+        "start": "07:00",
+        "end": "09:00"
+      },
+      "school_days": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "restricted": true
+    },
+    {
+      "id": 1,
+      "camera_id": 1,
+      "name": "Custom Zone",
+      "points": [
+        [
+          0.08149881831935195,
+          0.6466666666666666
+        ],
+        [
+          0.3531615817853941,
+          0.6133333333333333
+        ],
+        [
+          0.3455503405675955,
+          0.1
+        ],
+        [
+          0.08208429841302876,
+          0.11333333333333333
+        ]
+      ],
+      "max_occupancy": 3,
+      "restricted": false
     }
   ]
 }

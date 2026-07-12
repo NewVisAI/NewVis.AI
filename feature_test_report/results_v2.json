@@ -1,0 +1,336 @@
+{
+  "generated_at": "2026-07-03T09:42:34.205124",
+  "pipeline": {
+    "processed_frames": 683,
+    "video": {
+      "path": "D:\\Downloads\\view-IP2 (1).mp4",
+      "opened": true,
+      "width": 1920,
+      "height": 1080,
+      "fps": 29.97,
+      "frame_count": 5457,
+      "duration_sec": 182.1
+    }
+  },
+  "api_tests": {
+    "login_status": 200,
+    "audit_requires_auth": 401,
+    "clip_metadata": {
+      "intrusion": {
+        "count": 50,
+        "clip": {
+          "why_logged": "Entered a restricted zone (intrusion)",
+          "event_type": "restricted_zone_entry",
+          "logged_at": "2026-07-03T09:46:39",
+          "clip_start_seconds": 159.3,
+          "clip_end_seconds": 165.3,
+          "clip_duration_seconds": 6.0,
+          "source_fps": 29.97,
+          "details": "person, GID 48, camera 1, zone 1",
+          "camera_id": 1,
+          "zone_id": 1,
+          "global_id": 48,
+          "video_path": "D:\\Downloads\\view-IP2 (1).mp4",
+          "video_url": "/api/clip/video?path=D%3A%5CDownloads%5Cview-IP2%20%281%29.mp4#t=159.3,165.3"
+        }
+      },
+      "loitering": {
+        "count": 102,
+        "clip": {
+          "why_logged": "Tracked through zone (session ended)",
+          "event_type": "leaving",
+          "logged_at": "2026-07-03T04:16:45",
+          "clip_start_seconds": 159.3,
+          "clip_end_seconds": 168.77,
+          "clip_duration_seconds": 9.47,
+          "source_fps": 29.97,
+          "details": "person, GID 48, camera 1, zone 1, dwell 3.5s",
+          "camera_id": 1,
+          "zone_id": 1,
+          "global_id": 48,
+          "video_path": "D:\\Downloads\\view-IP2 (1).mp4",
+          "video_url": "/api/clip/video?path=D%3A%5CDownloads%5Cview-IP2%20%281%29.mp4#t=159.3,168.77"
+        }
+      },
+      "people in zone 2": {
+        "count": 39,
+        "clip": {
+          "why_logged": "Prolonged stay / loitering in zone",
+          "event_type": "leaving",
+          "logged_at": "2026-07-03T04:16:44",
+          "clip_start_seconds": 81.62,
+          "clip_end_seconds": 168.23,
+          "clip_duration_seconds": 86.61,
+          "source_fps": 29.97,
+          "details": "person, GID 39, camera 1, zone 2, dwell 80.6s",
+          "camera_id": 1,
+          "zone_id": 2,
+          "global_id": 39,
+          "video_path": "D:\\Downloads\\view-IP2 (1).mp4",
+          "video_url": "/api/clip/video?path=D%3A%5CDownloads%5Cview-IP2%20%281%29.mp4#t=81.62,168.23"
+        }
+      },
+      "falls": {
+        "count": 0,
+        "clip": null
+      }
+    },
+    "clip_video": {
+      "path": "view-IP2 (1).mp4",
+      "range_status": 206,
+      "content_range": "bytes 0-2047/77865991",
+      "content_length": "2048",
+      "why_logged": "Tracked through zone (session ended)",
+      "clip_window": [
+        159.3,
+        168.77
+      ],
+      "clip_duration": 9.47,
+      "no_token_status": 401
+    },
+    "cameras_total": 10,
+    "floors": [
+      "first",
+      "second"
+    ],
+    "grid": {
+      "first floor": {
+        "floor": "first",
+        "count": 5,
+        "layout": {
+          "tiles": 5,
+          "cols": 4,
+          "rows": 2
+        },
+        "cameras": [
+          "Cam 1 - Lobby",
+          "Cam 2 - East Corridor",
+          "Cam 3 - West Corridor",
+          "Cam 4 - Cafeteria",
+          "Cam 5 - Main Hall"
+        ]
+      },
+      "second floor": {
+        "floor": "second",
+        "count": 5,
+        "layout": {
+          "tiles": 5,
+          "cols": 4,
+          "rows": 2
+        },
+        "cameras": [
+          "Cam 6 - Library",
+          "Cam 7 - Lab Wing",
+          "Cam 8 - Classrooms",
+          "Cam 9 - Staff Room",
+          "Cam 10 - Auditorium"
+        ]
+      },
+      "library": {
+        "floor": null,
+        "count": 1,
+        "layout": {
+          "tiles": 1,
+          "cols": 1,
+          "rows": 1
+        },
+        "cameras": [
+          "Cam 6 - Library"
+        ]
+      },
+      "(all)": {
+        "floor": null,
+        "count": 10,
+        "layout": {
+          "tiles": 10,
+          "cols": 5,
+          "rows": 2
+        },
+        "cameras": [
+          "Cam 1 - Lobby",
+          "Cam 2 - East Corridor",
+          "Cam 3 - West Corridor",
+          "Cam 4 - Cafeteria",
+          "Cam 5 - Main Hall",
+          "Cam 6 - Library",
+          "Cam 7 - Lab Wing",
+          "Cam 8 - Classrooms",
+          "Cam 9 - Staff Room",
+          "Cam 10 - Auditorium"
+        ]
+      }
+    },
+    "camera_snapshot": {
+      "status": 200,
+      "content_type": "image/jpeg",
+      "bytes": 17734
+    },
+    "stream_route_registered": true,
+    "periodic_reports": {
+      "daily": {
+        "headcount": null,
+        "peak_simultaneous_people": null,
+        "total_occupancy_breaches": null,
+        "occupancy_breaches": null,
+        "loitering_sessions": null,
+        "alerts": null,
+        "busiest_hour": null,
+        "report_text": null
+      },
+      "monthly": {
+        "headcount": null,
+        "peak_simultaneous_people": null,
+        "total_occupancy_breaches": null,
+        "occupancy_breaches": null,
+        "loitering_sessions": null,
+        "alerts": null,
+        "busiest_hour": null,
+        "report_text": null
+      },
+      "yearly": {
+        "headcount": null,
+        "peak_simultaneous_people": null,
+        "total_occupancy_breaches": null,
+        "occupancy_breaches": null,
+        "loitering_sessions": null,
+        "alerts": null,
+        "busiest_hour": null,
+        "report_text": null
+      }
+    },
+    "audit": {
+      "total_entries": 42,
+      "action_counts": {
+        "view_audit": 3,
+        "view_grid": 12,
+        "view_clip": 1,
+        "nl_search": 19,
+        "login": 3,
+        "auto_daily_report": 3,
+        "smoke_test": 1
+      },
+      "sample": [
+        {
+          "id": 42,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "view_audit",
+          "target": "audit_log",
+          "details": null,
+          "ip": "testclient"
+        },
+        {
+          "id": 41,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "view_grid",
+          "target": "all",
+          "details": "10 cameras",
+          "ip": "testclient"
+        },
+        {
+          "id": 40,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "view_grid",
+          "target": "library",
+          "details": "1 cameras",
+          "ip": "testclient"
+        },
+        {
+          "id": 39,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "view_grid",
+          "target": "second floor",
+          "details": "5 cameras",
+          "ip": "testclient"
+        },
+        {
+          "id": 38,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "view_grid",
+          "target": "first floor",
+          "details": "5 cameras",
+          "ip": "testclient"
+        },
+        {
+          "id": 37,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "view_clip",
+          "target": "view-IP2 (1).mp4",
+          "details": null,
+          "ip": "testclient"
+        },
+        {
+          "id": 36,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "nl_search",
+          "target": "people",
+          "details": "69 results",
+          "ip": "testclient"
+        },
+        {
+          "id": 35,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "nl_search",
+          "target": "falls",
+          "details": "0 results",
+          "ip": "testclient"
+        },
+        {
+          "id": 34,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "nl_search",
+          "target": "people in zone 2",
+          "details": "39 results",
+          "ip": "testclient"
+        },
+        {
+          "id": 33,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "nl_search",
+          "target": "loitering",
+          "details": "102 results",
+          "ip": "testclient"
+        },
+        {
+          "id": 32,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "nl_search",
+          "target": "intrusion",
+          "details": "50 results",
+          "ip": "testclient"
+        },
+        {
+          "id": 31,
+          "timestamp": "2026-07-03T09:47:08",
+          "username": "principal",
+          "role": "principal",
+          "action": "login",
+          "target": "auth",
+          "details": null,
+          "ip": "testclient"
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,9 @@
 import unittest
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+import generate_key
+import license_validator
 from generate_key import generate_license
 from license_validator import (
     ALL_FEATURES,
@@ -12,6 +16,25 @@ from license_validator import (
 
 
 class LicenseValidatorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Sign with an ephemeral in-memory keypair so the suite does not depend
+        # on the developer-only dev_keys/ private key (absent on client/CI
+        # machines). Point the validator's public key at this keypair so the
+        # full sign -> verify round trip runs end-to-end.
+        cls._ephemeral_key = Ed25519PrivateKey.generate()
+        cls._orig_public_hex = license_validator._PUBLIC_KEY_HEX
+        license_validator._PUBLIC_KEY_HEX = (
+            cls._ephemeral_key.public_key().public_bytes_raw().hex()
+        )
+        cls._orig_loader = generate_key._load_private_key
+        generate_key._load_private_key = lambda: cls._ephemeral_key
+
+    @classmethod
+    def tearDownClass(cls):
+        license_validator._PUBLIC_KEY_HEX = cls._orig_public_hex
+        generate_key._load_private_key = cls._orig_loader
+
     def test_valid_license_validation_passes(self):
         fingerprint = get_hardware_fingerprint()
         key = generate_license("TEST_INC", 10, "2099-01-01", fingerprint, ["all"])

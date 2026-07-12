@@ -42,3 +42,10 @@ alert_snapshots/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime test artifacts (large frame dumps + logs)
+feature_test_report/frames/
+feature_test_report/pipeline_log.txt
+
+# MS Office lock/owner files
+~$*
