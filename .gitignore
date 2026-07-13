@@ -49,3 +49,8 @@ feature_test_report/pipeline_log.txt
 
 # MS Office lock/owner files
 ~$*
+
+# Exported model artifacts (regenerate via export_models.py)
+models/
+*.onnx
+*.tflite

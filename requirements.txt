@@ -97,5 +97,12 @@ websockets==15.0.1
 xxhash==3.8.0
 yarl==1.24.2
 zstandard==0.25.0
+# --- Edge / NPU inference ---
+# CPU ONNX runtime (default). For a real NPU, install ONE of these INSTEAD:
+#   onnxruntime-openvino   (Intel NPU / NCS2 / iGPU)
+#   onnxruntime-gpu        (NVIDIA CUDA/TensorRT)
 onnxruntime>=1.15.0
 tflite-runtime>=2.14.0
+# Edge-TPU (Coral) runtime: pip install pycoral  (Linux; needs libedgetpu)
+# Model export (run on a build host, not required at inference time):
+#   pip install torchreid onnx onnx2tf tensorflow onnx-graphsurgeon sng4onnx

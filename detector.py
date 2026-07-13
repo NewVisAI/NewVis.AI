@@ -1,10 +1,18 @@
 import torch
 from ultralytics import YOLO, RTDETR
 
+import inference_config
+
 
 class HumanDetector:
     def __init__(self, model_type="yolo", weights=None):
         self.model_type = model_type.lower()
+        # If no explicit weights are passed, take them from the central
+        # deployment config (lets a Budget/Edge tier point at an _edgetpu.tflite
+        # or .onnx model without any code change). Falls through to the .pt
+        # defaults below when neither is set.
+        if weights is None:
+            weights = inference_config.get_detector_weights()
         # Hardware Detection: Check file extension
         self.is_tpu = str(weights).endswith('_edgetpu.tflite') if weights else False
         self.is_onnx = str(weights).endswith('.onnx') if weights else False

@@ -6,6 +6,7 @@ from typing import Deque, Dict, List, Optional, Set, Tuple
 import cv2
 import numpy as np
 
+import inference_config
 from event import normalize_object_type
 
 STRONG_REID_THRESHOLD = 0.80
@@ -25,6 +26,30 @@ def _normalize_embedding(vector: np.ndarray) -> np.ndarray:
     if norm == 0:
         return vector.astype(np.float32, copy=False)
     return (vector / norm).astype(np.float32, copy=False)
+
+
+# --------------------------------------------------------------------------- #
+# OSNet / torchreid preprocessing.
+#
+# The ONNX and Edge-TPU/TFLite backends must reproduce EXACTLY what torchreid's
+# FeatureExtractor does, otherwise an OSNet model exported to ONNX/TFLite lands
+# in a different embedding space than the GPU path and cross-camera matching
+# silently degrades. torchreid resizes to 256x128 (HxW), scales to [0,1], then
+# applies ImageNet mean/std normalisation.
+# --------------------------------------------------------------------------- #
+OSNET_INPUT_HW = (256, 128)  # (height, width)
+_IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+_IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+
+def _preprocess_person_crop(crop: np.ndarray, input_hw, mean_std: bool = True) -> np.ndarray:
+    """BGR crop -> HxWx3 float32 RGB in [0,1], optionally ImageNet-normalised."""
+    height, width = input_hw
+    rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+    resized = cv2.resize(rgb, (width, height)).astype(np.float32) / 255.0
+    if mean_std:
+        resized = (resized - _IMAGENET_MEAN) / _IMAGENET_STD
+    return resized
 
 
 def _clip_bbox(frame_shape, bbox: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -165,39 +190,52 @@ class NeuralReIDEmbedder:
 
     def _build_backend(self) -> None:
         # -2. Attempt EdgeTPU / TFLite (Prioritize for embedded deployments)
-        tflite_weights = os.getenv("REID_MODEL_TFLITE", "")
+        tflite_weights = inference_config.get_reid_tflite_path()
         if tflite_weights and os.path.exists(tflite_weights):
             try:
-                # Try pycoral first, fallback to standard tflite_runtime
+                # Try pycoral (Edge TPU) first, fall back to plain tflite_runtime.
+                # A bare tflite_runtime can also load an _edgetpu.tflite as long as
+                # the Edge TPU delegate is registered; pycoral is the happy path.
                 try:
                     from pycoral.utils.edgetpu import make_interpreter
                     self._model = make_interpreter(tflite_weights)
-                except ImportError:
+                except Exception:
                     import tflite_runtime.interpreter as tflite
                     self._model = tflite.Interpreter(model_path=tflite_weights)
-                
+
                 self._model.allocate_tensors()
                 self._input_details = self._model.get_input_details()
                 self._output_details = self._model.get_output_details()
-                
+
                 self.backend_name = "tflite"
                 # Infer embedding size from output tensor shape
-                self.embedding_size = self._output_details[0]['shape'][-1]
+                self.embedding_size = int(self._output_details[0]['shape'][-1])
                 print(f"[NeuralReIDEmbedder] Edge TPU / TFLite ReID initialized with {tflite_weights}.")
                 return
             except Exception as e:
                 print(f"[NeuralReIDEmbedder] TFLite initialization failed ({e}); falling back...")
 
         # -1. Attempt ONNX / NPU
-        onnx_weights = os.getenv("REID_MODEL_ONNX", "")
+        onnx_weights = inference_config.get_reid_onnx_path()
         if onnx_weights and os.path.exists(onnx_weights):
             try:
                 import onnxruntime as ort
-                # Auto-selects TensorRT, OpenVINO, or CPU providers
-                self._model = ort.InferenceSession(onnx_weights)
+                # Explicitly select providers by preference, intersected with what
+                # this onnxruntime build actually has. Plain `onnxruntime` only
+                # ships CPU; NPU needs `onnxruntime-openvino`, GPU needs
+                # `onnxruntime-gpu` — so we log which provider actually bound.
+                preferred = inference_config.get_onnx_providers()
+                available = set(ort.get_available_providers())
+                providers = [p for p in preferred if p in available] or ["CPUExecutionProvider"]
+                self._model = ort.InferenceSession(onnx_weights, providers=providers)
+                active = self._model.get_providers()
                 self.backend_name = "onnx"
-                self.embedding_size = self._model.get_outputs()[0].shape[-1]
-                print(f"[NeuralReIDEmbedder] ONNX NPU ReID initialized with {onnx_weights}.")
+                self.embedding_size = int(self._model.get_outputs()[0].shape[-1])
+                print(f"[NeuralReIDEmbedder] ONNX ReID initialized with {onnx_weights} "
+                      f"(provider: {active[0] if active else 'unknown'}).")
+                if active and active[0] == "CPUExecutionProvider":
+                    print("[NeuralReIDEmbedder] NOTE: running ONNX on CPU. For NPU install "
+                          "'onnxruntime-openvino'; for GPU install 'onnxruntime-gpu'.")
                 return
             except Exception as e:
                 print(f"[NeuralReIDEmbedder] ONNX initialization failed ({e}); falling back...")
@@ -289,22 +327,32 @@ class NeuralReIDEmbedder:
 
         if self.backend_name == "tflite" and self._model is not None:
             try:
-                # Preprocess for TFLite (usually expects 128x64 or 256x128, RGB, normalized)
-                input_shape = self._input_details[0]['shape']
-                input_h, input_w = input_shape[1:3]
-                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                resized = cv2.resize(rgb_crop, (input_w, input_h))
-                
-                # Check if INT8 or FP32
-                if self._input_details[0]['dtype'] == np.uint8 or self._input_details[0]['dtype'] == np.int8:
-                    input_data = np.expand_dims(resized, axis=0).astype(self._input_details[0]['dtype'])
+                # TFLite input is NHWC. Read the model's real size instead of guessing.
+                detail = self._input_details[0]
+                _, input_h, input_w, _ = detail['shape']
+                # OSNet-parity float preprocessing (RGB, [0,1], ImageNet mean/std).
+                proc = _preprocess_person_crop(crop, (int(input_h), int(input_w)), mean_std=True)
+
+                dtype = detail['dtype']
+                if dtype in (np.uint8, np.int8):
+                    # Apply the model's quantization: q = value/scale + zero_point.
+                    scale, zero_point = detail.get('quantization', (0.0, 0))
+                    if scale and scale > 0:
+                        proc = proc / scale + zero_point
+                    input_data = np.expand_dims(proc, axis=0).astype(dtype)
                 else:
-                    input_data = np.expand_dims(resized, axis=0).astype(np.float32) / 255.0
-                
-                self._model.set_tensor(self._input_details[0]['index'], input_data)
+                    input_data = np.expand_dims(proc, axis=0).astype(np.float32)
+
+                self._model.set_tensor(detail['index'], input_data)
                 self._model.invoke()
-                output_data = self._model.get_tensor(self._output_details[0]['index'])
-                vector = output_data.reshape(-1)
+                output = self._model.get_tensor(self._output_details[0]['index'])
+                # De-quantize the output embedding if it came back INT8.
+                out_detail = self._output_details[0]
+                if out_detail['dtype'] in (np.uint8, np.int8):
+                    o_scale, o_zero = out_detail.get('quantization', (0.0, 0))
+                    if o_scale and o_scale > 0:
+                        output = (output.astype(np.float32) - o_zero) * o_scale
+                vector = np.asarray(output, dtype=np.float32).reshape(-1)
                 if vector.size > 0:
                     return _normalize_embedding(vector)
             except Exception as e:
@@ -312,22 +360,17 @@ class NeuralReIDEmbedder:
 
         elif self.backend_name == "onnx" and self._model is not None:
             try:
-                # Preprocess for ONNX (NCHW format, normalized)
-                input_name = self._model.get_inputs()[0].name
-                input_shape = self._model.get_inputs()[0].shape
-                # Assuming shape like [batch, channels, height, width] (e.g., [1, 3, 128, 64])
-                input_h, input_w = (128, 64) if len(input_shape) < 4 or type(input_shape[2]) != int else (input_shape[2], input_shape[3])
-                
-                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                resized = cv2.resize(rgb_crop, (input_w, input_h))
-                normalized = resized.astype(np.float32) / 255.0
-                
-                # NCHW
-                transposed = np.transpose(normalized, (2, 0, 1))
-                input_data = np.expand_dims(transposed, axis=0)
-                
-                result = self._model.run(None, {input_name: input_data})
-                vector = np.array(result[0]).reshape(-1)
+                # ONNX input is NCHW. Read the model's real HxW; default to OSNet's.
+                inp = self._model.get_inputs()[0]
+                shape = inp.shape
+                input_h = shape[2] if len(shape) == 4 and isinstance(shape[2], int) else OSNET_INPUT_HW[0]
+                input_w = shape[3] if len(shape) == 4 and isinstance(shape[3], int) else OSNET_INPUT_HW[1]
+                # OSNet-parity preprocessing, then HWC -> CHW -> NCHW.
+                proc = _preprocess_person_crop(crop, (int(input_h), int(input_w)), mean_std=True)
+                input_data = np.expand_dims(np.transpose(proc, (2, 0, 1)), axis=0).astype(np.float32)
+
+                result = self._model.run(None, {inp.name: input_data})
+                vector = np.asarray(result[0], dtype=np.float32).reshape(-1)
                 if vector.size > 0:
                     return _normalize_embedding(vector)
             except Exception as e:
@@ -402,7 +445,7 @@ class EmbeddingCacheRecord:
 class GlobalIdentityManager:
     def __init__(
         self,
-        similarity_threshold: float = 0.80,
+        similarity_threshold: Optional[float] = None,
         spatial_threshold: float = 150.0,
         cross_camera_similarity_threshold: Optional[float] = None,
         match_window_seconds: float = 20.0,
@@ -411,6 +454,17 @@ class GlobalIdentityManager:
         score_threshold: float = 0.45,
         embedding_memory_size: int = 16,
     ):
+        # Build the embedder first so we know which backend is active, then pick a
+        # backend-appropriate match threshold (Edge-TPU/INT8 embeddings separate
+        # identities less cleanly than OSNet, so they need a lower bar). An
+        # explicit similarity_threshold argument always wins.
+        self.embedder = NeuralReIDEmbedder()
+        if similarity_threshold is None:
+            similarity_threshold = inference_config.get_reid_similarity_threshold(
+                self.embedder.backend_name
+            )
+            print(f"[GlobalIdentityManager] ReID backend '{self.embedder.backend_name}' "
+                  f"-> match threshold {similarity_threshold:.2f}")
         self.similarity_threshold = similarity_threshold
         self.spatial_threshold = spatial_threshold
         self.cross_camera_similarity_threshold = (
@@ -429,7 +483,6 @@ class GlobalIdentityManager:
         self.camera_time_assignments: Dict[Tuple[int, float], Set[int]] = {}
         self.embedding_cache: Dict[Tuple[int, int], EmbeddingCacheRecord] = {}
         self.track_frame_counters: Dict[Tuple[int, int], int] = {}
-        self.embedder = NeuralReIDEmbedder()
         self.embedding_size = self.embedder.embedding_size
 
     def _color_similarity(
