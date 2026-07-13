@@ -5,10 +5,20 @@ from ultralytics import YOLO, RTDETR
 class HumanDetector:
     def __init__(self, model_type="yolo", weights=None):
         self.model_type = model_type.lower()
+        # Hardware Detection: Check file extension
+        self.is_tpu = str(weights).endswith('_edgetpu.tflite') if weights else False
+        self.is_onnx = str(weights).endswith('.onnx') if weights else False
         
         # Determine device
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"[HumanDetector] Using execution device: {self.device.upper()}")
+        if self.is_tpu:
+            self.device = "cpu"  # PyCoral handles TPU routing under the hood
+            print("[HumanDetector] Hardware: EDGE TPU DETECTED. Using Google Coral Accelerator.")
+        elif self.is_onnx:
+            self.device = "cpu"  # ONNX Runtime handles NPU/CPU
+            print("[HumanDetector] Hardware: NPU/ONNX DETECTED. Using ONNX Runtime.")
+        else:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"[HumanDetector] Hardware: GPU/CPU DETECTED. Using PyTorch on {self.device.upper()}")
 
         if self.model_type == "rtdetr":
             model_weights = weights or "rtdetr-l.pt"
@@ -17,6 +27,7 @@ class HumanDetector:
         else:
             model_weights = weights or "yolov8s.pt"
             print(f"[HumanDetector] Loading YOLO model with weights: {model_weights}...")
+            # Ultralytics natively loads .tflite and .onnx using the same YOLO() call!
             self.model = YOLO(model_weights)
 
         # Target classes (COCO dataset)

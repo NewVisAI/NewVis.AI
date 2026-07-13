@@ -164,6 +164,44 @@ class NeuralReIDEmbedder:
         self._build_backend()
 
     def _build_backend(self) -> None:
+        # -2. Attempt EdgeTPU / TFLite (Prioritize for embedded deployments)
+        tflite_weights = os.getenv("REID_MODEL_TFLITE", "")
+        if tflite_weights and os.path.exists(tflite_weights):
+            try:
+                # Try pycoral first, fallback to standard tflite_runtime
+                try:
+                    from pycoral.utils.edgetpu import make_interpreter
+                    self._model = make_interpreter(tflite_weights)
+                except ImportError:
+                    import tflite_runtime.interpreter as tflite
+                    self._model = tflite.Interpreter(model_path=tflite_weights)
+                
+                self._model.allocate_tensors()
+                self._input_details = self._model.get_input_details()
+                self._output_details = self._model.get_output_details()
+                
+                self.backend_name = "tflite"
+                # Infer embedding size from output tensor shape
+                self.embedding_size = self._output_details[0]['shape'][-1]
+                print(f"[NeuralReIDEmbedder] Edge TPU / TFLite ReID initialized with {tflite_weights}.")
+                return
+            except Exception as e:
+                print(f"[NeuralReIDEmbedder] TFLite initialization failed ({e}); falling back...")
+
+        # -1. Attempt ONNX / NPU
+        onnx_weights = os.getenv("REID_MODEL_ONNX", "")
+        if onnx_weights and os.path.exists(onnx_weights):
+            try:
+                import onnxruntime as ort
+                # Auto-selects TensorRT, OpenVINO, or CPU providers
+                self._model = ort.InferenceSession(onnx_weights)
+                self.backend_name = "onnx"
+                self.embedding_size = self._model.get_outputs()[0].shape[-1]
+                print(f"[NeuralReIDEmbedder] ONNX NPU ReID initialized with {onnx_weights}.")
+                return
+            except Exception as e:
+                print(f"[NeuralReIDEmbedder] ONNX initialization failed ({e}); falling back...")
+
         # 0. Attempt OSNet (torchreid) — a purpose-built person-ReID architecture,
         #    far better at separating identities than a generic classification net.
         #    Uses ImageNet-pretrained OSNet by default; drop in Market-1501 / campus
@@ -248,6 +286,52 @@ class NeuralReIDEmbedder:
         crop = frame[y1:y2, x1:x2]
         if crop.size == 0:
             return _extract_fallback_embedding(frame, bbox)
+
+        if self.backend_name == "tflite" and self._model is not None:
+            try:
+                # Preprocess for TFLite (usually expects 128x64 or 256x128, RGB, normalized)
+                input_shape = self._input_details[0]['shape']
+                input_h, input_w = input_shape[1:3]
+                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                resized = cv2.resize(rgb_crop, (input_w, input_h))
+                
+                # Check if INT8 or FP32
+                if self._input_details[0]['dtype'] == np.uint8 or self._input_details[0]['dtype'] == np.int8:
+                    input_data = np.expand_dims(resized, axis=0).astype(self._input_details[0]['dtype'])
+                else:
+                    input_data = np.expand_dims(resized, axis=0).astype(np.float32) / 255.0
+                
+                self._model.set_tensor(self._input_details[0]['index'], input_data)
+                self._model.invoke()
+                output_data = self._model.get_tensor(self._output_details[0]['index'])
+                vector = output_data.reshape(-1)
+                if vector.size > 0:
+                    return _normalize_embedding(vector)
+            except Exception as e:
+                print(f"[NeuralReIDEmbedder] TFLite extract error: {e}")
+
+        elif self.backend_name == "onnx" and self._model is not None:
+            try:
+                # Preprocess for ONNX (NCHW format, normalized)
+                input_name = self._model.get_inputs()[0].name
+                input_shape = self._model.get_inputs()[0].shape
+                # Assuming shape like [batch, channels, height, width] (e.g., [1, 3, 128, 64])
+                input_h, input_w = (128, 64) if len(input_shape) < 4 or type(input_shape[2]) != int else (input_shape[2], input_shape[3])
+                
+                rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                resized = cv2.resize(rgb_crop, (input_w, input_h))
+                normalized = resized.astype(np.float32) / 255.0
+                
+                # NCHW
+                transposed = np.transpose(normalized, (2, 0, 1))
+                input_data = np.expand_dims(transposed, axis=0)
+                
+                result = self._model.run(None, {input_name: input_data})
+                vector = np.array(result[0]).reshape(-1)
+                if vector.size > 0:
+                    return _normalize_embedding(vector)
+            except Exception as e:
+                print(f"[NeuralReIDEmbedder] ONNX extract error: {e}")
 
         if self.backend_name == "osnet" and self._osnet is not None:
             try:
