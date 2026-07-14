@@ -18,14 +18,21 @@ from typing import Dict, List, Optional
 REGISTRY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cameras.json")
 
 
+import threading
+
+# Thread lock to protect concurrent reads / writes to cameras.json
+_registry_lock = threading.Lock()
+
+
 def _load() -> Dict:
     if not os.path.exists(REGISTRY_PATH):
         return {"floors": [], "cameras": []}
-    with open(REGISTRY_PATH, "r", encoding="utf-8") as handle:
-        try:
-            data = json.load(handle)
-        except json.JSONDecodeError:
-            return {"floors": [], "cameras": []}
+    with _registry_lock:
+        with open(REGISTRY_PATH, "r", encoding="utf-8") as handle:
+            try:
+                data = json.load(handle)
+            except json.JSONDecodeError:
+                return {"floors": [], "cameras": []}
     data.setdefault("floors", [])
     data.setdefault("cameras", [])
     return data
