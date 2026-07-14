@@ -168,10 +168,13 @@ async def startup_tasks():
     asyncio.create_task(storage_cleanup_loop())
     asyncio.create_task(daily_report_loop())
 
-    # 3. Automatically start the live AI surveillance engine threads
+    # 3. Initialize multiprocessing shared state
+    import backend_runner
+    backend_runner.init_shared_state()
+
+    # 4. Automatically start the live AI surveillance engine processes
     def _run_safe_ai_engine():
         try:
-            import backend_runner
             backend_runner.start_surveillance_threads()
         except Exception as err:
             import traceback
