@@ -31,8 +31,18 @@ def _load_all_zones() -> List[Dict]:
 
 
 def _persist_all_zones(zones: List[Dict]) -> None:
-    with open(ZONES_PATH, "w", encoding="utf-8") as handle:
-        json.dump({"zones": zones}, handle, indent=2)
+    temp_path = ZONES_PATH + ".tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as handle:
+            json.dump({"zones": zones}, handle, indent=2)
+        os.replace(temp_path, ZONES_PATH)
+    except Exception as e:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise e
 
 
 def has_any_zones() -> bool:

@@ -49,8 +49,8 @@ def generate(period: str = "daily") -> Dict[str, Any]:
         period = "daily"
     events_cutoff, alerts_cutoff = _cutoffs(period)
 
-    conn = connect_db(validate_schema=False)
-    cur = conn.cursor()
+    with connect_db(validate_schema=False) as conn:
+        cur = conn.cursor()
 
     def ev_clause(col="entry_time"):
         return (f" AND {col} >= ?", [events_cutoff]) if events_cutoff else ("", [])
@@ -136,11 +136,11 @@ def generate(period: str = "daily") -> Dict[str, Any]:
     # --- Safety alerts breakdown --------------------------------------------
     alert_counts: Dict[str, int] = {}
 
-    def _table_exists(name):
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,))
-        return cur.fetchone() is not None
+    def _table_exists(cursor, name):
+        from db_schema import _table_exists as schema_table_exists
+        return schema_table_exists(cursor, name)
 
-    if _table_exists("alerts"):
+    if _table_exists(cur, "alerts"):
         a_clause = " WHERE timestamp >= ?" if alerts_cutoff else ""
         a_params = [alerts_cutoff] if alerts_cutoff else []
         cur.execute(adapt_query(
@@ -157,7 +157,6 @@ def generate(period: str = "daily") -> Dict[str, Any]:
     report["alerts"] = alert_counts
     report["total_alerts"] = sum(alert_counts.values())
 
-    conn.close()
     return report
 
 

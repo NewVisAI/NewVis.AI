@@ -32,8 +32,18 @@ def _load_all() -> List[Dict]:
 
 
 def _persist(lines: List[Dict]) -> None:
-    with open(LINES_PATH, "w", encoding="utf-8") as handle:
-        json.dump({"lines": lines}, handle, indent=2)
+    temp_path = LINES_PATH + ".tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as handle:
+            json.dump({"lines": lines}, handle, indent=2)
+        os.replace(temp_path, LINES_PATH)
+    except Exception as e:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise e
 
 
 def get_all_lines() -> List[Dict]:

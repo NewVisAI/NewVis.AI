@@ -208,45 +208,44 @@ def _save_snapshot(frame, bbox, alert_id: int, zone_name: str, object_type: str)
 
 
 def record_alert(alert: Dict, frame=None, bbox=None) -> int:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
-    timestamp = datetime.now().replace(microsecond=0).isoformat()
-    alert_id = _insert_returning_id(
-        cursor,
-        """
-        INSERT INTO alerts
-        (timestamp, alert_type, zone_id, zone_name, camera_id, global_id, object_type, message,
-         video_path, frame_number, track_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            timestamp,
-            alert["alert_type"],
-            alert.get("zone_id"),
-            alert.get("zone_name"),
-            alert.get("camera_id"),
-            alert.get("global_id"),
-            alert.get("object_type"),
-            alert.get("message"),
-            alert.get("video_path"),
-            alert.get("frame_number"),
-            alert.get("track_id"),
-        ),
-    )
-
-    snapshot_path = None
-    if frame is not None and bbox is not None:
-        snapshot_path = _save_snapshot(
-            frame, bbox, alert_id, alert.get("zone_name", ""), alert.get("object_type", "")
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        timestamp = datetime.now().replace(microsecond=0).isoformat()
+        alert_id = _insert_returning_id(
+            cursor,
+            """
+            INSERT INTO alerts
+            (timestamp, alert_type, zone_id, zone_name, camera_id, global_id, object_type, message,
+             video_path, frame_number, track_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                timestamp,
+                alert["alert_type"],
+                alert.get("zone_id"),
+                alert.get("zone_name"),
+                alert.get("camera_id"),
+                alert.get("global_id"),
+                alert.get("object_type"),
+                alert.get("message"),
+                alert.get("video_path"),
+                alert.get("frame_number"),
+                alert.get("track_id"),
+            ),
         )
-        if snapshot_path:
-            cursor.execute(
-                adapt_query("UPDATE alerts SET snapshot_path = ? WHERE id = ?"),
-                (snapshot_path, alert_id),
-            )
 
-    conn.commit()
-    conn.close()
+        snapshot_path = None
+        if frame is not None and bbox is not None:
+            snapshot_path = _save_snapshot(
+                frame, bbox, alert_id, alert.get("zone_name", ""), alert.get("object_type", "")
+            )
+            if snapshot_path:
+                cursor.execute(
+                    adapt_query("UPDATE alerts SET snapshot_path = ? WHERE id = ?"),
+                    (snapshot_path, alert_id),
+                )
+
+        conn.commit()
 
     # Console output today; real push/email/SMS delivery replaces this sink later.
     _safe_print(f"🚨 ALERT [{alert['alert_type']}]: {alert['message']}")
@@ -291,28 +290,25 @@ def _alert_title(alert_type: str) -> str:
 
 
 def _record_notification(alert: Dict, alert_id: int) -> int:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
     timestamp = datetime.now().replace(microsecond=0).isoformat()
     title = _alert_title(alert["alert_type"])
-    notification_id = _insert_returning_id(
-        cursor,
-        """
-        INSERT INTO notifications (timestamp, recipient, title, message, alert_id)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (timestamp, PRINCIPAL_RECIPIENT, title, alert.get("message"), alert_id),
-    )
-    conn.commit()
-    conn.close()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        notification_id = _insert_returning_id(
+            cursor,
+            """
+            INSERT INTO notifications (timestamp, recipient, title, message, alert_id)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (timestamp, PRINCIPAL_RECIPIENT, title, alert.get("message"), alert_id),
+        )
+        conn.commit()
 
     _safe_print(f"🔔 PRINCIPAL NOTIFICATION [{title}]: {alert.get('message')}")
     return notification_id
 
 
 def get_notifications(recipient: str = PRINCIPAL_RECIPIENT, unread_only: bool = False, limit: int = 50) -> List[Dict]:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
     sql = """
         SELECT n.id, n.timestamp, n.recipient, n.title, n.message, n.alert_id, n.read,
                a.camera_id, a.zone_name, a.global_id, a.object_type, a.snapshot_path, a.video_path
@@ -326,9 +322,10 @@ def get_notifications(recipient: str = PRINCIPAL_RECIPIENT, unread_only: bool = 
     sql += " ORDER BY n.timestamp DESC LIMIT ?"
     params.append(limit)
 
-    cursor.execute(adapt_query(sql), params)
-    rows = cursor.fetchall()
-    conn.close()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(adapt_query(sql), params)
+        rows = cursor.fetchall()
 
     return [
         {
@@ -351,21 +348,20 @@ def get_notifications(recipient: str = PRINCIPAL_RECIPIENT, unread_only: bool = 
 
 
 def mark_notifications_read(notification_ids: Optional[List[int]] = None, recipient: str = PRINCIPAL_RECIPIENT) -> None:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
-    if notification_ids:
-        placeholders = ",".join("?" * len(notification_ids))
-        cursor.execute(
-            adapt_query(f"UPDATE notifications SET read = 1 WHERE id IN ({placeholders})"),
-            notification_ids,
-        )
-    else:
-        cursor.execute(
-            adapt_query("UPDATE notifications SET read = 1 WHERE recipient = ?"),
-            (recipient,),
-        )
-    conn.commit()
-    conn.close()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        if notification_ids:
+            placeholders = ",".join("?" * len(notification_ids))
+            cursor.execute(
+                adapt_query(f"UPDATE notifications SET read = 1 WHERE id IN ({placeholders})"),
+                notification_ids,
+            )
+        else:
+            cursor.execute(
+                adapt_query("UPDATE notifications SET read = 1 WHERE recipient = ?"),
+                (recipient,),
+            )
+        conn.commit()
 
 
 def raise_zone_alert(
@@ -477,9 +473,10 @@ def search_alerts(
     sql += " ORDER BY timestamp DESC LIMIT ?"
     params.append(limit)
 
-    cursor.execute(adapt_query(sql), params)
-    rows = cursor.fetchall()
-    conn.close()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(adapt_query(sql), params)
+        rows = cursor.fetchall()
 
     results = []
     for row in rows:
@@ -511,19 +508,18 @@ def search_alerts(
 
 
 def get_alert_playback_entry(alert_id: int) -> Optional[Dict]:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
-    cursor.execute(
-        adapt_query(
-            """
-            SELECT camera_id, global_id, track_id, object_type, video_path, frame_number, timestamp
-            FROM alerts WHERE id = ?
-            """
-        ),
-        (alert_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            adapt_query(
+                """
+                SELECT camera_id, global_id, track_id, object_type, video_path, frame_number, timestamp
+                FROM alerts WHERE id = ?
+                """
+            ),
+            (alert_id,),
+        )
+        row = cursor.fetchone()
     if row is None or not row[4]:
         return None
 
@@ -540,24 +536,22 @@ def get_alert_playback_entry(alert_id: int) -> Optional[Dict]:
         "exit_time": None,
     }
 
-
 def get_recent_alerts(limit: int = 50) -> List[Dict]:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
-    cursor.execute(
-        adapt_query(
-            """
-            SELECT id, timestamp, alert_type, zone_id, zone_name, camera_id, global_id,
-                   object_type, message, acknowledged, video_path, frame_number, track_id, snapshot_path
-            FROM alerts
-            ORDER BY timestamp DESC
-            LIMIT ?
-            """
-        ),
-        (limit,),
-    )
-    rows = cursor.fetchall()
-    conn.close()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            adapt_query(
+                """
+                SELECT id, timestamp, alert_type, zone_id, zone_name, camera_id, global_id,
+                       object_type, message, acknowledged, video_path, frame_number, track_id, snapshot_path
+                FROM alerts
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """
+            ),
+            (limit,),
+        )
+        rows = cursor.fetchall()
 
     return [
         {
@@ -578,3 +572,37 @@ def get_recent_alerts(limit: int = 50) -> List[Dict]:
         }
         for row in rows
     ]
+
+
+def get_alert_by_id(alert_id: int) -> Optional[Dict]:
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            adapt_query(
+                """
+                SELECT id, timestamp, alert_type, zone_id, zone_name, camera_id, global_id,
+                       object_type, message, acknowledged, video_path, frame_number, track_id, snapshot_path
+                FROM alerts WHERE id = ?
+                """
+            ),
+            (alert_id,),
+        )
+        row = cursor.fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "timestamp": row[1],
+        "alert_type": row[2],
+        "zone_id": row[3],
+        "zone_name": row[4],
+        "camera_id": row[5],
+        "global_id": row[6],
+        "object_type": row[7],
+        "message": row[8],
+        "acknowledged": bool(row[9]),
+        "video_path": row[10],
+        "frame_number": row[11],
+        "track_id": row[12],
+        "snapshot_path": row[13],
+    }

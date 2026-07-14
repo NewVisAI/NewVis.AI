@@ -33,83 +33,82 @@ class QueryEngine:
         if not filters and user_query:
             filters = self._build_keyword_filters(user_query)
 
-        conn = connect_db(validate_schema=False)
-        cursor = conn.cursor()
-        self._ensure_event_columns(cursor)
-        if hasattr(conn, "commit"):
-            conn.commit()
-        display_mode = self._resolve_display_mode(filters)
-        session_mode = self._normalize_session_mode(session_mode or filters.get("session_mode"))
-
-        sql = """
-            SELECT track_id, global_id, camera_id, zone_id,
-                   entry_time, exit_time, duration, stayed,
-                   object_type, event_type,
-                   frame_start, frame_end, video_time, video_path, timestamp,
-                   cameras, video_paths, COALESCE(event_mode, mode_type, 'single')
-            FROM events
-            WHERE entry_time IS NOT NULL
-        """
-
-        params: List[Any] = []
-
-        object_type = filters.get("object_type") or filters.get("object")
-        if object_type:
-            sql += " AND LOWER(object_type) = ?"
-            params.append(object_type.lower())
-
-        event_type = filters.get("event")
-        if event_type == "staying":
-            sql += " AND stayed = 1"
-        elif event_type == "leaving":
-            sql += " AND exit_time IS NOT NULL"
-        elif event_type == "dress_code_violation":
-            sql += " AND event_type = ?"
-            params.append("dress_code_violation")
-        elif event_type in ("running_detected", "fall_detected"):
-            sql += " AND event_type = ?"
-            params.append(event_type)
-
-        zone_id = filters.get("zone_id")
-        if isinstance(zone_id, int):
-            sql += " AND zone_id = ?"
-            params.append(zone_id)
-
-        camera_id = filters.get("camera_id")
-        if isinstance(camera_id, int):
-            # Check if camera is in the JSON list of cameras OR matches camera_id
-            sql += " AND (camera_id = ? OR cameras LIKE ?)"
-            params.append(camera_id)
-            params.append(f"%{camera_id}%")
-
-        track_id = filters.get("track_id")
-        if isinstance(track_id, int):
-            sql += " AND track_id = ?"
-            params.append(track_id)
-
-        global_id = filters.get("global_id")
-        if isinstance(global_id, int):
-            sql += " AND global_id = ?"
-            params.append(global_id)
-
-        if session_mode:
-            sql += " AND COALESCE(event_mode, mode_type, 'single') = ?"
-            params.append(session_mode)
-
-        time_range = filters.get("time_range")
-        if time_range:
-            start_hour, end_hour = self._normalize_hour_range(time_range)
-            clause, range_params = self._time_range_clause(start_hour, end_hour)
-            sql += clause
-            params.extend(range_params)
-
-        sql += " ORDER BY COALESCE(exit_time, entry_time, timestamp) DESC"
-
-        cursor.execute(adapt_query(sql), params)
-        rows = cursor.fetchall()
-        conn.close()
-
         results: List[Dict[str, Any]] = []
+
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
+            self._ensure_event_columns(cursor)
+            if hasattr(conn, "commit"):
+                conn.commit()
+            display_mode = self._resolve_display_mode(filters)
+            session_mode = self._normalize_session_mode(session_mode or filters.get("session_mode"))
+
+            sql = """
+                SELECT track_id, global_id, camera_id, zone_id,
+                       entry_time, exit_time, duration, stayed,
+                       object_type, event_type,
+                       frame_start, frame_end, video_time, video_path, timestamp,
+                       cameras, video_paths, COALESCE(event_mode, mode_type, 'single')
+                FROM events
+                WHERE entry_time IS NOT NULL
+            """
+
+            params: List[Any] = []
+
+            object_type = filters.get("object_type") or filters.get("object")
+            if object_type:
+                sql += " AND LOWER(object_type) = ?"
+                params.append(object_type.lower())
+
+            event_type = filters.get("event")
+            if event_type == "staying":
+                sql += " AND stayed = 1"
+            elif event_type == "leaving":
+                sql += " AND exit_time IS NOT NULL"
+            elif event_type == "dress_code_violation":
+                sql += " AND event_type = ?"
+                params.append("dress_code_violation")
+            elif event_type in ("running_detected", "fall_detected"):
+                sql += " AND event_type = ?"
+                params.append(event_type)
+
+            zone_id = filters.get("zone_id")
+            if isinstance(zone_id, int):
+                sql += " AND zone_id = ?"
+                params.append(zone_id)
+
+            camera_id = filters.get("camera_id")
+            if isinstance(camera_id, int):
+                # Check if camera is in the JSON list of cameras OR matches camera_id
+                sql += " AND (camera_id = ? OR cameras LIKE ?)"
+                params.append(camera_id)
+                params.append(f"%{camera_id}%")
+
+            track_id = filters.get("track_id")
+            if isinstance(track_id, int):
+                sql += " AND track_id = ?"
+                params.append(track_id)
+
+            global_id = filters.get("global_id")
+            if isinstance(global_id, int):
+                sql += " AND global_id = ?"
+                params.append(global_id)
+
+            if session_mode:
+                sql += " AND COALESCE(event_mode, mode_type, 'single') = ?"
+                params.append(session_mode)
+
+            time_range = filters.get("time_range")
+            if time_range:
+                start_hour, end_hour = self._normalize_hour_range(time_range)
+                clause, range_params = self._time_range_clause(start_hour, end_hour)
+                sql += clause
+                params.extend(range_params)
+
+            sql += " ORDER BY COALESCE(exit_time, entry_time, timestamp) DESC"
+
+            cursor.execute(adapt_query(sql), params)
+            rows = cursor.fetchall()
         for row in rows:
             frame_start = row[10]
             frame_end = row[11]
@@ -150,8 +149,11 @@ class QueryEngine:
         return results
 
     def _ensure_event_columns(self, cursor: sqlite3.Cursor) -> None:
-        cursor.execute("PRAGMA table_info(events)")
-        columns = {row[1] for row in cursor.fetchall()}
+        from db_schema import _get_columns as schema_get_columns
+        try:
+            columns = schema_get_columns(cursor, "events")
+        except Exception:
+            return
         if not columns:
             return
         if "cameras" not in columns:
@@ -263,54 +265,53 @@ class QueryEngine:
         return clause, [start_hour, end_hour]
 
     def generate_security_report(self) -> str:
-        conn = connect_db(validate_schema=False)
-        cursor = conn.cursor()
-        
         report = []
         report.append("="*50)
         report.append("SENTINEL AI - SURVEILLANCE REPORT & STATS")
         report.append("="*50)
         
-        # 1. Total unique objects tracked
-        cursor.execute("SELECT COUNT(DISTINCT global_id) FROM events")
-        total_unique = cursor.fetchone()[0] or 0
-        report.append(f"• Total Unique Identities Tracked: {total_unique}")
-        
-        # Breakdown by class
-        cursor.execute("SELECT object_type, COUNT(DISTINCT global_id) FROM events GROUP BY object_type")
-        class_counts = cursor.fetchall()
-        if class_counts:
-            class_str = ", ".join([f"{cls}s: {cnt}" for cls, cnt in class_counts])
-            report.append(f"  [Breakdown: {class_str}]")
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
             
-        # 2. Most active zone
-        cursor.execute("SELECT zone_id, COUNT(*) as cnt FROM events GROUP BY zone_id ORDER BY cnt DESC LIMIT 1")
-        active_zone = cursor.fetchone()
-        if active_zone:
-            report.append(f"• Most Active Zone: Zone {active_zone[0]} ({active_zone[1]} entries recorded)")
+            # 1. Total unique objects tracked
+            cursor.execute("SELECT COUNT(DISTINCT global_id) FROM events")
+            total_unique = cursor.fetchone()[0] or 0
+            report.append(f"• Total Unique Identities Tracked: {total_unique}")
             
-        # 3. Peak activity hour
-        cursor.execute("SELECT substr(entry_time, 12, 2) as hr, COUNT(*) as cnt FROM events WHERE entry_time IS NOT NULL GROUP BY hr ORDER BY cnt DESC LIMIT 1")
-        peak_hour = cursor.fetchone()
-        if peak_hour and peak_hour[0]:
-            report.append(f"• Peak Activity Hour: {peak_hour[0]}:00 - {peak_hour[0]}:59 ({peak_hour[1]} events)")
-
-        # 4. Longest Dwell Time (Intruder warning)
-        cursor.execute("SELECT global_id, object_type, zone_id, duration FROM events ORDER BY duration DESC LIMIT 1")
-        longest_stay = cursor.fetchone()
-        if longest_stay and longest_stay[3] > 0:
-            report.append(f"• Longest Zone Stay: GID {longest_stay[0]} ({longest_stay[1]}) stayed in Zone {longest_stay[2]} for {longest_stay[3]:.1f}s")
-            
-        # 5. Dwell time averages per zone
-        cursor.execute("SELECT zone_id, AVG(duration) FROM events GROUP BY zone_id")
-        avg_dwells = cursor.fetchall()
-        if avg_dwells:
-            report.append("\nAverage Dwell Time by Zone:")
-            for zone_id, avg_dur in avg_dwells:
-                report.append(f"  - Zone {zone_id}: {avg_dur:.1f} seconds")
+            # Breakdown by class
+            cursor.execute("SELECT object_type, COUNT(DISTINCT global_id) FROM events GROUP BY object_type")
+            class_counts = cursor.fetchall()
+            if class_counts:
+                class_str = ", ".join([f"{cls}s: {cnt}" for cls, cnt in class_counts])
+                report.append(f"  [Breakdown: {class_str}]")
                 
+            # 2. Most active zone
+            cursor.execute("SELECT zone_id, COUNT(*) as cnt FROM events GROUP BY zone_id ORDER BY cnt DESC LIMIT 1")
+            active_zone = cursor.fetchone()
+            if active_zone:
+                report.append(f"• Most Active Zone: Zone {active_zone[0]} ({active_zone[1]} entries recorded)")
+                
+            # 3. Peak activity hour
+            cursor.execute("SELECT substr(entry_time, 12, 2) as hr, COUNT(*) as cnt FROM events WHERE entry_time IS NOT NULL GROUP BY hr ORDER BY cnt DESC LIMIT 1")
+            peak_hour = cursor.fetchone()
+            if peak_hour and peak_hour[0]:
+                report.append(f"• Peak Activity Hour: {peak_hour[0]}:00 - {peak_hour[0]}:59 ({peak_hour[1]} events)")
+
+            # 4. Longest Dwell Time (Intruder warning)
+            cursor.execute("SELECT global_id, object_type, zone_id, duration FROM events ORDER BY duration DESC LIMIT 1")
+            longest_stay = cursor.fetchone()
+            if longest_stay and longest_stay[3] is not None and longest_stay[3] > 0:
+                report.append(f"• Longest Zone Stay: GID {longest_stay[0]} ({longest_stay[1]}) stayed in Zone {longest_stay[2]} for {longest_stay[3]:.1f}s")
+                
+            # 5. Dwell time averages per zone
+            cursor.execute("SELECT zone_id, AVG(duration) FROM events GROUP BY zone_id")
+            avg_dwells = cursor.fetchall()
+            if avg_dwells:
+                report.append("\nAverage Dwell Time by Zone:")
+                for zone_id, avg_dur in avg_dwells:
+                    report.append(f"  - Zone {zone_id}: {avg_dur or 0.0:.1f} seconds")
+                    
         report.append("="*50)
-        conn.close()
         return "\n".join(report)
 
     def get_trajectory(self, global_id: int) -> List[Dict[str, Any]]:
@@ -327,9 +328,10 @@ class QueryEngine:
             WHERE global_id = ? AND entry_time IS NOT NULL
             ORDER BY entry_time ASC
         """
-        cursor.execute(adapt_query(sql), (global_id,))
-        rows = cursor.fetchall()
-        conn.close()
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
+            cursor.execute(adapt_query(sql), (global_id,))
+            rows = cursor.fetchall()
         
         trajectory = []
         for row in rows:
@@ -364,8 +366,6 @@ class QueryEngine:
             WHERE entry_time IS NOT NULL
             GROUP BY zone_id
         """
-        cursor.execute(adapt_query(sql))
-        rows = cursor.fetchall()
         
         # 2. Query currently active occupants in each zone (exit_time is null)
         sql_active = """
@@ -374,10 +374,14 @@ class QueryEngine:
             WHERE entry_time IS NOT NULL AND exit_time IS NULL
             GROUP BY zone_id
         """
-        cursor.execute(adapt_query(sql_active))
-        active_rows = dict(cursor.fetchall())
         
-        conn.close()
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
+            cursor.execute(adapt_query(sql))
+            rows = cursor.fetchall()
+            
+            cursor.execute(adapt_query(sql_active))
+            active_rows = dict(cursor.fetchall())
         
         report = []
         for row in rows:

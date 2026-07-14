@@ -79,7 +79,12 @@ def _public_view(cam: Dict) -> Dict:
         "floor": cam.get("floor"),
         "location": cam.get("location"),
         "stream_url": f"/api/cameras/{cam.get('id')}/stream",
-        "source_present": bool(cam.get("source")) and os.path.exists(str(cam.get("source"))),
+        "source_present": (
+            bool(cam.get("source")) and (
+                str(cam.get("source")).startswith(("rtsp://", "http://", "https://")) or
+                os.path.exists(str(cam.get("source")))
+            )
+        ),
     }
 
 

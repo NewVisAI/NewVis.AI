@@ -35,75 +35,74 @@ class ModeManager:
         count of zone-entry events/sessions — re-entries and tracker ID
         fragmentation would otherwise inflate the number.
         """
-        conn = connect_db(validate_schema=False)
-        cursor = conn.cursor()
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
 
-        cutoff = self._cutoff_iso(time_frame)
-        time_clause = " AND entry_time >= ?" if cutoff else ""
-        params = [cutoff] if cutoff else []
+            cutoff = self._cutoff_iso(time_frame)
+            time_clause = " AND entry_time >= ?" if cutoff else ""
+            params = [cutoff] if cutoff else []
 
-        summary: Dict[str, Any] = {
-            "time_frame": time_frame,
-            "headcount": 0,
-            "total_vehicles": 0,
-            "total_people_visits": 0,
-            "vehicle_types": {},
-            "suspicious_activities": [],
-            "zone_headcount": {},
-        }
+            summary: Dict[str, Any] = {
+                "time_frame": time_frame,
+                "headcount": 0,
+                "total_vehicles": 0,
+                "total_people_visits": 0,
+                "vehicle_types": {},
+                "suspicious_activities": [],
+                "zone_headcount": {},
+            }
 
-        cursor.execute(
-            adapt_query(
-                f"SELECT COUNT(DISTINCT global_id) FROM events WHERE object_type = 'person'{time_clause}"
-            ),
-            params,
-        )
-        row = cursor.fetchone()
-        summary["headcount"] = row[0] if row and row[0] is not None else 0
+            cursor.execute(
+                adapt_query(
+                    f"SELECT COUNT(DISTINCT global_id) FROM events WHERE object_type = 'person'{time_clause}"
+                ),
+                params,
+            )
+            row = cursor.fetchone()
+            summary["headcount"] = row[0] if row and row[0] is not None else 0
 
-        cursor.execute(
-            adapt_query(
-                f"SELECT object_type, COUNT(*) FROM events WHERE 1=1{time_clause} GROUP BY object_type"
-            ),
-            params,
-        )
-        for obj_type, count in cursor.fetchall():
-            if obj_type in ("car", "truck", "bus", "motorcycle", "bicycle"):
-                summary["total_vehicles"] += count
-                summary["vehicle_types"][obj_type] = summary["vehicle_types"].get(obj_type, 0) + count
-            elif obj_type == "person":
-                summary["total_people_visits"] = count
+            cursor.execute(
+                adapt_query(
+                    f"SELECT object_type, COUNT(*) FROM events WHERE 1=1{time_clause} GROUP BY object_type"
+                ),
+                params,
+            )
+            for obj_type, count in cursor.fetchall():
+                if obj_type in ("car", "truck", "bus", "motorcycle", "bicycle"):
+                    summary["total_vehicles"] += count
+                    summary["vehicle_types"][obj_type] = summary["vehicle_types"].get(obj_type, 0) + count
+                elif obj_type == "person":
+                    summary["total_people_visits"] = count
 
-        cursor.execute(
-            adapt_query(
-                f"""
-                SELECT zone_id, COUNT(DISTINCT global_id)
-                FROM events
-                WHERE object_type = 'person'{time_clause}
-                GROUP BY zone_id
-                """
-            ),
-            params,
-        )
-        for zone_id, count in cursor.fetchall():
-            summary["zone_headcount"][zone_id] = count
+            cursor.execute(
+                adapt_query(
+                    f"""
+                    SELECT zone_id, COUNT(DISTINCT global_id)
+                    FROM events
+                    WHERE object_type = 'person'{time_clause}
+                    GROUP BY zone_id
+                    """
+                ),
+                params,
+            )
+            for zone_id, count in cursor.fetchall():
+                summary["zone_headcount"][zone_id] = count
 
-        cursor.execute(
-            adapt_query(
-                f"SELECT object_type, zone_id, entry_time, duration FROM events WHERE stayed = 1{time_clause}"
-            ),
-            params,
-        )
-        for obj_type, zone_id, entry_time, duration in cursor.fetchall():
-            summary["suspicious_activities"].append({
-                "type": "Extended Dwell",
-                "object": obj_type,
-                "zone": zone_id,
-                "time": entry_time,
-                "duration": f"{duration:.1f}s",
-            })
+            cursor.execute(
+                adapt_query(
+                    f"SELECT object_type, zone_id, entry_time, duration FROM events WHERE stayed = 1{time_clause}"
+                ),
+                params,
+            )
+            for obj_type, zone_id, entry_time, duration in cursor.fetchall():
+                summary["suspicious_activities"].append({
+                    "type": "Extended Dwell",
+                    "object": obj_type,
+                    "zone": zone_id,
+                    "time": entry_time,
+                    "duration": f"{duration or 0.0:.1f}s",
+                })
 
-        conn.close()
         return summary
 
     def print_summary_report(self, use_zones: bool = False, time_frame: str = "all"):

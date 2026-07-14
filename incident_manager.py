@@ -20,6 +20,8 @@ class IncidentManager:
         # global_id -> {score: int, behaviors: List[str], last_update: float}
         self.risk_profiles: Dict[int, Dict] = {}
         self.incidents: List[Dict] = []
+        import threading
+        self.lock = threading.Lock()
         
         # Zone types metadata (could be loaded from zones.json later)
         self.zone_metadata = {
@@ -39,65 +41,74 @@ class IncidentManager:
             return "parking"
         return "default"
 
+    def prune_stale_profiles(self) -> None:
+        """Periodically removes profile records that have not been seen for over 10 minutes to prevent unbounded memory growth."""
+        now = time.time()
+        stale_ids = [gid for gid, prof in self.risk_profiles.items() if now - prof.get("last_seen", 0) > 600.0]
+        for gid in stale_ids:
+            self.risk_profiles.pop(gid, None)
+
     def update_risk(self, global_id: int, event_data: Dict) -> Dict:
         """
         Updates the risk profile for a global ID based on current activity.
         """
-        if global_id not in self.risk_profiles:
-            self.risk_profiles[global_id] = {
-                "score": 0,
-                "behaviors": set(),
-                "last_seen": time.time(),
-                "history": []
-            }
+        with self.lock:
+            self.prune_stale_profiles()
+            if global_id not in self.risk_profiles:
+                self.risk_profiles[global_id] = {
+                    "score": 0,
+                    "behaviors": set(),
+                    "last_seen": time.time(),
+                    "history": []
+                }
         
-        profile = self.risk_profiles[global_id]
-        score = profile["score"]
-        behaviors = profile["behaviors"]
-        
-        # 1. Zone-based risk
-        zone_name = event_data.get("zone_name", "Unknown")
-        zone_type = self._get_zone_type(zone_name)
-        metadata = self.zone_metadata.get(zone_type, self.zone_metadata["default"])
-        
-        # 2. Loitering Detection
-        duration = event_data.get("duration", 0.0)
-        if duration > self.LOITERING_THRESHOLD:
-            if "Loitering" not in behaviors:
-                behaviors.add("Loitering")
-                score += 20 * metadata["multiplier"]
-                self._add_incident(global_id, "Loitering", f"Person loitering in {zone_name}")
-
-        # 3. Intrusion Detection
-        if zone_type == "restricted" and duration > self.INTRUSION_THRESHOLD:
-            if "Intrusion" not in behaviors:
-                behaviors.add("Intrusion")
-                score += 50 * metadata["multiplier"]
-                self._add_incident(global_id, "Intrusion", f"Unauthorized entry into {zone_name}")
-
-        # 4. Temporal Risk (Night time)
-        video_time_val = event_data.get("video_time")
-        if video_time_val is not None:
-            # Simple heuristic: map video_time to "hour" if we don't have absolute timestamps
-            # Or just use system time if video_time doesn't represent actual hour
-            current_hour = time.localtime().tm_hour 
-        else:
-            current_hour = time.localtime().tm_hour
+            profile = self.risk_profiles[global_id]
+            score = profile["score"]
+            behaviors = profile["behaviors"]
             
-        if current_hour < 6 or current_hour > 21:
-            if "Night Activity" not in behaviors:
-                behaviors.add("Night Activity")
-                score += 15
-        
-        # Clamp score
-        profile["score"] = min(100, int(score))
-        profile["last_seen"] = time.time()
-        
-        return {
-            "score": profile["score"],
-            "level": self.get_risk_level(profile["score"]),
-            "behaviors": list(behaviors)
-        }
+            # 1. Zone-based risk
+            zone_name = event_data.get("zone_name", "Unknown")
+            zone_type = self._get_zone_type(zone_name)
+            metadata = self.zone_metadata.get(zone_type, self.zone_metadata["default"])
+            
+            # 2. Loitering Detection
+            duration = event_data.get("duration", 0.0)
+            if duration > self.LOITERING_THRESHOLD:
+                if "Loitering" not in behaviors:
+                    behaviors.add("Loitering")
+                    score += 20 * metadata["multiplier"]
+                    self._add_incident(global_id, "Loitering", f"Person loitering in {zone_name}")
+
+            # 3. Intrusion Detection
+            if zone_type == "restricted" and duration > self.INTRUSION_THRESHOLD:
+                if "Intrusion" not in behaviors:
+                    behaviors.add("Intrusion")
+                    score += 50 * metadata["multiplier"]
+                    self._add_incident(global_id, "Intrusion", f"Unauthorized entry into {zone_name}")
+
+            # 4. Temporal Risk (Night time)
+            video_time_val = event_data.get("video_time")
+            if video_time_val is not None:
+                # Simple heuristic: map video_time to "hour" if we don't have absolute timestamps
+                # Or just use system time if video_time doesn't represent actual hour
+                current_hour = time.localtime().tm_hour 
+            else:
+                current_hour = time.localtime().tm_hour
+                
+            if current_hour < 6 or current_hour > 21:
+                if "Night Activity" not in behaviors:
+                    behaviors.add("Night Activity")
+                    score += 15
+            
+            # Clamp score
+            profile["score"] = min(100, int(score))
+            profile["last_seen"] = time.time()
+            
+            return {
+                "score": profile["score"],
+                "level": self.get_risk_level(profile["score"]),
+                "behaviors": list(behaviors)
+            }
 
     def get_risk_level(self, score: int) -> str:
         if score >= 71: return "HIGH"

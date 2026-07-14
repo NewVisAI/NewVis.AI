@@ -684,6 +684,16 @@ class GlobalIdentityManager:
         for cache_key in stale_embedding_keys:
             self.embedding_cache.pop(cache_key, None)
 
+        # Evict identities that have not been seen for longer than the ReID match window
+        stale_identities = [
+            gid
+            for gid, record in self.identity_store.items()
+            if abs(float(current_time) - float(record.last_seen_time)) > max(600.0, self.match_window_seconds * 5.0)
+        ]
+        for gid in stale_identities:
+            self.identity_store.pop(gid, None)
+            self.global_id_map.pop(gid, None)
+
     def _match_existing_identity(
         self,
         camera_id: int,

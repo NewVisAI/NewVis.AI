@@ -39,6 +39,13 @@ class LockedConnection:
         self.lock = lock
         self.lock.acquire()
         
+    def __enter__(self):
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+        
     def cursor(self, *args, **kwargs):
         return self.conn.cursor(*args, **kwargs)
         

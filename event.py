@@ -129,16 +129,15 @@ def clear_event_logs() -> None:
     sessions.clear()
     active_uniform_violations.clear()
     tracking_write_buffer.clear()
-    conn = _connect()
-    cursor = conn.cursor()
-    if get_db_type() == "postgres":
-        cursor.execute("TRUNCATE events, tracking_data RESTART IDENTITY CASCADE")
-    else:
-        cursor.execute("DELETE FROM events")
-        cursor.execute("DELETE FROM tracking_data")
-        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('events', 'tracking_data')")
-    conn.commit()
-    conn.close()
+    with _connect() as conn:
+        cursor = conn.cursor()
+        if get_db_type() == "postgres":
+            cursor.execute("TRUNCATE events, tracking_data RESTART IDENTITY CASCADE")
+        else:
+            cursor.execute("DELETE FROM events")
+            cursor.execute("DELETE FROM tracking_data")
+            cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('events', 'tracking_data')")
+        conn.commit()
 
 
 def _utc_now_iso() -> str:
@@ -289,19 +288,18 @@ def _write_session_event(
     duration: float,
     stayed: bool,
 ) -> None:
-    conn = _connect()
-    cursor = conn.cursor()
-    _insert_session_event(
-        cursor=cursor,
-        session=session,
-        exit_time=exit_time,
-        frame_number=frame_number,
-        video_time=video_time,
-        duration=duration,
-        stayed=stayed,
-    )
-    conn.commit()
-    conn.close()
+    with _connect() as conn:
+        cursor = conn.cursor()
+        _insert_session_event(
+            cursor=cursor,
+            session=session,
+            exit_time=exit_time,
+            frame_number=frame_number,
+            video_time=video_time,
+            duration=duration,
+            stayed=stayed,
+        )
+        conn.commit()
 
     # Trigger custom event callbacks
     for cb in EVENT_CALLBACKS:
@@ -461,19 +459,18 @@ def flush_tracking_data() -> None:
     if not tracking_write_buffer:
         return
 
-    conn = _connect()
-    cursor = conn.cursor()
-    cursor.executemany(
-        """
-        INSERT OR REPLACE INTO tracking_data
-        (camera_id, video_path, frame_number, track_id, global_id, object_type,
-         bbox_x1, bbox_y1, bbox_x2, bbox_y2, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        tracking_write_buffer,
-    )
-    conn.commit()
-    conn.close()
+    with _connect() as conn:
+        cursor = conn.cursor()
+        cursor.executemany(
+            """
+            INSERT OR REPLACE INTO tracking_data
+            (camera_id, video_path, frame_number, track_id, global_id, object_type,
+             bbox_x1, bbox_y1, bbox_x2, bbox_y2, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            tracking_write_buffer,
+        )
+        conn.commit()
     tracking_write_buffer.clear()
 
 
@@ -516,9 +513,6 @@ def get_tracking_data(
         global_id: Optional[int] = None,
     ) -> List[Dict]:
     flush_tracking_data()
-    conn = _connect()
-    cursor = conn.cursor()
-
     sql = """
         SELECT frame_number, track_id, global_id, object_type,
                bbox_x1, bbox_y1, bbox_x2, bbox_y2
@@ -535,7 +529,6 @@ def get_tracking_data(
         sql += " AND track_id = ?"
         params.append(track_id)
     else:
-        conn.close()
         raise ValueError("Either track_id or global_id must be provided.")
 
     if camera_id is None:
@@ -546,9 +539,10 @@ def get_tracking_data(
 
     sql += " ORDER BY frame_number ASC"
 
-    cursor.execute(sql, params)
-    rows = cursor.fetchall()
-    conn.close()
+    with _connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
 
     return [
         {
@@ -749,43 +743,40 @@ def _write_occupancy_alert_to_db(
 ) -> None:
     timestamp = _utc_now_iso()
     try:
-        conn = connect_db(validate_schema=False)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO events (
-                timestamp, object_type, track_id, global_id, camera_id, video_path,
-                frame_number, frame_start, frame_end, video_time, zone_id,
-                event_type, event_mode, mode_type, entry_time, exit_time, duration, stayed
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                timestamp,
-                "zone",
-                -1,
-                -1,
-                camera_id,
-                video_path,
-                frame_number,
-                frame_number,
-                frame_number,
-                video_time,
-                zone_id,
-                "occupancy_alert",
-                "single",
-                "system",
-                timestamp,
-                timestamp,
-                float(current_count),
-                limit
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO events (
+                    timestamp, object_type, track_id, global_id, camera_id, video_path,
+                    frame_number, frame_start, frame_end, video_time, zone_id,
+                    event_type, event_mode, mode_type, entry_time, exit_time, duration, stayed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    timestamp,
+                    "zone",
+                    -1,
+                    -1,
+                    camera_id,
+                    video_path,
+                    frame_number,
+                    frame_number,
+                    frame_number,
+                    video_time,
+                    zone_id,
+                    "occupancy_alert",
+                    "single",
+                    "system",
+                    timestamp,
+                    timestamp,
+                    float(current_count),
+                    limit
+                )
             )
-        )
-        conn.commit()
+            conn.commit()
     except Exception as e:
         print(f"Error logging occupancy alert: {e}")
-    finally:
-        if "conn" in locals():
-            conn.close()
 
     alert_event = {
         "event_id": -1,
@@ -902,44 +893,43 @@ def _write_dress_code_violation_to_db(
     video_time: float,
     video_path: str
 ) -> None:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
 
-    timestamp = _utc_now_iso()
-    color_desc = f"RGB({int(shirt_rgb[0])},{int(shirt_rgb[1])},{int(shirt_rgb[2])})"
+        timestamp = _utc_now_iso()
+        color_desc = f"RGB({int(shirt_rgb[0])},{int(shirt_rgb[1])},{int(shirt_rgb[2])})"
 
-    sql = """
-        INSERT INTO events (
-            timestamp, object_type, track_id, global_id, camera_id, video_path,
-            frame_number, frame_start, frame_end, video_time, zone_id, event_type,
-            entry_time, exit_time, duration, stayed, event_mode, mode_type
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
+        sql = """
+            INSERT INTO events (
+                timestamp, object_type, track_id, global_id, camera_id, video_path,
+                frame_number, frame_start, frame_end, video_time, zone_id, event_type,
+                entry_time, exit_time, duration, stayed, event_mode, mode_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
 
-    params = (
-        timestamp,
-        "person",
-        -1,
-        global_id,
-        camera_id,
-        video_path,
-        0,
-        0,
-        0,
-        video_time,
-        0,
-        "dress_code_violation",
-        timestamp,
-        timestamp,
-        0.0,
-        1,
-        "single",
-        "single"
-    )
+        params = (
+            timestamp,
+            "person",
+            -1,
+            global_id,
+            camera_id,
+            video_path,
+            0,
+            0,
+            0,
+            video_time,
+            0,
+            "dress_code_violation",
+            timestamp,
+            timestamp,
+            0.0,
+            1,
+            "single",
+            "single"
+        )
 
-    cursor.execute(adapt_query(sql), params)
-    conn.commit()
-    conn.close()
+        cursor.execute(adapt_query(sql), params)
+        conn.commit()
 
     print(f"🚨 [DRESS CODE VIOLATION] GID {global_id} is wearing non-uniform clothing: {color_desc}")
 

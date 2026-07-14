@@ -17,6 +17,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 # Ensure parent directory is in path for relative imports
@@ -69,7 +70,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -172,6 +173,8 @@ async def storage_cleanup_loop():
 async def daily_report_loop():
     """Emit an automated daily summary once every 24h (works off whatever the
     ingest pipeline has logged, live feed or processed video alike)."""
+    # Sleep on startup to avoid firing immediately when the server restarts
+    await asyncio.sleep(86400)
     while True:
         try:
             report = periodic_report.generate("daily")
@@ -352,10 +355,11 @@ def login(request: LoginRequest, http_request: Request = None):
     record_audit(user["username"], user["role"], "login", target="auth", ip=ip)
     return {"token": token, "username": user["username"], "role": user["role"]}
 
-
 @app.post("/api/logout")
-def logout(user: dict = Depends(current_user)):
-    # Token revocation is handled client-side by discarding; also drop server-side entries.
+def logout(credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))):
+    if credentials:
+        from backend.auth import revoke_token
+        revoke_token(credentials.credentials)
     return {"status": "success"}
 
 
@@ -504,12 +508,6 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Clear database logs for a fresh upload session
-    try:
-        clear_event_logs()
-    except Exception as e:
-        print(f"Error clearing event logs: {e}")
-
     # Initialize a default whole-frame zone for camera_id 1 if no zones exist yet
     try:
         if not get_all_zones():
@@ -549,14 +547,15 @@ async def reprocess_video(request: ReprocessRequest, background_tasks: Backgroun
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Original video file not found.")
 
+    # Restrict path traversal
+    abs_upload_dir = os.path.normcase(os.path.abspath(UPLOAD_DIR))
+    abs_file_path = os.path.normcase(os.path.abspath(file_path))
+    if not abs_file_path.startswith(abs_upload_dir):
+        raise HTTPException(status_code=403, detail="Access denied. Path is outside uploads folder.")
+
     clean_name = os.path.basename(file_path)
     output_filename = f"processed_{clean_name}"
     output_path = os.path.join(OUTPUT_DIR, output_filename)
-
-    try:
-        clear_event_logs()
-    except Exception as e:
-        print(f"Error clearing event logs: {e}")
 
     try:
         background_tasks.add_task(process_uploaded_video_task, file_path, output_path)
@@ -595,7 +594,7 @@ def get_processing_status(video_path: str):
     return {"status": task_status}
 
 
-@app.get("/api/test-frames")
+@app.get("/api/test-frames", dependencies=[Depends(require_roles("tech"))])
 def test_frames():
     import backend_runner
     return {
@@ -831,14 +830,14 @@ def recent_alerts(limit: int = 50):
 @app.get("/api/alerts/{alert_id}/snapshot")
 def alert_snapshot(alert_id: int, http_request: Request = None,
                    user: dict = Depends(require_roles("principal"))):
-    for alert in alerts.get_recent_alerts(limit=1000):
-        if alert["id"] == alert_id:
-            snapshot_path = alert.get("snapshot_path")
-            if snapshot_path and os.path.exists(snapshot_path):
-                record_audit(user["username"], user["role"], "view_snapshot",
-                             target=f"alert {alert_id}", ip=_client_ip(http_request))
-                return FileResponse(snapshot_path, media_type="image/jpeg")
-            raise HTTPException(status_code=404, detail="No snapshot stored for this alert.")
+    alert = alerts.get_alert_by_id(alert_id)
+    if alert is not None:
+        snapshot_path = alert.get("snapshot_path")
+        if snapshot_path and os.path.exists(snapshot_path):
+            record_audit(user["username"], user["role"], "view_snapshot",
+                         target=f"alert {alert_id}", ip=_client_ip(http_request))
+            return FileResponse(snapshot_path, media_type="image/jpeg")
+        raise HTTPException(status_code=404, detail="No snapshot stored for this alert.")
     raise HTTPException(status_code=404, detail="Alert not found.")
 
 
