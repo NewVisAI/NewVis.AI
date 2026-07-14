@@ -36,7 +36,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 # team signing key was not present here); the matching private key lives in
 # dev_keys/license_signing_key.pem. To hand off to real deployments, restore
 # the team's public key here and re-issue licenses from the team's private key.
-_PUBLIC_KEY_HEX = "1ea5e9cf6b1f35cf0bc627484d2599327977151e6f0ee792c29ec99dc024a929"
+_PUBLIC_KEY_HEX = "fc1b893e9b92c984f340647283d129e1fc049ee30fbb8356d1c5d490b82391e8"
 
 LICENSE_FILE = "license.key"
 LICENSE_ENV_VAR = "SENTINEL_LICENSE"
@@ -176,7 +176,8 @@ def get_license_info(license_key: Optional[str] = None) -> Dict[str, Any]:
     hardware_locked = bool(allowed_hash and allowed_hash != "ANY")
     if hardware_locked:
         current_fingerprint = get_hardware_fingerprint()
-        if allowed_hash != current_fingerprint:
+        allowed_hashes = [h.strip().upper() for h in allowed_hash.split(",") if h.strip()]
+        if current_fingerprint not in allowed_hashes:
             return {
                 "mode": "invalid",
                 "client_id": payload.get("client_id"),

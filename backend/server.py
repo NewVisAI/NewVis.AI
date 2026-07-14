@@ -168,6 +168,19 @@ async def startup_tasks():
     asyncio.create_task(storage_cleanup_loop())
     asyncio.create_task(daily_report_loop())
 
+    # 3. Automatically start the live AI surveillance engine threads
+    def _run_safe_ai_engine():
+        try:
+            import backend_runner
+            backend_runner.start_surveillance_threads()
+        except Exception as err:
+            import traceback
+            print(f"[AI ENGINE ERROR] Failed to start: {err}", flush=True)
+            traceback.print_exc()
+
+    import threading
+    threading.Thread(target=_run_safe_ai_engine, daemon=True).start()
+
     # 3. Licensing check (empty key = evaluation mode: 1 camera, core features)
     license_key = load_license_key()
     zones = get_all_zones()
@@ -545,8 +558,17 @@ def get_processing_status(video_path: str):
         parts = task_status.split(":")
         percent = int(parts[1]) if len(parts) > 1 else 0
         return {"status": "processing", "progress": percent}
-
+        
     return {"status": task_status}
+
+
+@app.get("/api/test-frames")
+def test_frames():
+    import backend_runner
+    return {
+        "active_camera_ids": list(backend_runner.latest_frames.keys()),
+        "has_frame": {cid: (frame is not None) for cid, frame in backend_runner.latest_frames.items()}
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1044,8 +1066,12 @@ def camera_stream_endpoint(camera_id: int, token: str = "", http_request: Reques
     cam = camera_registry.get_camera(camera_id)
     if cam is None:
         raise HTTPException(status_code=404, detail="Camera not found.")
-    if not cam.get("source") or not os.path.exists(str(cam["source"])):
+    
+    source_str = str(cam.get("source", ""))
+    is_rtsp = source_str.startswith("rtsp://") or source_str.startswith("http://")
+    if not source_str or (not is_rtsp and not os.path.exists(source_str)):
         raise HTTPException(status_code=404, detail="Camera source video not available.")
+        
     record_audit(user["username"], user["role"], "view_camera",
                  target=cam.get("name", f"cam {camera_id}"), ip=_client_ip(http_request))
     return StreamingResponse(
@@ -1061,8 +1087,14 @@ def camera_snapshot_endpoint(camera_id: int, token: str = "", http_request: Requ
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid or missing token.")
     cam = camera_registry.get_camera(camera_id)
-    if cam is None or not cam.get("source") or not os.path.exists(str(cam["source"])):
+    if cam is None:
+        raise HTTPException(status_code=404, detail="Camera not found.")
+        
+    source_str = str(cam.get("source", ""))
+    is_rtsp = source_str.startswith("rtsp://") or source_str.startswith("http://")
+    if not source_str or (not is_rtsp and not os.path.exists(source_str)):
         raise HTTPException(status_code=404, detail="Camera source not available.")
+        
     jpeg = camera_stream.grab_snapshot(cam)
     if jpeg is None:
         raise HTTPException(status_code=500, detail="Could not grab frame.")
