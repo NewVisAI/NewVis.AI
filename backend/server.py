@@ -153,7 +153,31 @@ async def storage_cleanup_loop():
                         break
                 print(f"[DISK WATCHDOG] Purge completed. Deleted {deleted_count} old files.", flush=True)
 
-            # 2. Traditional 30-day raw MP4 deletion
+            # 2. Prune SQLite / Postgres database records older than 30 days
+            try:
+                from event import connect_db, adapt_query
+                import time as t_mod
+                thirty_days_ago_sec = t_mod.time() - (30 * 86400)
+                cutoff_iso = t_mod.strftime("%Y-%m-%dT%H:%M:%S", t_mod.gmtime(thirty_days_ago_sec))
+                
+                with connect_db(validate_schema=False) as conn:
+                    cursor = conn.cursor()
+                    # Prune old tracking coordinates
+                    cursor.execute(
+                        adapt_query("DELETE FROM tracking_data WHERE created_at < ?"),
+                        (cutoff_iso,)
+                    )
+                    # Prune old parsed event logs
+                    cursor.execute(
+                        adapt_query("DELETE FROM events WHERE timestamp < ?"),
+                        (cutoff_iso,)
+                    )
+                    conn.commit()
+                    print(f"[MAINTENANCE] Pruned events/tracking database records older than {cutoff_iso}")
+            except Exception as dbe:
+                print(f"[MAINTENANCE ERROR] Database record pruning failed: {dbe}")
+
+            # 3. Traditional 30-day raw MP4 deletion
             now = time.time()
             cutoff_time = now - (30 * 86400)  # 30 days
             for directory in [UPLOAD_DIR, OUTPUT_DIR]:
