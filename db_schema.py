@@ -74,13 +74,61 @@ def _connect_absolute_db():
         return psycopg2.connect(DATABASE_URL)
     else:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(get_db_path(), check_same_thread=False, timeout=30.0)
+        db_file = get_db_path()
         try:
+            conn = sqlite3.connect(db_file, check_same_thread=False, timeout=30.0)
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
-        except sqlite3.Error:
-            pass
-        return conn
+            # Run a fast integrity check on connection to verify the database is not corrupted
+            cur = conn.cursor()
+            cur.execute("PRAGMA integrity_check(1);")
+            row = cur.fetchone()
+            if row and "ok" not in str(row[0]).lower():
+                raise sqlite3.DatabaseError("SQLite integrity check failed")
+            return conn
+        except (sqlite3.DatabaseError, sqlite3.OperationalError) as err:
+            print(f"[DATABASE EMERGENCY] SQLite corruption detected on connection: {err}. Initiating auto-repair...", flush=True)
+            try:
+                if 'conn' in locals():
+                    conn.close()
+            except Exception:
+                pass
+            import time as t_mod
+            backup_path = f"{db_file}.corrupt_{int(t_mod.time())}"
+            try:
+                if os.path.exists(db_file):
+                    os.rename(db_file, backup_path)
+                    print(f"[DATABASE EMERGENCY] Moved corrupted database file to: {backup_path}", flush=True)
+                # Retry connection on a fresh file
+                conn = sqlite3.connect(db_file, check_same_thread=False, timeout=30.0)
+                conn.execute("PRAGMA journal_mode=WAL;")
+                conn.execute("PRAGMA synchronous=NORMAL;")
+                return conn
+            except Exception as backup_err:
+                print(f"[DATABASE CRITICAL ERROR] Database auto-repair failed: {backup_err}", flush=True)
+                raise err
+
+
+def connect_db(validate_schema: bool = True):
+    if validate_schema:
+        try:
+            ensure_valid_schema()
+        except Exception as schema_err:
+            print(f"[DATABASE EMERGENCY] Schema validation failed: {schema_err}. Attempting auto-repair...", flush=True)
+            db_file = get_db_path()
+            if get_db_type() == "sqlite" and os.path.exists(db_file):
+                import time as t_mod
+                backup_path = f"{db_file}.corrupt_{int(t_mod.time())}"
+                try:
+                    os.rename(db_file, backup_path)
+                    print(f"[DATABASE EMERGENCY] Schema repair success: moved corrupted DB to {backup_path}", flush=True)
+                    ensure_valid_schema()
+                except Exception as repair_err:
+                    print(f"[DATABASE CRITICAL ERROR] Schema repair failed: {repair_err}", flush=True)
+    conn = _connect_absolute_db()
+    if db_lock is not None:
+        return LockedConnection(conn, db_lock)
+    return conn
 
 
 def _table_exists(cursor, table_name: str) -> bool:
@@ -344,10 +392,4 @@ def ensure_valid_schema() -> str:
                 conn.close()
 
 
-def connect_db(validate_schema: bool = True):
-    if validate_schema:
-        ensure_valid_schema()
-    conn = _connect_absolute_db()
-    if db_lock is not None:
-        return LockedConnection(conn, db_lock)
-    return conn
+
