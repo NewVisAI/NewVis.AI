@@ -41,21 +41,64 @@ def reader_thread_func(source, frame_queue, stop_event):
     """
     Background thread that continuously grabs raw frames from the VideoCapture source.
     This separates network frame acquisition from YOLO inference, preventing OpenCV deadlocks.
+    Includes thread execution watchdog safety to prevent indefinite hangs in OpenCV.
     """
     import cv2
     from app import resolve_capture_source
     cap = None
     
+    def timed_op(func, args=(), timeout=10.0):
+        """Runs an operation in a helper thread to enforce a strict timeout."""
+        res = [None]
+        err = [None]
+        def worker():
+            try:
+                res[0] = func(*args)
+            except Exception as e:
+                err[0] = e
+        t = threading.Thread(target=worker)
+        t.daemon = True
+        t.start()
+        t.join(timeout=timeout)
+        if t.is_alive():
+            return None, True  # timed out
+        if err[0]:
+            raise err[0]
+        return res[0], False
+
     while not stop_event.is_set():
-        if cap is None or not cap.isOpened():
+        if cap is None:
             resolved = resolve_capture_source(source)
-            cap = cv2.VideoCapture(resolved)
-            if not cap.isOpened():
+            # Enforce 10-second timeout on VideoCapture open
+            res, timed_out = timed_op(cv2.VideoCapture, (resolved,), timeout=10.0)
+            if timed_out or res is None or not res.isOpened():
+                if res:
+                    try:
+                        res.release()
+                    except Exception:
+                        pass
                 time.sleep(2.0)
                 continue
+            cap = res
         
         try:
-            ret, frame = cap.read()
+            # Enforce 10-second timeout on frame read to prevent indefinite RTSP blocking
+            res, timed_out = timed_op(cap.read, timeout=10.0)
+            if timed_out:
+                print(f"[AI WORKER POOL WATCHDOG] Frame acquisition timed out for {source}. Recreating capture...", flush=True)
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+                cap = None
+                time.sleep(1.0)
+                continue
+
+            if res is None:
+                time.sleep(0.1)
+                continue
+                
+            ret, frame = res
             if not ret or frame is None:
                 time.sleep(0.1)
                 continue
@@ -71,7 +114,10 @@ def reader_thread_func(source, frame_queue, stop_event):
             time.sleep(0.5)
             
     if cap is not None:
-        cap.release()
+        try:
+            timed_op(cap.release, timeout=3.0)
+        except Exception:
+            pass
 
 def overlay_live_status(frame, camera_name):
     """Draws standard live status overlays directly onto the frame at source."""
