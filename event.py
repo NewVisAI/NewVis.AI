@@ -348,6 +348,12 @@ def _finalize_expired_sessions(current_video_time: float) -> None:
             _finalize_session(session_key, session)
 
 
+def finalize_expired_sessions(current_video_time: float) -> None:
+    """Public wrapper to finalize expired sessions externally (e.g. on empty frames)."""
+    _finalize_expired_sessions(current_video_time)
+
+
+
 def update_session_event(
     track_id: int,
     global_id: int,

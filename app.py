@@ -23,6 +23,7 @@ from event import (
     check_occupancy_alerts,
     clear_event_logs,
     finalize_camera_sessions,
+    finalize_expired_sessions,
     flush_tracking_data,
     init_db,
     log_tracking_data,
@@ -658,6 +659,9 @@ def _process_camera_frame(
     # occupancy-limit alerts are pure noise. Live headcount and peak-concurrency
     # density are still reported; we just don't raise "occupancy_alert" events.
     # (check_occupancy_alerts remains available in event.py if ever needed.)
+    
+    finalize_expired_sessions(video_time)
+    
     camera_state.display_frame = frame
 
 
