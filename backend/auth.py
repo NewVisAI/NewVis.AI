@@ -50,58 +50,66 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 def init_users_db() -> None:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
-    pk = (
-        "id SERIAL PRIMARY KEY"
-        if get_db_type() == "postgres"
-        else "id INTEGER PRIMARY KEY AUTOINCREMENT"
-    )
-    cursor.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS users (
-            {pk},
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL,
-            created_at TEXT
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        pk = (
+            "id SERIAL PRIMARY KEY"
+            if get_db_type() == "postgres"
+            else "id INTEGER PRIMARY KEY AUTOINCREMENT"
         )
-        """
-    )
-    conn.commit()
-
-    cursor.execute("SELECT COUNT(*) FROM users")
-    if cursor.fetchone()[0] == 0:
-        # Seed default accounts; override via env vars, change before any real deployment.
-        defaults = [
-            ("developer", os.environ.get("SENTINEL_DEV_PASSWORD", "dev@sentinel"), "developer"),
-            ("techteam", os.environ.get("SENTINEL_TECH_PASSWORD", "tech@sentinel"), "tech"),
-            ("principal", os.environ.get("SENTINEL_PRINCIPAL_PASSWORD", "principal@sentinel"), "principal"),
-        ]
-        for username, password, role in defaults:
-            cursor.execute(
-                adapt_query(
-                    "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)"
-                ),
-                (username, _hash_password(password), role, time.strftime("%Y-%m-%dT%H:%M:%S")),
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS users (
+                {pk},
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
+                created_at TEXT
             )
-        conn.commit()
-        print(
-            "[AUTH] Seeded default users: developer / techteam / principal "
-            "(passwords from SENTINEL_*_PASSWORD env vars or built-in defaults — change them!)"
+            """
         )
-    conn.close()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS active_tokens (
+                token TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                role TEXT NOT NULL,
+                expires REAL NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+        cursor.execute("SELECT COUNT(*) FROM users")
+        if cursor.fetchone()[0] == 0:
+            # Seed default accounts; override via env vars, change before any real deployment.
+            defaults = [
+                ("developer", os.environ.get("SENTINEL_DEV_PASSWORD", "dev@sentinel"), "developer"),
+                ("techteam", os.environ.get("SENTINEL_TECH_PASSWORD", "tech@sentinel"), "tech"),
+                ("principal", os.environ.get("SENTINEL_PRINCIPAL_PASSWORD", "principal@sentinel"), "principal"),
+            ]
+            for username, password, role in defaults:
+                cursor.execute(
+                    adapt_query(
+                        "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)"
+                    ),
+                    (username, _hash_password(password), role, time.strftime("%Y-%m-%dT%H:%M:%S")),
+                )
+            conn.commit()
+            print(
+                "[AUTH] Seeded default users: developer / techteam / principal "
+                "(passwords from SENTINEL_*_PASSWORD env vars or built-in defaults — change them!)"
+            )
 
 
 def authenticate(username: str, password: str) -> Optional[Dict]:
-    conn = connect_db(validate_schema=False)
-    cursor = conn.cursor()
-    cursor.execute(
-        adapt_query("SELECT username, password_hash, role FROM users WHERE username = ?"),
-        (username,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            adapt_query("SELECT username, password_hash, role FROM users WHERE username = ?"),
+            (username,),
+        )
+        row = cursor.fetchone()
 
     if row is None or not _verify_password(password, row[1]):
         return None
@@ -110,26 +118,53 @@ def authenticate(username: str, password: str) -> Optional[Dict]:
 
 def create_token(username: str, role: str) -> str:
     token = secrets.token_urlsafe(32)
-    _active_tokens[token] = {
-        "username": username,
-        "role": role,
-        "expires": time.time() + TOKEN_TTL_SECONDS,
-    }
+    expires = time.time() + TOKEN_TTL_SECONDS
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            adapt_query("INSERT INTO active_tokens (token, username, role, expires) VALUES (?, ?, ?, ?)"),
+            (token, username, role, expires),
+        )
+        conn.commit()
     return token
 
 
 def revoke_token(token: str) -> None:
-    _active_tokens.pop(token, None)
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            adapt_query("DELETE FROM active_tokens WHERE token = ?"),
+            (token,),
+        )
+        conn.commit()
 
 
 def _resolve_token(token: str) -> Optional[Dict]:
-    entry = _active_tokens.get(token)
-    if entry is None:
-        return None
-    if time.time() > entry["expires"]:
-        _active_tokens.pop(token, None)
-        return None
-    return entry
+    with connect_db(validate_schema=False) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            adapt_query("SELECT username, role, expires FROM active_tokens WHERE token = ?"),
+            (token,),
+        )
+        row = cursor.fetchone()
+        
+        if row is None:
+            return None
+        
+        expires = row[2]
+        if time.time() > expires:
+            cursor.execute(
+                adapt_query("DELETE FROM active_tokens WHERE token = ?"),
+                (token,),
+            )
+            conn.commit()
+            return None
+            
+        return {
+            "username": row[0],
+            "role": row[1],
+            "expires": expires,
+        }
 
 
 def current_user(
