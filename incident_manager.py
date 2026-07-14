@@ -63,6 +63,17 @@ class IncidentManager:
                 }
         
             profile = self.risk_profiles[global_id]
+            
+            # Apply time-based risk decay: reduce risk score by 1 point per 10 seconds of inactivity
+            now = time.time()
+            elapsed = now - profile.get("last_seen", now)
+            if elapsed > 10.0:
+                decay_amount = int(elapsed // 10.0)
+                profile["score"] = max(0, profile["score"] - decay_amount)
+                # If risk decayed back to 0, clear registered behavior memory tags so they can be re-evaluated
+                if profile["score"] == 0:
+                    profile["behaviors"].clear()
+
             score = profile["score"]
             behaviors = profile["behaviors"]
             
@@ -102,7 +113,7 @@ class IncidentManager:
             
             # Clamp score
             profile["score"] = min(100, int(score))
-            profile["last_seen"] = time.time()
+            profile["last_seen"] = now
             
             return {
                 "score": profile["score"],
