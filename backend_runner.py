@@ -11,6 +11,19 @@ _manager = None
 latest_frames = {}
 active_workers = {}
 
+class DummyVideoCapture:
+    """Mock OpenCV VideoCapture to allow offline camera initialization at startup."""
+    def isOpened(self):
+        return True
+    def read(self):
+        return False, None
+    def get(self, propId):
+        return 0.0
+    def set(self, propId, value):
+        return True
+    def release(self):
+        pass
+
 def init_shared_state():
     """Initializes the multiprocessing manager dictionary for sharing frames between processes."""
     global _manager, latest_frames
@@ -94,7 +107,7 @@ def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_fram
     # Configure the shared database lock for safe writes across child processes (Task 8!)
     db_schema.db_lock = db_lock
     
-    from app import _create_camera_runtime, _process_camera_frame, HumanDetector, GlobalIdentityManager, IncidentManager
+    from app import _create_camera_runtime, _process_camera_frame, HumanDetector, GlobalIdentityManager, IncidentManager, resolve_capture_source
     
     print(f"[AI WORKER POOL {worker_id}] Booting pool worker for {len(cameras_list)} cameras...", flush=True)
     
@@ -110,11 +123,59 @@ def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_fram
     reader_threads = {}
     last_frame_times = {}
     
+    orig_video_capture = cv2.VideoCapture
+    
     for cam in cameras_list:
         config = cam.copy()
         config["camera_id"] = config["id"]
         
+        # Test if the camera is openable.
+        # If it's a network RTSP stream, do a fast socket connection test first
+        # to avoid the 30-second OpenCV hang when cameras are offline.
+        is_open = False
+        source_str = str(config["source"])
+        is_rtsp = source_str.startswith(("rtsp://", "http://", "https://"))
+        
+        if is_rtsp:
+            try:
+                # Extract host and port
+                if "@" in source_str:
+                    host_part = source_str.split("@")[1].split("/")[0]
+                else:
+                    host_part = source_str.split("//")[1].split("/")[0]
+                
+                if ":" in host_part:
+                    host, port = host_part.split(":")
+                    port = int(port)
+                else:
+                    host = host_part
+                    port = 554
+                
+                import socket
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.5) # Fast 500ms timeout
+                result = s.connect_ex((host, port))
+                s.close()
+                if result == 0:
+                    src = resolve_capture_source(config["source"])
+                    cap = orig_video_capture(src)
+                    is_open = cap.isOpened()
+                    cap.release()
+            except Exception:
+                pass
+        else:
+            src = resolve_capture_source(config["source"])
+            cap = orig_video_capture(src)
+            is_open = cap.isOpened()
+            cap.release()
+        
+        if not is_open:
+            print(f"[AI WORKER POOL {worker_id}] Camera '{cam['name']}' is offline/inaccessible at boot. Applying Dummy Capture proxy.", flush=True)
+            cv2.VideoCapture = lambda *args, **kwargs: DummyVideoCapture()
+            
         camera_state = _create_camera_runtime(config)
+        cv2.VideoCapture = orig_video_capture # Restore original OpenCV capture class
+        
         if not camera_state:
             print(f"[AI WORKER POOL {worker_id}] Error: Could not open runtime for {cam['name']}", flush=True)
             continue
@@ -206,7 +267,7 @@ def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_fram
                             disp = cv2.resize(disp, (480, int(h * scale)))
                         disp = overlay_live_status(disp, cam["name"])
                         
-                        # Compress to JPEG bytes inside child process to bypass Pickle serialization bottlenecks
+                        # Task 7: Compress to JPEG bytes inside child process to bypass Pickle serialization bottlenecks
                         ret, jpeg_buf = cv2.imencode(".jpg", disp, [cv2.IMWRITE_JPEG_QUALITY, 65])
                         if ret:
                             shared_frames_dict[cam_id] = jpeg_buf.tobytes()
