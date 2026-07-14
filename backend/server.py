@@ -121,22 +121,52 @@ _main_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
 async def storage_cleanup_loop():
-    """Background task to delete raw mp4 files older than 30 days to prevent disk exhaustion"""
+    """Background task to delete raw mp4 files older than 30 days and enforce disk quota limits"""
     while True:
         try:
+            # 1. Enforce 10% disk space watchdog quota (purging oldest files)
+            import shutil
+            total, used, free = shutil.disk_usage(".")
+            free_ratio = free / total
+            if free_ratio < 0.10:
+                print(f"[DISK WATCHDOG] Free disk space is critically low at {free_ratio*100:.1f}%. Starting emergency purge...", flush=True)
+                target_dirs = ["alert_snapshots", UPLOAD_DIR, OUTPUT_DIR]
+                files_to_check = []
+                for directory in target_dirs:
+                    if os.path.exists(directory):
+                        for filename in os.listdir(directory):
+                            filepath = os.path.join(directory, filename)
+                            if os.path.isfile(filepath):
+                                files_to_check.append((filepath, os.path.getmtime(filepath)))
+                # Sort by oldest first
+                files_to_check.sort(key=lambda x: x[1])
+                deleted_count = 0
+                for filepath, _ in files_to_check:
+                    try:
+                        os.remove(filepath)
+                        deleted_count += 1
+                    except Exception:
+                        pass
+                    _, _, current_free = shutil.disk_usage(".")
+                    if current_free / total >= 0.15:
+                        break
+                print(f"[DISK WATCHDOG] Purge completed. Deleted {deleted_count} old files.", flush=True)
+
+            # 2. Traditional 30-day raw MP4 deletion
             now = time.time()
             cutoff_time = now - (30 * 86400)  # 30 days
             for directory in [UPLOAD_DIR, OUTPUT_DIR]:
-                for filename in os.listdir(directory):
-                    filepath = os.path.join(directory, filename)
-                    if os.path.isfile(filepath):
-                        file_age = os.stat(filepath).st_mtime
-                        if file_age < cutoff_time:
-                            os.remove(filepath)
-                            print(f"[MAINTENANCE] Deleted old video file: {filepath}")
+                if os.path.exists(directory):
+                    for filename in os.listdir(directory):
+                        filepath = os.path.join(directory, filename)
+                        if os.path.isfile(filepath):
+                            file_age = os.stat(filepath).st_mtime
+                            if file_age < cutoff_time:
+                                os.remove(filepath)
+                                print(f"[MAINTENANCE] Deleted old video file: {filepath}")
         except Exception as e:
             print(f"[MAINTENANCE ERROR] Storage cleanup failed: {e}")
-        await asyncio.sleep(86400)  # sleep 24 hours
+        await asyncio.sleep(3600)  # check once every hour instead of 24h
 
 
 async def daily_report_loop():

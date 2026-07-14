@@ -4,11 +4,12 @@ import queue
 import threading
 import numpy as np
 import os
-from typing import Dict
+from typing import Dict, List
 
 # Shared latest frames manager
 _manager = None
 latest_frames = {}
+active_workers = {}
 
 def init_shared_state():
     """Initializes the multiprocessing manager dictionary for sharing frames between processes."""
@@ -59,10 +60,26 @@ def reader_thread_func(source, frame_queue, stop_event):
     if cap is not None:
         cap.release()
 
-def run_camera_process(camera_config, shared_frames_dict):
+def overlay_live_status(frame, camera_name):
+    """Draws standard live status overlays directly onto the frame at source."""
+    import cv2
+    from datetime import datetime
+    h, w = frame.shape[:2]
+    # Draw top banner
+    cv2.rectangle(frame, (0, 0), (w, 26), (20, 20, 20), cv2.FILLED)
+    # Red "LIVE" dot
+    cv2.circle(frame, (12, 13), 5, (0, 0, 255), cv2.FILLED)
+    label = f"LIVE  {camera_name}"
+    cv2.putText(frame, label, (24, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1)
+    # Current timestamp
+    ts = datetime.now().strftime("%H:%M:%S")
+    cv2.putText(frame, ts, (w - 78, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+    return frame
+
+def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_frames_dict, db_lock):
     """
-    Subprocess worker running the detection pipeline for a single camera.
-    Each camera runs in its own Process, completely bypassing Python's GIL.
+    Subprocess worker running the detection pipeline sequentially for a group of cameras.
+    This reduces process/VRAM overhead from 200 instances to just N instances.
     """
     import os
     # Limit internal numpy/opencv threading to avoid resource fighting on Windows
@@ -72,98 +89,182 @@ def run_camera_process(camera_config, shared_frames_dict):
     import cv2
     import queue
     import threading
+    import db_schema
+    
+    # Configure the shared database lock for safe writes across child processes (Task 8!)
+    db_schema.db_lock = db_lock
+    
     from app import _create_camera_runtime, _process_camera_frame, HumanDetector, GlobalIdentityManager, IncidentManager
     
-    config = camera_config.copy()
-    config["camera_id"] = config["id"]
+    print(f"[AI WORKER POOL {worker_id}] Booting pool worker for {len(cameras_list)} cameras...", flush=True)
     
-    print(f"[AI ENGINE WORKER] Booting isolated process for {config['name']} (ID {config['id']})", flush=True)
-    
-    # Load PyTorch models inside the worker process context
+    # Load PyTorch models exactly ONCE per pool worker process (saving VRAM/RAM)
     detector = HumanDetector(model_type="yolo", weights="yolov8n.pt")
     identity_manager = GlobalIdentityManager()
     incident_manager = IncidentManager()
     
-    # Initialize the camera runtime structure
-    camera_state = _create_camera_runtime(config)
-    if not camera_state:
-        print(f"[AI ENGINE WORKER] Error: Could not open runtime for {config['name']}", flush=True)
-        return
-
-    # Start the non-blocking reader thread with the watchdog queue
-    frame_queue = queue.Queue(maxsize=1)
-    stop_event = threading.Event()
-    reader_thread = threading.Thread(
-        target=reader_thread_func,
-        args=(config["source"], frame_queue, stop_event),
-        daemon=True
-    )
-    reader_thread.start()
-
-    print(f"[AI ENGINE WORKER] Watchdog Queue Reader active for {config['name']}", flush=True)
+    # Initialize runtimes and watchdog threads for all assigned cameras
+    runtimes = {}
+    reader_queues = {}
+    stop_events = {}
+    reader_threads = {}
+    last_frame_times = {}
     
-    last_process_time = 0.0
-    # Process at 1.0 FPS target in the background to ensure low CPU/VRAM usage and 24/7 stability
-    target_interval = 1.0 
+    for cam in cameras_list:
+        config = cam.copy()
+        config["camera_id"] = config["id"]
+        
+        camera_state = _create_camera_runtime(config)
+        if not camera_state:
+            print(f"[AI WORKER POOL {worker_id}] Error: Could not open runtime for {cam['name']}", flush=True)
+            continue
+            
+        runtimes[cam["id"]] = camera_state
+        last_frame_times[cam["id"]] = time.time()
+        
+        # Start watchdog queue reader thread
+        frame_queue = queue.Queue(maxsize=1)
+        stop_event = threading.Event()
+        reader_thread = threading.Thread(
+            target=reader_thread_func,
+            args=(config["source"], frame_queue, stop_event),
+            daemon=True
+        )
+        reader_thread.start()
+        
+        reader_queues[cam["id"]] = frame_queue
+        stop_events[cam["id"]] = stop_event
+        reader_threads[cam["id"]] = reader_thread
+        
+    print(f"[AI WORKER POOL {worker_id}] All camera runtimes initialized. Entering detection loop.", flush=True)
+    
+    last_process_times = {cam["id"]: 0.0 for cam in cameras_list if cam["id"] in runtimes}
+    target_interval = 1.0 # 1 FPS target
+    
+    frames_processed = 0
+    # Cycle the entire pool worker process after 10000 total frames processed to clear VRAM fragmentation
+    MAX_FRAMES_TOTAL = 10000
     
     try:
-        while not camera_state.finished:
+        while frames_processed < MAX_FRAMES_TOTAL and any(not r.finished for r in runtimes.values()):
+            processed_any = False
             now = time.time()
-            if now - last_process_time < target_interval:
-                time.sleep(0.05)
-                continue
-                
-            try:
-                # Read from watchdog queue with strict 5-second timeout to handle RTSP freezes
-                frame = frame_queue.get(timeout=5.0)
-            except queue.Empty:
-                print(f"[WATCHDOG TIMEOUT] Camera '{config['name']}' has not yielded a frame in 5 seconds! Reconnecting stream...", flush=True)
-                # Restart reader thread
-                stop_event.set()
-                reader_thread.join(timeout=2.0)
-                
-                # Reinitialize connection
-                stop_event = threading.Event()
-                frame_queue = queue.Queue(maxsize=1)
-                reader_thread = threading.Thread(
-                    target=reader_thread_func,
-                    args=(config["source"], frame_queue, stop_event),
-                    daemon=True
-                )
-                reader_thread.start()
-                continue
-                
-            # Intercept camera_state.cap.read() to return the watchdog queue frame
-            def fake_read():
-                return True, frame.copy()
-            camera_state.cap.read = fake_read
             
-            # Run tracking, alerts and zones
-            _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "multi")
-            
-            if camera_state.display_frame is not None:
-                # Store the fully annotated frame in shared memory
-                shared_frames_dict[config["id"]] = camera_state.display_frame
+            for cam in cameras_list:
+                cam_id = cam["id"]
+                if cam_id not in runtimes or runtimes[cam_id].finished:
+                    continue
+                    
+                if now - last_process_times[cam_id] >= target_interval:
+                    q = reader_queues[cam_id]
+                    try:
+                        # Non-blocking get to prevent sequentially blocking the worker process
+                        frame = q.get_nowait()
+                        last_frame_times[cam_id] = now
+                    except queue.Empty:
+                        # Watchdog check: has camera stopped yielding frames for 10 seconds?
+                        if now - last_frame_times[cam_id] > 10.0:
+                            print(f"[WATCHDOG TIMEOUT POOL {worker_id}] Camera '{cam['name']}' stream hung. Reconnecting...", flush=True)
+                            # Reinitialize watchdog reader thread
+                            stop_events[cam_id].set()
+                            reader_threads[cam_id].join(timeout=2.0)
+                            
+                            stop_event = threading.Event()
+                            frame_queue = queue.Queue(maxsize=1)
+                            reader_thread = threading.Thread(
+                                target=reader_thread_func,
+                                args=(cam["source"], frame_queue, stop_event),
+                                daemon=True
+                            )
+                            reader_thread.start()
+                            
+                            reader_queues[cam_id] = frame_queue
+                            stop_events[cam_id] = stop_event
+                            reader_threads[cam_id] = reader_thread
+                            last_frame_times[cam_id] = now
+                        continue
+                        
+                    camera_state = runtimes[cam_id]
+                    
+                    # Intercept camera_state.cap.read() to return the watchdog queue frame
+                    def fake_read():
+                        return True, frame.copy()
+                    camera_state.cap.read = fake_read
+                    
+                    # Run detection, ReID tracking, zones, incident manager
+                    _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "multi")
+                    frames_processed += 1
+                    processed_any = True
+                    
+                    if camera_state.display_frame is not None:
+                        # Draw LIVE overlay directly in child process
+                        disp = camera_state.display_frame
+                        # Resize to standard width = 480 at source to reduce serialization overhead
+                        h, w = disp.shape[:2]
+                        if w > 480:
+                            scale = 480.0 / w
+                            disp = cv2.resize(disp, (480, int(h * scale)))
+                        disp = overlay_live_status(disp, cam["name"])
+                        
+                        # Compress to JPEG bytes inside child process to bypass Pickle serialization bottlenecks
+                        ret, jpeg_buf = cv2.imencode(".jpg", disp, [cv2.IMWRITE_JPEG_QUALITY, 65])
+                        if ret:
+                            shared_frames_dict[cam_id] = jpeg_buf.tobytes()
+                            
+                    last_process_times[cam_id] = time.time()
+                    
+            if not processed_any:
+                time.sleep(0.02) # Prevent CPU thrashing
                 
-            last_process_time = time.time()
+        if frames_processed >= MAX_FRAMES_TOTAL:
+            print(f"[AI WORKER POOL {worker_id}] Reached cycle limit ({MAX_FRAMES_TOTAL} frames). Exiting gracefully to cycle memory...", flush=True)
             
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f"[AI ENGINE WORKER ERROR] Process crash on {config['name']}: {e}", flush=True)
+        print(f"[AI WORKER POOL ERROR {worker_id}] Process crash: {e}", flush=True)
     finally:
-        stop_event.set()
-        camera_state.close()
+        for cam_id, stop_event in stop_events.items():
+            stop_event.set()
+        for cam_id, r in runtimes.items():
+            r.close()
+
+def process_monitor_thread(pools_assignment: Dict[int, List[dict]], db_lock):
+    """Monitors child worker process pools and automatically respawns them if they exit."""
+    global active_workers
+    while True:
+        try:
+            for pool_id, cameras_list in pools_assignment.items():
+                p = active_workers.get(pool_id)
+                if p is None or not p.is_alive():
+                    if p is not None:
+                        try:
+                            p.close()
+                        except Exception:
+                            pass
+                            
+                    new_p = multiprocessing.Process(
+                        target=run_camera_pool_worker,
+                        args=(pool_id, cameras_list, latest_frames, db_lock),
+                        daemon=True
+                    )
+                    new_p.start()
+                    active_workers[pool_id] = new_p
+                    print(f"[AI ENGINE MANAGER] Spawned Process Pool {pool_id} with {len(cameras_list)} cameras (PID: {new_p.pid})", flush=True)
+        except Exception as e:
+            print(f"[AI ENGINE MANAGER ERROR] Monitor loop error: {e}", flush=True)
+        time.sleep(5.0)
 
 def start_surveillance_threads():
-    """Reads camera registry and starts isolated background processes for all active cameras."""
+    """Groups active cameras and starts worker pools."""
     import camera_registry
     
     init_shared_state()
     
     registry = camera_registry._load()
     cameras = registry.get("cameras", [])
-
+    
+    valid_cameras = []
     for cam in cameras:
         source = cam.get("source")
         if not source:
@@ -171,10 +272,31 @@ def start_surveillance_threads():
             
         is_rtsp = str(source).startswith(("rtsp://", "http://", "https://"))
         if is_rtsp or os.path.exists(str(source)):
-            p = multiprocessing.Process(
-                target=run_camera_process,
-                args=(cam, latest_frames),
-                daemon=True
-            )
-            p.start()
-            print(f"[AI ENGINE MANAGER] Spawned Multiprocessing Process for {cam['name']} (PID: {p.pid})", flush=True)
+            valid_cameras.append(cam)
+            
+    if not valid_cameras:
+        print("[AI ENGINE MANAGER] No active camera sources found.", flush=True)
+        return
+        
+    # Group cameras into 4 Worker process pools (Task 6!)
+    num_pools = min(4, multiprocessing.cpu_count())
+    pools_assignment = {i: [] for i in range(num_pools)}
+    
+    for idx, cam in enumerate(valid_cameras):
+        pool_id = idx % num_pools
+        pools_assignment[pool_id].append(cam)
+        
+    # Remove empty pools if any
+    pools_assignment = {k: v for k, v in pools_assignment.items() if v}
+            
+    # Shared database lock for safe writes across child processes (Task 8!)
+    db_lock = multiprocessing.Lock()
+    
+    # Start the monitor thread
+    monitor_thread = threading.Thread(
+        target=process_monitor_thread,
+        args=(pools_assignment, db_lock),
+        daemon=True
+    )
+    monitor_thread.start()
+    print(f"[AI ENGINE MANAGER] Background monitoring thread started successfully with {len(pools_assignment)} pool workers.", flush=True)

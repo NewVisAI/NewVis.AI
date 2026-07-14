@@ -30,6 +30,36 @@ def adapt_query(query: str) -> str:
     return query
 
 
+# Shared multiprocessing lock for database write safety
+db_lock = None
+
+class LockedConnection:
+    def __init__(self, conn, lock):
+        self.conn = conn
+        self.lock = lock
+        self.lock.acquire()
+        
+    def cursor(self, *args, **kwargs):
+        return self.conn.cursor(*args, **kwargs)
+        
+    def commit(self, *args, **kwargs):
+        return self.conn.commit(*args, **kwargs)
+        
+    def rollback(self, *args, **kwargs):
+        return self.conn.rollback(*args, **kwargs)
+        
+    def execute(self, *args, **kwargs):
+        return self.conn.execute(*args, **kwargs)
+        
+    def close(self):
+        try:
+            self.conn.close()
+        finally:
+            try:
+                self.lock.release()
+            except ValueError:
+                pass # Already released
+
 def _connect_absolute_db():
     if get_db_type() == "postgres":
         if psycopg2 is None:
@@ -37,7 +67,13 @@ def _connect_absolute_db():
         return psycopg2.connect(DATABASE_URL)
     else:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        return sqlite3.connect(get_db_path(), check_same_thread=False, timeout=15.0)
+        conn = sqlite3.connect(get_db_path(), check_same_thread=False, timeout=30.0)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+        except sqlite3.Error:
+            pass
+        return conn
 
 
 def _table_exists(cursor, table_name: str) -> bool:
@@ -304,4 +340,7 @@ def ensure_valid_schema() -> str:
 def connect_db(validate_schema: bool = True):
     if validate_schema:
         ensure_valid_schema()
-    return _connect_absolute_db()
+    conn = _connect_absolute_db()
+    if db_lock is not None:
+        return LockedConnection(conn, db_lock)
+    return conn
