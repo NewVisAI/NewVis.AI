@@ -29,6 +29,10 @@ _PBKDF2_ITERATIONS = 200_000
 # token -> {"username", "role", "expires"}
 _active_tokens: Dict[str, Dict] = {}
 
+_failed_attempts: Dict[str, Dict] = {}
+LOCKOUT_DURATION = 300
+MAX_ATTEMPTS = 5
+
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -103,6 +107,11 @@ def init_users_db() -> None:
 
 
 def authenticate(username: str, password: str) -> Optional[Dict]:
+    now = time.time()
+    record = _failed_attempts.get(username)
+    if record and record.get("lockout_until", 0) > now:
+        return None
+        
     with connect_db(validate_schema=False) as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -112,7 +121,17 @@ def authenticate(username: str, password: str) -> Optional[Dict]:
         row = cursor.fetchone()
 
     if row is None or not _verify_password(password, row[1]):
+        if not record or record.get("lockout_until", 0) <= now:
+            record = {"attempts": 0, "lockout_until": 0}
+            _failed_attempts[username] = record
+        record["attempts"] += 1
+        if record["attempts"] >= MAX_ATTEMPTS:
+            record["lockout_until"] = now + LOCKOUT_DURATION
         return None
+        
+    if username in _failed_attempts:
+        del _failed_attempts[username]
+        
     return {"username": row[0], "role": row[2]}
 
 

@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -107,6 +108,7 @@ class CameraRuntime:
     last_tracked_objects: List[Tuple] = field(default_factory=list)
     sv_zones: Optional[Dict[int, sv.PolygonZone]] = None
     line_counter: Optional[object] = None
+    start_time: float = field(default_factory=time.time)
 
     def close(self) -> None:
         self.cap.release()
@@ -419,7 +421,10 @@ def _process_camera_frame(
                 polygon=polygon_np
             )
 
-    video_time = camera_state.current_frame_number / camera_state.fps if camera_state.fps else camera_state.current_frame_number / DEFAULT_FPS
+    if camera_state.is_live_stream:
+        video_time = time.time() - camera_state.start_time
+    else:
+        video_time = camera_state.current_frame_number / camera_state.fps if camera_state.fps else camera_state.current_frame_number / DEFAULT_FPS
 
     # Motion Detection / Smart Frame Skipping
     is_static = False
