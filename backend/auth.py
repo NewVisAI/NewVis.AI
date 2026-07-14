@@ -108,6 +108,12 @@ def init_users_db() -> None:
 
 def authenticate(username: str, password: str) -> Optional[Dict]:
     now = time.time()
+    
+    # Prune expired lockouts to prevent memory leak from random usernames
+    expired_keys = [k for k, v in _failed_attempts.items() if v.get("lockout_until", 0) <= now]
+    for k in expired_keys:
+        del _failed_attempts[k]
+        
     record = _failed_attempts.get(username)
     if record and record.get("lockout_until", 0) > now:
         return None
