@@ -252,8 +252,22 @@ def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_fram
     # Cycle the entire pool worker process after 10000 total frames processed to clear VRAM fragmentation
     MAX_FRAMES_TOTAL = 10000
     
+    # Periodic VRAM check counter
+    vram_clear_counter = 0
+
     try:
         while frames_processed < MAX_FRAMES_TOTAL and any(not r.finished for r in runtimes.values()):
+            # Clear PyTorch CUDA cache periodically to avoid VRAM fragmentation accumulation
+            vram_clear_counter += 1
+            if vram_clear_counter >= 100:
+                vram_clear_counter = 0
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except Exception:
+                    pass
+
             processed_any = False
             now = time.time()
             
