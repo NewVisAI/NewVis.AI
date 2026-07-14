@@ -257,7 +257,8 @@ async def broadcast_alert(message: dict):
     if not active_websockets:
         return
     disconnected = set()
-    for ws in active_websockets:
+    # Convert to list to avoid 'dictionary/set changed size during iteration' race conditions
+    for ws in list(active_websockets):
         try:
             await ws.send_json(message)
         except Exception:
