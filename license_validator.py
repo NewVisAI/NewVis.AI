@@ -157,7 +157,8 @@ def get_license_info(license_key: Optional[str] = None) -> Dict[str, Any]:
                 "valid": False,
                 "message": "Invalid license expiration date format.",
             }
-        if datetime.now() > exp_date:
+        # Compare at the date level to avoid timezone-naive datetime differences
+        if datetime.now().date() > exp_date.date():
             return {
                 "mode": "expired",
                 "client_id": payload.get("client_id"),

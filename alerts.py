@@ -21,7 +21,7 @@ import cv2
 import school_calendar
 from db_schema import adapt_query, connect_db, get_db_type
 
-SNAPSHOT_DIR = "alert_snapshots"
+SNAPSHOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_snapshots")
 
 RESTRICTED_ZONE_ENTRY = "restricted_zone_entry"
 AFTER_HOURS_ENTRY = "after_hours_entry"
