@@ -5,12 +5,29 @@ import os
 
 def start_web_server():
     import uvicorn
+    import socket
     # Append the backend folder path to sys.path if not present
     sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend"))
     from backend.server import app as fastapi_app
     
+    # Scan for first free port starting from 8000
+    target_port = 8000
+    for port in range(8000, 8010):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        # On Windows, using SO_REUSEADDR allows quick port reclaiming
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("0.0.0.0", port))
+            s.close()
+            target_port = port
+            break
+        except OSError:
+            continue
+            
+    print(f"[SERVER] Port verified. Launching Web Dashboard on port {target_port} ...", flush=True)
     # Run the server
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000, log_level="warning")
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=target_port, log_level="warning")
 
 def main():
     print("="*60)

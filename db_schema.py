@@ -125,7 +125,22 @@ def connect_db(validate_schema: bool = True):
                     ensure_valid_schema()
                 except Exception as repair_err:
                     print(f"[DATABASE CRITICAL ERROR] Schema repair failed: {repair_err}", flush=True)
-    conn = _connect_absolute_db()
+    # Exponential backoff auto-retry logic to handle database locking / concurrency spikes
+    import time as t_mod
+    max_retries = 3
+    delay = 0.5
+    for attempt in range(max_retries):
+        try:
+            conn = _connect_absolute_db()
+            break
+        except Exception as e:
+            if attempt == max_retries - 1:
+                print(f"[DATABASE CRITICAL ERROR] Database connection attempts exhausted: {e}", flush=True)
+                raise e
+            print(f"[DATABASE WARNING] Connection attempt {attempt + 1} failed: {e}. Retrying in {delay}s...", flush=True)
+            t_mod.sleep(delay)
+            delay *= 2
+
     if db_lock is not None:
         return LockedConnection(conn, db_lock)
     return conn
