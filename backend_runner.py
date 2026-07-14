@@ -303,8 +303,56 @@ def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_fram
 def process_monitor_thread(pools_assignment: Dict[int, List[dict]], db_lock):
     """Monitors child worker process pools and automatically respawns them if they exit."""
     global active_workers
+    import camera_registry
+    
+    # Store initial modification time of cameras.json config
+    last_mtime = 0.0
+    if os.path.exists(camera_registry.REGISTRY_PATH):
+        last_mtime = os.path.getmtime(camera_registry.REGISTRY_PATH)
+        
     while True:
         try:
+            # Check for config changes to dynamically hot-reload camera pools
+            if os.path.exists(camera_registry.REGISTRY_PATH):
+                current_mtime = os.path.getmtime(camera_registry.REGISTRY_PATH)
+                if current_mtime > last_mtime:
+                    print("[AI ENGINE MANAGER] Config cameras.json changed! Performing graceful hot-reload...", flush=True)
+                    last_mtime = current_mtime
+                    
+                    # Gracefully stop all active pool workers
+                    for pool_id, p in list(active_workers.items()):
+                        if p and p.is_alive():
+                            p.terminate()
+                            p.join(timeout=2.0)
+                            try:
+                                p.close()
+                            except Exception:
+                                pass
+                    active_workers.clear()
+                    
+                    # Reload cameras.json config
+                    registry = camera_registry._load()
+                    cameras = registry.get("cameras", [])
+                    valid_cameras = []
+                    for cam in cameras:
+                        source = cam.get("source")
+                        if not source:
+                            continue
+                        is_rtsp = str(source).startswith(("rtsp://", "http://", "https://"))
+                        if is_rtsp or os.path.exists(str(source)):
+                            valid_cameras.append(cam)
+                            
+                    if not valid_cameras:
+                        print("[AI ENGINE MANAGER] No active cameras available after config reload.", flush=True)
+                        pools_assignment = {}
+                    else:
+                        num_pools = min(4, multiprocessing.cpu_count())
+                        pools_assignment = {i: [] for i in range(num_pools)}
+                        for idx, cam in enumerate(valid_cameras):
+                            pool_id = idx % num_pools
+                            pools_assignment[pool_id].append(cam)
+                        pools_assignment = {k: v for k, v in pools_assignment.items() if v}
+            
             for pool_id, cameras_list in pools_assignment.items():
                 p = active_workers.get(pool_id)
                 if p is None or not p.is_alive():
