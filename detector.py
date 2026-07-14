@@ -61,7 +61,7 @@ class HumanDetector:
                 cls_id = int(box.cls[0])
 
                 # Filter only selected classes
-                if cls_id in self.TARGET_CLASSES and conf > 0.20:
+                if cls_id in self.TARGET_CLASSES and conf > 0.45:
                     detections.append((
                         x1,
                         y1,
