@@ -287,6 +287,16 @@ def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_fram
     finally:
         for cam_id, stop_event in stop_events.items():
             stop_event.set()
+        
+        # Flush pending tracking data and finalize sessions to prevent data loss
+        try:
+            from event import flush_tracking_data, finalize_camera_sessions
+            flush_tracking_data()
+            for cam_id in list(runtimes.keys()):
+                finalize_camera_sessions(cam_id)
+        except Exception as e:
+            print(f"[AI WORKER POOL {worker_id} SHUTDOWN WARNING] Failed to flush events: {e}", flush=True)
+
         for cam_id, r in runtimes.items():
             r.close()
 
@@ -300,6 +310,7 @@ def process_monitor_thread(pools_assignment: Dict[int, List[dict]], db_lock):
                 if p is None or not p.is_alive():
                     if p is not None:
                         try:
+                            p.join(timeout=1.0)
                             p.close()
                         except Exception:
                             pass
