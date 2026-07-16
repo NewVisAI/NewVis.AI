@@ -186,7 +186,16 @@ class NeuralReIDEmbedder:
         self._osnet = None
         self._device = "cpu"
         self._preprocess = None
+        # Deferred mode: skip the heavy neural forward pass in the live path and
+        # use the cheap colour/edge fallback (OSNet runs only at search time).
+        self.deferred = inference_config.reid_deferred()
         self._build_backend()
+        if self.deferred:
+            # Keep the neural model loaded for reference, but the live embedding
+            # uses the fallback dimensionality.
+            self.embedding_size = 84
+            print(f"[NeuralReIDEmbedder] DEFERRED Re-ID: '{self.backend_name}' model NOT run live; "
+                  "using cheap fallback embeddings + on-demand search.")
 
     def _build_backend(self) -> None:
         # -2. Attempt EdgeTPU / TFLite (Prioritize for embedded deployments)
@@ -323,6 +332,12 @@ class NeuralReIDEmbedder:
         x1, y1, x2, y2 = _clip_bbox(frame.shape, bbox)
         crop = frame[y1:y2, x1:x2]
         if crop.size == 0:
+            return _extract_fallback_embedding(frame, bbox)
+
+        # Deferred Re-ID: never run the heavy neural forward pass in the live path;
+        # a cheap colour/edge embedding keeps within-camera continuity. Full OSNet
+        # cross-camera matching happens on-demand in reid_search.py.
+        if self.deferred:
             return _extract_fallback_embedding(frame, bbox)
 
         if self.backend_name == "tflite" and self._model is not None:

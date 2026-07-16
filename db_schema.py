@@ -7,7 +7,10 @@ try:
 except ImportError:
     psycopg2 = None
 
-DB_PATH = Path(__file__).resolve().with_name("cctv_logs.db")
+# SQLite DB location. Defaults to next to this file, but can be overridden with
+# SENTINEL_DB_PATH — important under WSL, where a DB on /mnt/* (drvfs) makes every
+# connection-open take ~3s; pointing it at native ext4 storage is ~1000x faster.
+DB_PATH = Path(os.environ.get("SENTINEL_DB_PATH") or Path(__file__).resolve().with_name("cctv_logs.db"))
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 

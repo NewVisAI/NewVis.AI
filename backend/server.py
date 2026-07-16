@@ -229,17 +229,30 @@ async def startup_tasks():
     import backend_runner
     backend_runner.init_shared_state()
 
-    # 4. Automatically start the live AI surveillance engine processes
-    def _run_safe_ai_engine():
-        try:
-            backend_runner.start_surveillance_threads()
-        except Exception as err:
-            import traceback
-            print(f"[AI ENGINE ERROR] Failed to start: {err}", flush=True)
-            traceback.print_exc()
+    # 4. Automatically start the live AI surveillance engine processes.
+    #    Set DISABLE_AI_ENGINE=1 to skip it (e.g. on a low-core dev box where the
+    #    worker pools would saturate every CPU and starve live streaming).
+    if os.environ.get("DISABLE_AI_ENGINE", "").strip() in ("1", "true", "True"):
+        print("[AI ENGINE] Disabled via DISABLE_AI_ENGINE — use per-camera live_analytics instead.", flush=True)
+    else:
+        def _run_safe_ai_engine():
+            try:
+                backend_runner.start_surveillance_threads()
+            except Exception as err:
+                import traceback
+                print(f"[AI ENGINE ERROR] Failed to start: {err}", flush=True)
+                traceback.print_exc()
 
-    import threading
-    threading.Thread(target=_run_safe_ai_engine, daemon=True).start()
+        import threading
+        threading.Thread(target=_run_safe_ai_engine, daemon=True).start()
+
+    # 4b. Pre-warm the live-analytics models so a start request never blocks the
+    #     event loop reloading YOLO/OSNet.
+    try:
+        import live_analytics
+        live_analytics.prewarm()
+    except Exception as err:
+        print(f"[LIVE ANALYTICS] Pre-warm scheduling failed: {err}", flush=True)
 
     # 3. Licensing check (empty key = evaluation mode: 1 camera, core features)
     license_key = load_license_key()
@@ -1132,7 +1145,7 @@ def camera_stream_endpoint(camera_id: int, token: str = "", http_request: Reques
     record_audit(user["username"], user["role"], "view_camera",
                  target=cam.get("name", f"cam {camera_id}"), ip=_client_ip(http_request))
     return StreamingResponse(
-        camera_stream.mjpeg_generator(cam),
+        camera_stream.mjpeg_generator(cam, fps=15),
         media_type=f"multipart/x-mixed-replace; boundary={camera_stream.BOUNDARY}",
     )
 
@@ -1157,6 +1170,43 @@ def camera_snapshot_endpoint(camera_id: int, token: str = "", http_request: Requ
         raise HTTPException(status_code=500, detail="Could not grab frame.")
     from fastapi.responses import Response
     return Response(content=jpeg, media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# Live analytics — smooth raw feed up front + full pipeline in the background.
+# Reader thread streams the live tile at camera fps; a separate analytics thread
+# runs detection/tracking/ReID/zones/fall/running/violence + event & alert logging
+# without ever making the feed choppy. Events flow to Notifications/Search/Reports.
+# ---------------------------------------------------------------------------
+
+@app.post("/api/cameras/{camera_id}/analytics/start", dependencies=[Depends(require_roles("tech"))])
+def start_camera_analytics(camera_id: int, fps: int = 3, analytics_fps: int = 0,
+                           http_request: Request = None, user: dict = Depends(current_user)):
+    _require_feature("core_tracking")
+    import live_analytics
+    rate = analytics_fps or fps  # accept either query param
+    result = live_analytics.start(camera_id, analytics_fps=max(1, min(10, rate)))
+    if not result.get("started") and result.get("reason") == "unknown camera_id":
+        raise HTTPException(status_code=404, detail="Camera not found.")
+    record_audit(user["username"], user["role"], "start_analytics",
+                 target=f"camera {camera_id}", ip=_client_ip(http_request))
+    return result
+
+
+@app.post("/api/cameras/{camera_id}/analytics/stop", dependencies=[Depends(require_roles("tech"))])
+def stop_camera_analytics(camera_id: int, http_request: Request = None,
+                          user: dict = Depends(current_user)):
+    import live_analytics
+    result = live_analytics.stop(camera_id)
+    record_audit(user["username"], user["role"], "stop_analytics",
+                 target=f"camera {camera_id}", ip=_client_ip(http_request))
+    return result
+
+
+@app.get("/api/cameras/analytics/status", dependencies=[Depends(current_user)])
+def camera_analytics_status():
+    import live_analytics
+    return {"workers": live_analytics.status()}
 
 
 # ---------------------------------------------------------------------------

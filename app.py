@@ -110,6 +110,7 @@ class CameraRuntime:
     sv_zones: Optional[Dict[int, sv.PolygonZone]] = None
     line_counter: Optional[object] = None
     start_time: float = field(default_factory=time.time)
+    last_person_count: int = 0   # people detected in the most recent processed frame
 
     def close(self) -> None:
         self.cap.release()
@@ -393,7 +394,6 @@ def _process_camera_frame(
             print(f"[RECONNECT] Camera '{camera_state.name}' frame capture failed. "
                   f"Attempting reconnection {camera_state.consecutive_failures}/{camera_state.max_reconnect_attempts}...")
             camera_state.cap.release()
-            import time
             time.sleep(1.5)
             resolved_src = resolve_capture_source(camera_state.source)
             camera_state.cap = cv2.VideoCapture(resolved_src)
@@ -661,7 +661,11 @@ def _process_camera_frame(
     # (check_occupancy_alerts remains available in event.py if ever needed.)
     
     finalize_expired_sessions(video_time)
-    
+
+    # Expose how many people were seen this frame so an adaptive-rate gate can
+    # slow analytics down when a camera is empty and speed up when someone appears.
+    camera_state.last_person_count = len(people_this_frame)
+
     camera_state.display_frame = frame
 
 

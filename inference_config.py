@@ -97,6 +97,17 @@ def get_onnx_providers() -> List[str]:
     return list(_DEFAULT_ONNX_PROVIDERS)
 
 
+def reid_deferred() -> bool:
+    """When true, OSNet Re-ID is NOT run in the live path — the cheap colour/edge
+    fallback embedding is used for within-camera continuity, representative crops
+    are saved, and full OSNet cross-camera matching runs only on-demand at search
+    time (reid_search.py). This removes the single heaviest continuous GPU cost."""
+    v = os.environ.get("REID_DEFERRED")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("reid_deferred", False))
+
+
 def get_reid_similarity_threshold(backend: str) -> float:
     """Backend-aware match threshold. An explicit override always wins."""
     override = os.environ.get("REID_SIMILARITY_THRESHOLD")

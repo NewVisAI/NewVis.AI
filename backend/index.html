@@ -419,7 +419,12 @@ pre.report { font-family: var(--mono); font-size: 12px; line-height: 1.65; color
               <div class="right" id="ana-live-ctl" style="display:none;">
                 <select class="inp" id="ana-cam-select"></select>
                 <button class="btn sm" id="ana-cam-go">View feed</button>
+                <button class="btn sm acc" id="ana-analytics-toggle" style="display:none;">▶ Run live analytics</button>
               </div>
+            </div>
+            <div id="ana-analytics-bar" style="display:none; margin-top:10px; align-items:center; gap:8px; font-size:12.5px; color:var(--text-faint);">
+              <span id="ana-analytics-dot" style="width:8px; height:8px; border-radius:50%; background:#888; display:inline-block; flex:none;"></span>
+              <span id="ana-analytics-status">Analytics off — the live feed streams raw &amp; fast. Start analytics to process on the backend, log events, and push alerts to Notifications.</span>
             </div>
             <div class="dropzone" id="dropzone">
               <div class="big">📤</div>
@@ -921,9 +926,14 @@ async function enterApp() {
 
 function applyRoleUI() {
   const isPrincipal = State.role === 'principal';
+  const canLiveAnalytics = State.role === 'developer' || State.role === 'tech';
   // principal: no upload, no zone drawing — analytics defaults to a live feed
   $('dropzone').style.display = isPrincipal ? 'none' : '';
-  $('ana-live-ctl').style.display = isPrincipal ? 'flex' : 'none';
+  // live-camera controls are available to everyone; the analytics toggle only to
+  // roles that can start it (developer/tech).
+  $('ana-live-ctl').style.display = 'flex';
+  $('ana-analytics-toggle').style.display = canLiveAnalytics ? '' : 'none';
+  $('ana-analytics-bar').style.display = canLiveAnalytics ? 'flex' : 'none';
   $('ana-sub').innerText = isPrincipal ? 'live camera feed · processed footage playback' : 'upload footage → AI pipeline → annotated playback';
   // developer-only: clear audit
   $('audit-clear').style.display = State.role === 'developer' ? '' : 'none';
@@ -1195,6 +1205,64 @@ function showAnalyticsLiveFeed(camId) {
   shell.style.display = 'block';
 }
 $('ana-cam-go').onclick = () => showAnalyticsLiveFeed(parseInt($('ana-cam-select').value, 10));
+
+/* ---------- live analytics (smooth raw feed + background processing) ---------- */
+const AnalyticsLive = { camId: null, timer: null };
+
+function setAnalyticsBar(kind, text) {
+  const colors = { off: '#888', on: '#2ecc71', wait: '#e0a800', err: '#e74c3c' };
+  $('ana-analytics-dot').style.background = colors[kind] || '#888';
+  $('ana-analytics-status').innerText = text;
+}
+
+async function refreshAnalyticsStatus() {
+  try {
+    const d = await api('/api/cameras/analytics/status');
+    const w = (d.workers || {})[AnalyticsLive.camId];
+    if (!w) { setAnalyticsBar('off', 'Analytics off — the live feed streams raw & fast. Start analytics to log events & alerts.'); return; }
+    const camName = (State.cameras.find(c => c.id === AnalyticsLive.camId) || {}).name || ('Cam ' + AnalyticsLive.camId);
+    if (w.status === 'running') {
+      setAnalyticsBar('on', `● Analytics running on ${camName} — feed ${w.display_frames} frames · processed ${w.analytics_frames} for events. Alerts go to Notifications.`);
+    } else if (w.status === 'waiting-for-camera' || w.status === 'reconnecting') {
+      setAnalyticsBar('wait', `Connecting to ${camName}… (feed streams as soon as the camera responds)`);
+    } else {
+      setAnalyticsBar('off', `Analytics ${w.status}.`);
+    }
+  } catch (e) { /* ignore transient */ }
+}
+
+async function startLiveAnalytics(camId) {
+  try {
+    setAnalyticsBar('wait', 'Starting analytics…');
+    await api(`/api/cameras/${camId}/analytics/start?fps=3`, { method: 'POST' });
+    AnalyticsLive.camId = camId;
+    showAnalyticsLiveFeed(camId);               // raw, fast feed
+    $('ana-analytics-toggle').innerText = '⏹ Stop analytics';
+    $('ana-analytics-toggle').classList.remove('acc');
+    if (AnalyticsLive.timer) clearInterval(AnalyticsLive.timer);
+    AnalyticsLive.timer = setInterval(refreshAnalyticsStatus, 3000);
+    refreshAnalyticsStatus();
+    toast('Live analytics started', 'Feed is live; events log in the background.', 'ok');
+  } catch (e) {
+    setAnalyticsBar('err', 'Could not start: ' + e.message);
+    toast('Could not start analytics', e.message, 'err');
+  }
+}
+
+async function stopLiveAnalytics(camId) {
+  try { await api(`/api/cameras/${camId}/analytics/stop`, { method: 'POST' }); } catch (e) {}
+  if (AnalyticsLive.timer) { clearInterval(AnalyticsLive.timer); AnalyticsLive.timer = null; }
+  $('ana-analytics-toggle').innerText = '▶ Run live analytics';
+  $('ana-analytics-toggle').classList.add('acc');
+  setAnalyticsBar('off', 'Analytics stopped — the feed streams raw & fast. Start analytics to log events & alerts.');
+}
+
+$('ana-analytics-toggle').onclick = () => {
+  const running = $('ana-analytics-toggle').innerText.indexOf('Stop') !== -1;
+  const camId = parseInt($('ana-cam-select').value, 10);
+  if (running) stopLiveAnalytics(AnalyticsLive.camId != null ? AnalyticsLive.camId : camId);
+  else startLiveAnalytics(camId);
+};
 
 /* ---------- upload ---------- */
 const dropzone = $('dropzone'), fileInput = $('file-input');

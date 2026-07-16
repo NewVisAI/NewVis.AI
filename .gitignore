@@ -54,3 +54,9 @@ feature_test_report/pipeline_log.txt
 models/
 *.onnx
 *.tflite
+
+# Deferred Re-ID saved crops (runtime)
+reid_crops/
+# SQLite WAL sidecars
+*.db-wal
+*.db-shm

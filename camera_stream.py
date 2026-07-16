@@ -12,14 +12,30 @@ overlay a banner -> JPEG. Heavy annotation belongs to the processing pipeline,
 not the live wall.
 """
 
+import os
 import time
 from datetime import datetime
 from typing import Dict, Iterator, Optional
 import cv2
+import numpy as np
 from detector import HumanDetector
+
+# Harden OpenCV's FFMPEG backend for RTSP BEFORE any VideoCapture is created:
+# force TCP transport and a finite read timeout so a stalled camera can never
+# block a decode thread forever (the old default could hang or wedge a worker).
+os.environ.setdefault(
+    "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+    "rtsp_transport;tcp|stimeout;5000000",  # 5s socket timeout, TCP transport
+)
 
 BOUNDARY = "frame"
 _detector = None
+
+
+def _is_live_source(source) -> bool:
+    """RTSP/HTTP camera vs. a local video file."""
+    return str(source).lower().startswith(("rtsp://", "http://", "https://"))
+
 
 def _get_detector():
     global _detector
@@ -27,6 +43,21 @@ def _get_detector():
         # It will automatically detect .pt, .onnx, or .tflite weights and select NPU/TPU/CPU backend
         _detector = HumanDetector(model_type="yolo", weights="yolov8n.pt")
     return _detector
+
+
+def _placeholder_jpeg(camera: Dict, width: int = 480, message: str = "Connecting to camera...") -> bytes:
+    """A lightweight 'no signal yet' tile, so live cameras never force the web
+    process to decode RTSP itself (which could block or crash the server)."""
+    height = int(width * 9 / 16)
+    frame = np.full((height, width, 3), 30, dtype=np.uint8)
+    cv2.putText(frame, message, (16, height // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (170, 170, 170), 1)
+    cv2.rectangle(frame, (0, 0), (width, 26), (20, 20, 20), cv2.FILLED)
+    cv2.circle(frame, (12, 13), 5, (0, 140, 220), cv2.FILLED)  # amber = connecting
+    cv2.putText(frame, f"LIVE  {camera.get('name', 'Cam')}", (24, 18),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1)
+    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+    return buf.tobytes()
 
 
 def _open(camera: Dict):
@@ -85,6 +116,13 @@ def grab_snapshot(camera: Dict, width: int = 480) -> Optional[bytes]:
         ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
         return buf.tobytes() if ok else None
 
+    # Live cameras (RTSP) are NEVER decoded in the web process — that path can
+    # block a worker thread or crash the server on a stalled/offline camera. The
+    # live_analytics runner is the sole RTSP decoder and fills the frame cache
+    # above; until it does, show a placeholder.
+    if _is_live_source(camera.get("source")):
+        return _placeholder_jpeg(camera, width)
+
     cap, _vfps, _total = _open(camera)
     if cap is None:
         return None
@@ -133,8 +171,20 @@ def mjpeg_generator(camera: Dict, fps: int = 8, width: int = 480) -> Iterator[by
                     )
             time.sleep(delay)
             continue
-            
-        # Safe fallback: read directly from the NVR source if background engine has not booted yet
+
+        # No cached frame yet. LIVE cameras are NEVER decoded here — the
+        # live_analytics runner owns the RTSP stream and fills the cache above.
+        # Until it does (or if the camera is offline), stream a placeholder so a
+        # stalled/offline camera can never block a worker or crash the server.
+        if _is_live_source(camera.get("source")):
+            yield (
+                b"--" + BOUNDARY.encode() + b"\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + _placeholder_jpeg(camera, width) + b"\r\n"
+            )
+            time.sleep(delay)
+            continue
+
+        # Safe fallback for local video FILES only: decode/loop in-process.
         cap, vfps, total = _open(camera)
         if cap is None:
             time.sleep(delay)

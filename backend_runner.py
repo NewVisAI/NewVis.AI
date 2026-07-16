@@ -24,6 +24,36 @@ class DummyVideoCapture:
     def release(self):
         pass
 
+
+class FrameInjector:
+    """Feeds a pre-fetched frame (from the watchdog reader thread) into
+    _process_camera_frame via camera_state.cap.
+
+    We CANNOT monkey-patch cv2.VideoCapture.read (it's a read-only C attribute),
+    so instead we replace camera_state.cap with this stand-in whose read()
+    returns the queued frame. It also answers the get()/set()/grab() calls the
+    pipeline makes, reporting the frame's real dimensions for zone scaling."""
+    def __init__(self, frame):
+        self._frame = frame
+    def read(self):
+        return True, self._frame
+    def get(self, propId):
+        import cv2 as _cv2
+        if propId == _cv2.CAP_PROP_FRAME_WIDTH:
+            return float(self._frame.shape[1])
+        if propId == _cv2.CAP_PROP_FRAME_HEIGHT:
+            return float(self._frame.shape[0])
+        return 0.0
+    def set(self, propId, value):
+        return True
+    def grab(self):
+        return True
+    def isOpened(self):
+        return True
+    def release(self):
+        pass
+
+
 def init_shared_state():
     """Initializes the multiprocessing manager dictionary for sharing frames between processes."""
     global _manager, latest_frames
@@ -306,12 +336,19 @@ def run_camera_pool_worker(worker_id: int, cameras_list: List[dict], shared_fram
                         continue
                         
                     camera_state = runtimes[cam_id]
-                    
-                    # Intercept camera_state.cap.read() to return the watchdog queue frame
-                    def fake_read():
-                        return True, frame.copy()
-                    camera_state.cap.read = fake_read
-                    
+
+                    # Feed the watchdog-queue frame into the pipeline. We can't
+                    # patch cv2.VideoCapture.read (read-only C attribute), so swap
+                    # the whole cap for a FrameInjector. Release the real capture
+                    # the first time so we don't leak the camera connection the
+                    # reader thread already owns.
+                    if not isinstance(camera_state.cap, FrameInjector):
+                        try:
+                            camera_state.cap.release()
+                        except Exception:
+                            pass
+                    camera_state.cap = FrameInjector(frame.copy())
+
                     # Run detection, ReID tracking, zones, incident manager
                     _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "multi")
                     frames_processed += 1
