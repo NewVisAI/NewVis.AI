@@ -1209,6 +1209,13 @@ def camera_analytics_status():
     return {"workers": live_analytics.status()}
 
 
+@app.get("/api/cameras/{camera_id}/analytics/summary", dependencies=[Depends(current_user)])
+def get_camera_analytics_summary(camera_id: int):
+    import summary_manager
+    return {"summary": summary_manager.get_summary(camera_id)}
+
+
+
 # ---------------------------------------------------------------------------
 # Automated periodic summary reports (daily / monthly / yearly)
 # ---------------------------------------------------------------------------
