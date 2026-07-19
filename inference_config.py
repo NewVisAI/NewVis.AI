@@ -142,6 +142,46 @@ def to_substream_url(source, explicit: Optional[str] = None) -> str:
     return s
 
 
+def motion_gating() -> bool:
+    """When true, the analytics reader thins its DECODE rate on cameras that report
+    no motion (via ONVIF), dropping to a slow heartbeat instead of decoding every
+    frame — the decode saving the adaptive-rate gate can't give (that gate only
+    throttles inference). Fail-safe: a camera with no working motion source is
+    always treated as active (never skipped). Off by default."""
+    v = os.environ.get("MOTION_GATING")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("motion_gating", False))
+
+
+def motion_window_s() -> float:
+    """Seconds after the last motion event during which a camera stays 'active'
+    (full-rate decode). A person who triggers motion keeps the camera hot for this
+    long even if the next event is late."""
+    override = os.environ.get("MOTION_WINDOW_S")
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get("motion_window_s")
+    return float(cfg) if isinstance(cfg, (int, float)) else 30.0
+
+
+def idle_decode_fps() -> float:
+    """Heartbeat decode rate on a motion-idle camera. Low enough to save decode,
+    high enough that a person who appears without tripping motion is still caught
+    quickly (then the person-gate/hangover takes over). Default 2 fps."""
+    override = os.environ.get("IDLE_DECODE_FPS")
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get("idle_decode_fps")
+    return float(cfg) if isinstance(cfg, (int, float)) else 2.0
+
+
 def get_reid_similarity_threshold(backend: str) -> float:
     """Backend-aware match threshold. An explicit override always wins."""
     override = os.environ.get("REID_SIMILARITY_THRESHOLD")

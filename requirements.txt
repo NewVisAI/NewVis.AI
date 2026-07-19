@@ -106,3 +106,6 @@ tflite-runtime>=2.14.0
 # Edge-TPU (Coral) runtime: pip install pycoral  (Linux; needs libedgetpu)
 # Model export (run on a build host, not required at inference time):
 #   pip install torchreid onnx onnx2tf tensorflow onnx-graphsurgeon sng4onnx
+# Motion gating (lever ③, MOTION_GATING=1): camera-side ONVIF motion events.
+# Optional — without it, motion gating fail-safes to full-rate decode (no change):
+#   pip install onvif-zeep

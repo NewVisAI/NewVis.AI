@@ -41,6 +41,7 @@ import cv2
 import backend_runner
 import camera_registry
 import inference_config
+import motion_gate
 from backend_runner import FrameInjector, overlay_live_status
 
 DISPLAY_WIDTH = 640        # published live-view width (raw feed)
@@ -136,6 +137,19 @@ class _LiveWorker:
                       "using main stream (set 'substream_source' in the registry to override).", flush=True)
         else:
             self.source = raw_source
+        # Motion gating (lever ③): thin DECODE on cameras the camera itself reports
+        # as idle (via ONVIF). Fail-safe + person-hold enforced in the reader loop.
+        self.motion_gating = inference_config.motion_gating()
+        self.idle_decode_interval = 1.0 / max(0.2, inference_config.idle_decode_fps())
+        self.decode_gate = "active"   # 'active' (full-rate) or 'motion-idle' (heartbeat)
+        if self.motion_gating:
+            try:
+                motion_gate.start_onvif_listener(config)
+                print(f"[LIVE ANALYTICS] Cam {self.camera_id}: motion gating ON "
+                      f"(heartbeat {inference_config.idle_decode_fps():.1f} fps when idle).", flush=True)
+            except Exception as exc:
+                print(f"[LIVE ANALYTICS] Cam {self.camera_id}: motion listener start failed ({exc}); "
+                      "fail-safe to full-rate decode.", flush=True)
         # Adaptive-rate gate: run the pipeline fast when a person is around, slow
         # (idle rate) when the camera is empty — with a hangover so a person who
         # stops moving (or falls) keeps being processed.
@@ -171,6 +185,9 @@ class _LiveWorker:
             "display_frames": self.display_frames,
             "analytics_frames": self.analytics_frames,
             "gate": self.gate,
+            "decode_gate": self.decode_gate,
+            "motion_gating": self.motion_gating,
+            "motion_state": motion_gate.gate().state(self.camera_id) if self.motion_gating else "off",
             "active_frames": self.active_frames,
             "idle_frames": self.idle_frames,
             "adaptive": self.adaptive,
@@ -245,6 +262,18 @@ class _LiveWorker:
                         self._frame_q.put_nowait(frame)
                     except queue.Full:
                         pass
+
+                    # Motion gating (lever ③): thin decode to the heartbeat rate on a
+                    # motion-idle camera. Stays full-rate whenever the person-gate is
+                    # active (someone is/was here — covers a motionless/fallen person)
+                    # OR motion is recent OR the motion source is unreliable
+                    # (is_active fail-safes to True). Never skips a watched camera.
+                    if (self.motion_gating and self.gate != "active"
+                            and not motion_gate.gate().is_active(self.camera_id)):
+                        self.decode_gate = "motion-idle"
+                        self.stop_event.wait(self.idle_decode_interval)
+                    else:
+                        self.decode_gate = "active"
                 except Exception as exc:
                     self.last_error = f"reader error: {exc}"
                     self.stop_event.wait(0.3)
