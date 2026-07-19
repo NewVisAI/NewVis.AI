@@ -108,6 +108,40 @@ def reid_deferred() -> bool:
     return bool(_load().get("reid_deferred", False))
 
 
+def use_substream() -> bool:
+    """When true, the analytics decoder pulls each camera's low-res SUB-stream
+    instead of the full-res main stream. Person detection is unaffected at 720p,
+    but decode cost (the usual bottleneck on GPU boxes) drops ~2x. The full-res
+    main stream is left untouched for the NVR's evidence recording. Off by default
+    so existing deployments are unchanged; enable per GPU node once validated."""
+    v = os.environ.get("USE_SUBSTREAM")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("use_substream", False))
+
+
+def to_substream_url(source, explicit: Optional[str] = None) -> str:
+    """Derive the low-res sub-stream URL from a camera's main RTSP source.
+
+    An explicit per-camera ``substream_source`` always wins. Local video files and
+    unrecognised URL patterns are returned unchanged (analytics still runs — just
+    without the decode saving), so this is always safe to call.
+    """
+    if explicit:
+        return str(explicit)
+    s = str(source)
+    if not s.lower().startswith(("rtsp://", "rtmp://", "http://", "https://")):
+        return s  # local video file — no sub-stream concept
+    # Common IP-camera conventions, most-specific first:
+    #   Adiva / Hikvision OEM : /ch1/main/av_stream -> /ch1/sub/av_stream
+    #   Dahua                 : subtype=0            -> subtype=1
+    for main_token, sub_token in (("/main/", "/sub/"), ("subtype=0", "subtype=1")):
+        if main_token in s:
+            return s.replace(main_token, sub_token, 1)
+    # Unknown pattern: fall back to the main stream (correct, just no saving).
+    return s
+
+
 def get_reid_similarity_threshold(backend: str) -> float:
     """Backend-aware match threshold. An explicit override always wins."""
     override = os.environ.get("REID_SIMILARITY_THRESHOLD")

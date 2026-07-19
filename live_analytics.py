@@ -40,6 +40,7 @@ import cv2
 
 import backend_runner
 import camera_registry
+import inference_config
 from backend_runner import FrameInjector, overlay_live_status
 
 DISPLAY_WIDTH = 640        # published live-view width (raw feed)
@@ -121,6 +122,20 @@ class _LiveWorker:
         self.config = config
         self.camera_id = int(config["camera_id"])
         self.name = str(config.get("name", f"Cam {self.camera_id}"))
+        # Sub-stream analytics: decode the low-res sub-stream (big decode saving)
+        # when enabled. This single reader owns the only decode, so switching its
+        # source moves both display + analytics onto the sub-stream. Off by default
+        # -> self.source is just the configured main source (unchanged behaviour).
+        raw_source = config["source"]
+        if inference_config.use_substream():
+            self.source = inference_config.to_substream_url(raw_source, config.get("substream_source"))
+            if self.source != raw_source:
+                print(f"[LIVE ANALYTICS] Cam {self.camera_id}: SUB-stream analytics -> {self.source}", flush=True)
+            else:
+                print(f"[LIVE ANALYTICS] Cam {self.camera_id}: USE_SUBSTREAM on but no sub-stream URL derived; "
+                      "using main stream (set 'substream_source' in the registry to override).", flush=True)
+        else:
+            self.source = raw_source
         # Adaptive-rate gate: run the pipeline fast when a person is around, slow
         # (idle rate) when the camera is empty — with a hangover so a person who
         # stops moving (or falls) keeps being processed.
@@ -175,11 +190,11 @@ class _LiveWorker:
                 try:
                     if cap is None or not cap.isOpened():
                         self.status = "waiting-for-camera"
-                        if not _source_reachable(self.config["source"]):
+                        if not _source_reachable(self.source):
                             self.stop_event.wait(open_backoff)
                             open_backoff = min(15.0, open_backoff * 1.5)
                             continue
-                        cap = cv2.VideoCapture(resolve_capture_source(self.config["source"]))
+                        cap = cv2.VideoCapture(resolve_capture_source(self.source))
                         if not cap.isOpened():
                             try:
                                 cap.release()
