@@ -109,3 +109,7 @@ tflite-runtime>=2.14.0
 # Motion gating (lever ③, MOTION_GATING=1): camera-side ONVIF motion events.
 # Optional — without it, motion gating fail-safes to full-rate decode (no change):
 #   pip install onvif-zeep
+# Hardware decode (lever ②, DECODE_BACKEND=nvdec|quicksync|vaapi): the stock PyPI
+# opencv-python is CPU-only and silently falls back to software decode. For real
+# NVDEC/QuickSync install an OpenCV built with a hwaccel-enabled FFmpeg (or a vendor
+# build). Verify via the reader's CAP_PROP_HW_ACCELERATION log line (0 = software).

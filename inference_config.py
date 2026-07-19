@@ -142,6 +142,33 @@ def to_substream_url(source, explicit: Optional[str] = None) -> str:
     return s
 
 
+def decode_backend() -> str:
+    """Video-decode backend for RTSP (lever ②): 'cpu' (software, default),
+    'nvdec'/'cuda' (NVIDIA GPU), 'quicksync'/'qsv' (Intel iGPU), or 'vaapi'.
+    Hardware backends offload decode off the CPU. IMPORTANT: they require an
+    OpenCV/FFmpeg build that ships the hwaccel — the stock PyPI `opencv-python`
+    wheel is CPU-only and will silently fall back to software decode. Verify on the
+    GPU node via the CAP_PROP_HW_ACCELERATION log line the reader prints."""
+    v = _resolve("decode_backend", "DECODE_BACKEND", "cpu")
+    return (str(v).strip().lower() or "cpu")
+
+
+_HWACCEL_TOKEN = {
+    "nvdec": "cuda", "cuda": "cuda",
+    "quicksync": "qsv", "qsv": "qsv",
+    "vaapi": "vaapi",
+}
+
+
+def ffmpeg_capture_options() -> str:
+    """OPENCV_FFMPEG_CAPTURE_OPTIONS string. Always forces TCP transport + a finite
+    read timeout; appends an ``hwaccel`` when decode_backend() selects a hardware
+    decoder. Set before the first cv2.VideoCapture; an explicit env override wins."""
+    base = "rtsp_transport;tcp|stimeout;5000000"
+    token = _HWACCEL_TOKEN.get(decode_backend())
+    return f"{base}|hwaccel;{token}" if token else base
+
+
 def motion_gating() -> bool:
     """When true, the analytics reader thins its DECODE rate on cameras that report
     no motion (via ONVIF), dropping to a slow heartbeat instead of decoding every

@@ -18,14 +18,16 @@ from datetime import datetime
 from typing import Dict, Iterator, Optional
 import cv2
 import numpy as np
+import inference_config
 from detector import HumanDetector
 
 # Harden OpenCV's FFMPEG backend for RTSP BEFORE any VideoCapture is created:
 # force TCP transport and a finite read timeout so a stalled camera can never
-# block a decode thread forever (the old default could hang or wedge a worker).
+# block a decode thread forever. Also selects the hardware decoder (NVDEC/QuickSync)
+# when DECODE_BACKEND is set (lever ②); defaults to software decode.
 os.environ.setdefault(
     "OPENCV_FFMPEG_CAPTURE_OPTIONS",
-    "rtsp_transport;tcp|stimeout;5000000",  # 5s socket timeout, TCP transport
+    inference_config.ffmpeg_capture_options(),
 )
 
 BOUNDARY = "frame"

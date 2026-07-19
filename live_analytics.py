@@ -31,16 +31,19 @@ import threading
 import time
 from typing import Dict, Optional
 
+import inference_config
+
+# Set the FFmpeg capture options (TCP + timeout, plus a hardware decoder when
+# DECODE_BACKEND selects one — lever ②) BEFORE the first cv2.VideoCapture.
 os.environ.setdefault(
     "OPENCV_FFMPEG_CAPTURE_OPTIONS",
-    "rtsp_transport;tcp|stimeout;5000000",
+    inference_config.ffmpeg_capture_options(),
 )
 
 import cv2
 
 import backend_runner
 import camera_registry
-import inference_config
 import motion_gate
 from backend_runner import FrameInjector, overlay_live_status
 
@@ -224,6 +227,17 @@ class _LiveWorker:
                         open_backoff = 2.0
                         fails = 0
                         self.status = "running"
+                        # One-time: log whether hardware decode actually engaged, so a
+                        # GPU node can confirm NVDEC/QuickSync is on (0 = software).
+                        if inference_config.decode_backend() != "cpu" and not getattr(self, "_hw_logged", False):
+                            try:
+                                hw = cap.get(cv2.CAP_PROP_HW_ACCELERATION)
+                                print(f"[LIVE ANALYTICS] Cam {self.camera_id}: "
+                                      f"decode_backend={inference_config.decode_backend()} "
+                                      f"CAP_PROP_HW_ACCELERATION={hw} (0=software/none).", flush=True)
+                            except Exception:
+                                pass
+                            self._hw_logged = True
 
                     ok, frame = cap.read()
                     if not ok or frame is None:
