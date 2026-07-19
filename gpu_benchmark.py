@@ -34,18 +34,40 @@ from app import (_create_camera_runtime, _process_camera_frame, HumanDetector,
                  GlobalIdentityManager, IncidentManager, resolve_capture_source,
                  reset_runtime_state, reset_running_state, reset_fall_state)
 from backend_runner import FrameInjector
+import inference_config
 
 video = sys.argv[1] if len(sys.argv) > 1 else None
 n = int(sys.argv[2]) if len(sys.argv) > 2 else 200
 if not video:
     print("usage: python gpu_benchmark.py <video-or-rtsp> [frames]"); sys.exit(1)
 
+# Detector weights: honour DETECTOR_WEIGHTS / deployment.json so a quantized model
+# (e.g. yolov8n.engine TensorRT FP16/INT8, or a .onnx) can be benchmarked against
+# the FP32 .pt by just setting the env var. Falls back to the yolov8n baseline.
+det_weights = inference_config.get_detector_weights() or "yolov8n.pt"
+
+
+def _precision_of(path: str) -> str:
+    p = str(path).lower()
+    if p.endswith(".engine"):
+        return "TensorRT engine (FP16/INT8 per build)"
+    if "fp16" in p:
+        return "FP16"
+    if p.endswith(".onnx"):
+        return "ONNX"
+    if p.endswith(".pt"):
+        return "FP32 (.pt baseline)"
+    return "unknown"
+
+
 print("=" * 60)
 print(f"PyTorch device : {DEV}   {GPU_NAME}")
 print(f"REID_DEFERRED  : {os.environ.get('REID_DEFERRED', '0')}")
+print(f"Detector       : {det_weights}   [{_precision_of(det_weights)}]")
+print(f"ReID ONNX      : {inference_config.get_reid_onnx_path() or '(torchreid FP32)'}")
 print("=" * 60)
 
-det = HumanDetector(model_type="yolo", weights="yolov8n.pt")
+det = HumanDetector(model_type="yolo", weights=det_weights)
 idm = GlobalIdentityManager()
 inc = IncidentManager()
 print(f"ReID backend   : {idm.embedder.backend_name}   deferred={idm.embedder.deferred}\n")
