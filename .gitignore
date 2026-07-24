@@ -64,3 +64,6 @@ reid_crops/
 # SQLite WAL sidecars
 *.db-wal
 *.db-shm
+
+# Graphify generated knowledge graph (regenerate via `graphify extract`)
+graphify-out/
