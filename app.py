@@ -383,7 +383,13 @@ def _process_camera_frame(
     identity_manager: GlobalIdentityManager,
     incident_manager: IncidentManager,
     session_mode: str,
+    draw: bool = True,
 ) -> None:
+    # ``draw`` gates only the cosmetic annotation (trails/boxes/labels + zone
+    # overlays) that gets written onto ``camera_state.display_frame``. Detection,
+    # tracking, events, snapshots and the adaptive-rate gate all run regardless.
+    # live_analytics passes draw=False: its tile shows the reader thread's raw
+    # frame, so annotating here would be pure wasted CPU (lever #11).
     if camera_state.finished:
         return
 
@@ -633,7 +639,7 @@ def _process_camera_frame(
             frame_number=camera_state.current_frame_number,
         )
 
-    if active_tracked_objects:
+    if draw and active_tracked_objects:
         xyxy = np.array([[obj[0], obj[1], obj[2], obj[3]] for obj in active_tracked_objects], dtype=np.float32)
         tracker_ids = np.array([obj[4] for obj in active_tracked_objects], dtype=np.int32)
         class_ids = np.array([obj[5] for obj in active_tracked_objects], dtype=np.int32)
@@ -653,7 +659,8 @@ def _process_camera_frame(
         # 3. Draw labels
         frame = label_annotator.annotate(scene=frame, detections=sv_detections, labels=custom_labels)
 
-    draw_zone_overlays(frame, camera_state.pixel_zones)
+    if draw:
+        draw_zone_overlays(frame, camera_state.pixel_zones)
     # Crowd/occupancy alerts are intentionally NOT logged: in a school setting
     # zones are routinely crowded (class changes, assemblies), so per-zone
     # occupancy-limit alerts are pure noise. Live headcount and peak-concurrency

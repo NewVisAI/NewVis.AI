@@ -357,7 +357,9 @@ class _LiveWorker:
                         proc = cv2.resize(proc, (PROCESS_WIDTH, int(proc.shape[0] * s)))
                     camera_state.cap = FrameInjector(proc)
                     camera_state.finished = False
-                    _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "multi")
+                    # draw=False: this tile displays the reader thread's raw frame,
+                    # so annotating the analytics frame here would be wasted CPU (lever #11).
+                    _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "multi", draw=False)
                     self.analytics_frames += 1
                     if self.gate == "active":
                         self.active_frames += 1
