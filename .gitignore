@@ -24,6 +24,10 @@ runs/
 # Videos
 *.mp4
 *.avi
+*.m4a
+
+# Prelaunch video scratch media (recordings / clips)
+prelaunch/
 
 # Cleanup staging (created by cleanup_hackathonpro.ps1)
 _to_delete/

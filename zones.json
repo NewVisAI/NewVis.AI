@@ -32,7 +32,9 @@
         "tue",
         "wed",
         "thu",
-        "fri"
+        "fri",
+        "sat",
+        "sun"
       ],
       "restricted": true
     },
