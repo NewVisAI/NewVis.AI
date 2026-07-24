@@ -181,6 +181,20 @@ def motion_gating() -> bool:
     return bool(_load().get("motion_gating", False))
 
 
+def frame_dedup() -> bool:
+    """When true, the analytics loop skips a frame that is byte-identical to the one it
+    just processed (lever #13, frame-dedup half; the embedding-cache half already lives
+    in reid.py's dynamic-stride cache). Lossless — identical pixels give identical
+    detections, so nothing is ever missed. A healthy camera's sensor noise makes frames
+    ~never byte-identical, so this only pays off on a stalled/frozen feed (a stuck decoder
+    repeating the last buffer); the per-frame signature it costs isn't worth imposing on
+    every node, hence OFF by default. Enable per node with feeds known to freeze."""
+    v = os.environ.get("FRAME_DEDUP")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("frame_dedup", False))
+
+
 def motion_window_s() -> float:
     """Seconds after the last motion event during which a camera stays 'active'
     (full-rate decode). A person who triggers motion keeps the camera hot for this

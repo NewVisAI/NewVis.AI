@@ -172,6 +172,8 @@ class _LiveWorker:
         self.analytics_frames = 0
         self.active_frames = 0            # frames processed at the fast rate
         self.idle_frames = 0             # frames processed at the slow (empty) rate
+        self.dup_frames = 0              # byte-identical frames skipped (#13, opt-in)
+        self.frame_dedup = inference_config.frame_dedup()  # #13 opt-in, default off
         self.gate = "idle"              # 'active' (person around) or 'idle' (empty)
         self.last_error: Optional[str] = None
 
@@ -193,6 +195,7 @@ class _LiveWorker:
             "motion_state": motion_gate.gate().state(self.camera_id) if self.motion_gating else "off",
             "active_frames": self.active_frames,
             "idle_frames": self.idle_frames,
+            "dup_frames": self.dup_frames,
             "adaptive": self.adaptive,
             "name": self.name,
             "last_error": self.last_error,
@@ -319,6 +322,7 @@ class _LiveWorker:
         camera_state = None
         last_run = 0.0
         last_person_time = -1e9   # when we last saw a person (drives the gate)
+        last_proc_sig = None      # signature of the last processed frame (#13 dedup)
         try:
             while not self.stop_event.is_set():
                 try:
@@ -339,6 +343,18 @@ class _LiveWorker:
                 if now - last_run < interval:
                     continue
                 last_run = now
+
+                # Frame dedup (#13, opt-in via FRAME_DEDUP): skip a frame byte-identical
+                # to the last one processed. Lossless — identical pixels give identical
+                # detections — so no real event is ever missed. Off by default because a
+                # healthy feed's noise means frames are ~never identical (so the hash is
+                # pure cost); it only pays off on a stalled/frozen stream.
+                if self.frame_dedup:
+                    sig = hash(frame.tobytes())
+                    if sig == last_proc_sig:
+                        self.dup_frames += 1
+                        continue
+                    last_proc_sig = sig
 
                 try:
                     if camera_state is None:
