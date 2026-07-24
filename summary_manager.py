@@ -1,8 +1,26 @@
 import os
 import time
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import alerts
 from llm_parser import LLMParser
+
+# "Recent" means the last N minutes. Without this the summary replayed the last 50
+# alerts EVER for a camera — so stale alerts from old runs showed as current activity.
+RECENT_WINDOW_MINUTES = float(os.environ.get("SUMMARY_WINDOW_MINUTES", "15"))
+
+
+def _is_recent(ts: str, window_minutes: float) -> bool:
+    """True if an ISO timestamp (e.g. 2026-07-19T20:29:38) is within the window.
+    Unparseable timestamps are treated as NOT recent, so nothing stale leaks in."""
+    if not ts:
+        return False
+    try:
+        when = datetime.fromisoformat(str(ts).split(".")[0])
+    except ValueError:
+        return False
+    return (datetime.now() - when) <= timedelta(minutes=window_minutes)
+
 
 class SummaryManager:
     def __init__(self):
@@ -16,10 +34,14 @@ class SummaryManager:
     def get_camera_summary(self, camera_id: int) -> str:
         """
         Gets a natural language AI summary of recent events/alerts on the specified camera.
+        Only alerts within the last RECENT_WINDOW_MINUTES count as "recent activity".
         """
-        # Fetch the last 30 alerts from all cameras, and filter by camera_id
         all_alerts = alerts.get_recent_alerts(limit=50)
-        cam_alerts = [a for a in all_alerts if int(a.get("camera_id") or 0) == int(camera_id)]
+        cam_alerts = [
+            a for a in all_alerts
+            if int(a.get("camera_id") or 0) == int(camera_id)
+            and _is_recent(a.get("timestamp"), RECENT_WINDOW_MINUTES)
+        ]
 
         if not cam_alerts:
             return "No significant incidents or alerts detected on this camera recently. The area appears secure."
