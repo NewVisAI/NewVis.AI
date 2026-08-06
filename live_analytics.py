@@ -60,6 +60,22 @@ _lock = threading.Lock()
 _models = None
 _models_lock = threading.Lock()
 
+# --- Motion-delta helpers (temporal-redundancy skip, see inference_config.motion_delta) --- #
+_DELTA_DOWNSCALE = (160, 90)   # tiny grayscale frame the change-ratio is measured on
+_DELTA_PIXEL_TOL = 20          # per-pixel intensity change below this is treated as noise
+
+
+def _delta_downscale(frame):
+    """Shrink a BGR frame to the tiny grayscale image the motion-delta signal is computed
+    on. Cheap enough to run every idle frame; big enough that a person entering registers."""
+    return cv2.cvtColor(cv2.resize(frame, _DELTA_DOWNSCALE), cv2.COLOR_BGR2GRAY)
+
+
+def _frame_change_ratio(cur_small, ref_small, pixel_tol: int = _DELTA_PIXEL_TOL) -> float:
+    """Fraction (0..1) of pixels that changed by more than pixel_tol between two small
+    grayscale frames — the cheap signal that decides whether an idle scene is 'static'."""
+    return float((cv2.absdiff(cur_small, ref_small) > pixel_tol).mean())
+
 
 def _get_models():
     """(detector, identity_manager, incident_manager), loaded once, shared."""
@@ -174,6 +190,13 @@ class _LiveWorker:
         self.idle_frames = 0             # frames processed at the slow (empty) rate
         self.dup_frames = 0              # byte-identical frames skipped (#13, opt-in)
         self.frame_dedup = inference_config.frame_dedup()  # #13 opt-in, default off
+        # Motion-delta skip: on an IDLE (empty) camera, skip the detector pass on a frame
+        # essentially unchanged from the last processed one (temporal redundancy), with a
+        # periodic full-scan heartbeat so a still newcomer is never missed. Opt-in, off by default.
+        self.motion_delta = inference_config.motion_delta()
+        self.delta_thresh = inference_config.motion_delta_thresh()
+        self.delta_fullscan_s = inference_config.motion_delta_fullscan_s()
+        self.delta_skipped = 0           # detector passes skipped by motion-delta
         self.gate = "idle"              # 'active' (person around) or 'idle' (empty)
         self.last_error: Optional[str] = None
 
@@ -196,6 +219,8 @@ class _LiveWorker:
             "active_frames": self.active_frames,
             "idle_frames": self.idle_frames,
             "dup_frames": self.dup_frames,
+            "motion_delta": self.motion_delta,
+            "delta_skipped": self.delta_skipped,
             "adaptive": self.adaptive,
             "name": self.name,
             "last_error": self.last_error,
@@ -323,6 +348,8 @@ class _LiveWorker:
         last_run = 0.0
         last_person_time = -1e9   # when we last saw a person (drives the gate)
         last_proc_sig = None      # signature of the last processed frame (#13 dedup)
+        delta_ref = None          # small grayscale reference for motion-delta skip
+        last_fullscan = 0.0       # last forced full detector pass (motion-delta heartbeat)
         try:
             while not self.stop_event.is_set():
                 try:
@@ -355,6 +382,22 @@ class _LiveWorker:
                         self.dup_frames += 1
                         continue
                     last_proc_sig = sig
+
+                # Motion-delta skip: when the person-gate is IDLE (empty camera), skip the
+                # detector pass on a frame that barely changed from the last processed one —
+                # reusing temporal redundancy (DeltaCNN-style, frame-level, CPU-only). Never
+                # applied while the gate is active, so a tracked or falling person is always
+                # processed; a full-scan heartbeat (delta_fullscan_s) bounds how long a
+                # low-motion newcomer waits before a forced detection.
+                if self.motion_delta and self.gate == "idle":
+                    small = _delta_downscale(frame)
+                    if delta_ref is not None and (now - last_fullscan) < self.delta_fullscan_s:
+                        if _frame_change_ratio(small, delta_ref) < self.delta_thresh:
+                            self.delta_skipped += 1
+                            delta_ref = small
+                            continue
+                    delta_ref = small
+                    last_fullscan = now
 
                 try:
                     if camera_state is None:

@@ -195,6 +195,89 @@ def frame_dedup() -> bool:
     return bool(_load().get("frame_dedup", False))
 
 
+def motion_delta() -> bool:
+    """When true, the analytics loop skips the detector pass on a frame whose content is
+    essentially unchanged from the last processed one (a cheap grayscale frame-difference
+    below MOTION_DELTA_THRESH) — exploiting the same temporal redundancy DeltaCNN-style
+    methods do, but at the frame level and CPU-only. Applied ONLY while the adaptive
+    person-gate is idle (empty camera), so a tracked or falling person is never skipped,
+    and a MOTION_DELTA_FULLSCAN_S heartbeat forces a periodic full detector pass so a
+    person who appears with little motion is still caught within a bounded delay.
+
+    This is the compute-REDUCING half of the accuracy/speed work: on a static idle scene
+    the detector goes near-silent instead of running at the idle rate. Lossless for a
+    populated scene (YOLO keeps the gate active on any person, incl. a motionless/fallen
+    one, so the skip only engages once nobody has been seen for the hangover). Off by
+    default; enable per node once validated on that site's footage."""
+    v = os.environ.get("MOTION_DELTA")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("motion_delta", False))
+
+
+def motion_delta_thresh() -> float:
+    """Fraction of changed pixels (0..1) below which an idle-camera frame counts as
+    'static' and its detector pass is skipped (MOTION_DELTA). Measured on a small
+    grayscale frame-diff with a per-pixel intensity tolerance, so sensor noise reads as
+    ~zero change while a person entering reads well above it. Lower = more conservative."""
+    override = os.environ.get("MOTION_DELTA_THRESH")
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get("motion_delta_thresh")
+    return float(cfg) if isinstance(cfg, (int, float)) else 0.002
+
+
+def motion_delta_fullscan_s() -> float:
+    """Max seconds between forced full detector passes while MOTION_DELTA is skipping a
+    static idle scene. Bounds how long a person who appears with little motion can wait
+    before detection — a safety heartbeat mirroring motion gating's idle heartbeat."""
+    override = os.environ.get("MOTION_DELTA_FULLSCAN_S")
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get("motion_delta_fullscan_s")
+    return float(cfg) if isinstance(cfg, (int, float)) else 4.0
+
+
+def pose_verify() -> bool:
+    """When true, a pose model runs on the person crop ONLY when the cheap bbox fall
+    heuristic already fired, to attach a keypoint-based confidence that the person is
+    really in a fallen posture. It AUGMENTS the fall alert (pose_verified/pose_confidence)
+    and NEVER suppresses it — a safety system must not drop a real fall because pose
+    disagreed. Average compute stays ~zero because it fires only on the rare fall event.
+    Off by default; enable per node once validated on that site's footage."""
+    v = os.environ.get("POSE_VERIFY")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("pose_verify", False))
+
+
+def pose_verify_weights() -> str:
+    """Weights for the fall-verification pose model. Defaults to ultralytics' pose net,
+    which emits the same 17 COCO keypoints as PoseNet and reuses the YOLO stack already
+    loaded (no new runtime). Point at an exported ONNX/TensorRT build on a GPU node."""
+    return str(_resolve("pose_verify_weights", "POSE_VERIFY_WEIGHTS", "yolov8n-pose.pt"))
+
+
+def pose_verify_thresh() -> float:
+    """Torso-horizontal ratio (0..1) above which pose CONFIRMS a fall (pose_verified=True).
+    0 = perfectly upright torso, 1 = perfectly horizontal (lying). Only affects the
+    confidence flag on the alert, never whether the alert fires."""
+    override = os.environ.get("POSE_VERIFY_THRESH")
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get("pose_verify_thresh")
+    return float(cfg) if isinstance(cfg, (int, float)) else 0.5
+
+
 def motion_window_s() -> float:
     """Seconds after the last motion event during which a camera stays 'active'
     (full-rate decode). A person who triggers motion keeps the camera hot for this

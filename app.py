@@ -592,6 +592,7 @@ def _process_camera_frame(
                 global_id=global_id,
                 bbox=(x1, y1, x2, y2),
                 video_time=video_time,
+                frame=frame,   # enables event-gated pose verification when POSE_VERIFY=1
             )
             if fall_details:
                 raise_fall_alert(

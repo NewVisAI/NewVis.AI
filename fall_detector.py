@@ -80,12 +80,19 @@ def check_fall(
     global_id: int,
     bbox: Tuple[int, int, int, int],
     video_time: float,
+    frame=None,
 ) -> Optional[Dict]:
     """
     Feed one frame's bbox for a tracked person.
     Returns a details dict the moment a fall is newly detected, else None.
     The caller is responsible for routing it into the alerts pipeline
     (alerts.raise_fall_alert) so it gets a snapshot + principal notification.
+
+    ``frame`` is optional. When supplied AND ``POSE_VERIFY`` is enabled, a pose model
+    runs on the person crop of a newly-detected fall to attach a keypoint-based
+    confidence (pose_verified / pose_confidence) to the returned details. This only
+    ever *augments* the fall — it never suppresses one (safety) — so callers that pass
+    no frame, and the whole existing behaviour, are unchanged.
     """
     ratio, centroid_y, height = _bbox_metrics(bbox)
 
@@ -127,9 +134,24 @@ def check_fall(
         return None
 
     _last_fall_time[global_id] = video_time
-    return {
+    details = {
         "aspect_ratio_before": round(earliest["ratio"], 2),
         "aspect_ratio_after": round(latest["ratio"], 2),
         "vertical_drop_ratio": round(vertical_drop_ratio, 2),
         "window_seconds": round(latest["time"] - earliest["time"], 2),
     }
+
+    # Event-gated pose verification (POSE_VERIFY): only now — on a rare, newly-detected
+    # fall — optionally run pose on the crop to attach a keypoint-based confidence.
+    # It augments the details; it must never suppress the fall (a safety alert stays).
+    # Kept lazy so fall_detector has no hard dependency on the pose stack.
+    if frame is not None:
+        try:
+            import inference_config
+            if inference_config.pose_verify():
+                import pose_verify
+                details.update(pose_verify.verify_fall(frame, bbox))
+        except Exception:
+            pass  # pose is best-effort; the fall alert stands regardless
+
+    return details
