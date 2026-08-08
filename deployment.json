@@ -1,0 +1,9 @@
+{
+  "_comment": "Per-deployment settings. Precedence: env var > this file > code default. This is the DURABLE home for flags that must survive a server restart (an env var passed on the command line does not). See inference_config.py.",
+  "use_substream": true,
+  "_use_substream_note": "Live view decodes the camera's low-res SUB-stream (e.g. .../ch1/sub/av_stream, 800x448) instead of the full-res main stream (2880x1616), keeping the live tile real-time and low-latency on CPU-only nodes. The NVR still records the main stream for evidence.",
+  "analytics_full_res": true,
+  "_analytics_full_res_note": "SPLIT DECODE: with use_substream on, the live tile stays on the fast sub-stream but ANALYTICS decodes the full-res main stream in a second capture. Sharp crops keep OSNet re-ID stable so one person keeps a single global id across track breaks (low-res crops fragmented one person into GID 1/2/3). Costs a second decode (CPU) — the deliberate trade for identity accuracy.",
+  "reid_onnx": "models/osnet_x1_0.onnx",
+  "_reid_onnx_note": "Run OSNet Re-ID via onnxruntime (a plain wheel) instead of the torchreid library, which needs a C compiler to build its Cython bits — unavailable on this native-Windows box. The ONNX export has ~0.999999 cosine parity with the torchreid OSNet, so identity behaviour is unchanged. onnxruntime binds CPUExecutionProvider here; a GPU node can add onnxruntime-gpu. The full-res .onnx (+ .onnx.data) lives in models/."
+}

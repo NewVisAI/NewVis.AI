@@ -33,6 +33,8 @@ unchanged.** Model file also shrank **9.5 MB → 5.1 MB (~46%)**.
 ### `quantize.py` — produce lower-precision models
 ```bash
 # OSNet FP32 ONNX -> FP16 ONNX  (runs on CPU; already validated above)
+# Prereq: models/osnet_x1_0.onnx exists (export_models.py --target onnx --skip-yolo)
+#         and `pip install onnxconverter-common`.
 python quantize.py osnet-fp16
 #   -> models/osnet_x1_0_fp16.onnx
 
@@ -58,17 +60,27 @@ Exits non-zero on FAIL, so it can gate a deploy script / CI step.
 It honours `DETECTOR_WEIGHTS` and `REID_MODEL_ONNX`, and prints the active precision, so you
 benchmark FP32 vs quantized by swapping env vars — no code change.
 
-## Runbook on the GPU box (friend's RTX 5060)
+## Runbook on the GPU box (friend's RTX 5060) — FP16 only
+
+> **This round is FP16 only** (proven zero accuracy loss). INT8 is deferred until it clears the
+> recall gate on real footage — see Status/next steps.
+>
+> **Prerequisites before `quantize.py osnet-fp16`:**
+> 1. The FP32 OSNet ONNX must exist: `python export_models.py --target onnx --skip-yolo`
+>    → `models/osnet_x1_0.onnx` (the converter and the validator both read this reference).
+> 2. `pip install onnxconverter-common` — the FP16 converter needs it (this is CPU-side too).
+
 Install a CUDA build + TensorRT extras in a fresh venv (repo `.venv` is CPU-only):
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu124   # or the CUDA build you use
-pip install onnxruntime-gpu tensorrt
+pip install onnxruntime-gpu tensorrt onnxconverter-common
 ```
 Then, from the repo root:
 ```bash
-# 1. Build quantized models
-python quantize.py osnet-fp16
-python quantize.py yolo-trt --precision fp16 --weights yolov8n.pt --imgsz 640
+# 1. Build quantized models  (FP16)
+python export_models.py --target onnx --skip-yolo                  # prereq -> models/osnet_x1_0.onnx
+python quantize.py osnet-fp16                                       # -> models/osnet_x1_0_fp16.onnx
+python quantize.py yolo-trt --precision fp16 --weights yolov8n.pt --imgsz 640   # -> yolov8n.engine
 
 # 2. GATE on accuracy (must PASS before step 3)
 python validate_quantization.py --fp16 models/osnet_x1_0_fp16.onnx \

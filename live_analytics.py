@@ -147,15 +147,28 @@ class _LiveWorker:
         # source moves both display + analytics onto the sub-stream. Off by default
         # -> self.source is just the configured main source (unchanged behaviour).
         raw_source = config["source"]
+        # self.source drives the DISPLAY reader (live tile). Use the light sub-stream
+        # for a fast, low-latency feed when enabled.
         if inference_config.use_substream():
             self.source = inference_config.to_substream_url(raw_source, config.get("substream_source"))
-            if self.source != raw_source:
-                print(f"[LIVE ANALYTICS] Cam {self.camera_id}: SUB-stream analytics -> {self.source}", flush=True)
-            else:
+            if self.source == raw_source:
                 print(f"[LIVE ANALYTICS] Cam {self.camera_id}: USE_SUBSTREAM on but no sub-stream URL derived; "
                       "using main stream (set 'substream_source' in the registry to override).", flush=True)
         else:
             self.source = raw_source
+        # ANALYTICS decodes the full-res MAIN stream when analytics_full_res is on and the
+        # display is on a different (sub) stream -> "split decode": sharp crops for re-ID
+        # (stops one person fragmenting into many global ids) while the tile stays fast.
+        if inference_config.analytics_full_res() and self.source != raw_source:
+            self.analytics_source = raw_source
+            self.split_decode = True
+            print(f"[LIVE ANALYTICS] Cam {self.camera_id}: SPLIT decode — display {self.source} | "
+                  f"analytics(full-res) {self.analytics_source}", flush=True)
+        else:
+            self.analytics_source = self.source
+            self.split_decode = False
+            if self.source != raw_source:
+                print(f"[LIVE ANALYTICS] Cam {self.camera_id}: SUB-stream analytics -> {self.source}", flush=True)
         # Motion gating (lever ③): thin DECODE on cameras the camera itself reports
         # as idle (via ONVIF). Fail-safe + person-hold enforced in the reader loop.
         self.motion_gating = inference_config.motion_gating()
@@ -294,16 +307,19 @@ class _LiveWorker:
                         backend_runner.latest_frames[self.camera_id] = buf.tobytes()
                         self.display_frames += 1
 
-                    # Hand the newest frame to analytics (drop any stale one).
-                    if self._frame_q.full():
+                    # Hand the newest frame to analytics (drop any stale one). Skipped in
+                    # split-decode mode, where the analytics thread owns its own full-res
+                    # main-stream capture instead of consuming this sub-stream frame.
+                    if not self.split_decode:
+                        if self._frame_q.full():
+                            try:
+                                self._frame_q.get_nowait()
+                            except queue.Empty:
+                                pass
                         try:
-                            self._frame_q.get_nowait()
-                        except queue.Empty:
+                            self._frame_q.put_nowait(frame)
+                        except queue.Full:
                             pass
-                    try:
-                        self._frame_q.put_nowait(frame)
-                    except queue.Full:
-                        pass
 
                     # Motion gating (lever ③): thin decode to the heartbeat rate on a
                     # motion-idle camera. Stays full-rate whenever the person-gate is
@@ -350,11 +366,53 @@ class _LiveWorker:
         last_proc_sig = None      # signature of the last processed frame (#13 dedup)
         delta_ref = None          # small grayscale reference for motion-delta skip
         last_fullscan = 0.0       # last forced full detector pass (motion-delta heartbeat)
+
+        # Split decode: analytics owns a SECOND capture on the full-res main stream so
+        # re-ID crops are sharp and independent of the sub-stream display reader. It reads
+        # at the stream's native rate (keeps frames fresh); the interval gate below still
+        # throttles the heavy pipeline. Non-split mode consumes the reader's queue as before.
+        from app import resolve_capture_source
+        ana_cap = None
+        ana_fails = 0
+
+        def _next_frame():
+            nonlocal ana_cap, ana_fails
+            if not self.split_decode:
+                try:
+                    return self._frame_q.get(timeout=1.0)
+                except queue.Empty:
+                    return None
+            if ana_cap is None or not ana_cap.isOpened():
+                if not _source_reachable(self.analytics_source):
+                    self.stop_event.wait(1.0)
+                    return None
+                ana_cap = cv2.VideoCapture(resolve_capture_source(self.analytics_source))
+                if not ana_cap.isOpened():
+                    try:
+                        ana_cap.release()
+                    except Exception:
+                        pass
+                    ana_cap = None
+                    self.stop_event.wait(1.0)
+                    return None
+            ok, f = ana_cap.read()
+            if not ok or f is None:
+                ana_fails += 1
+                if ana_fails >= 8:
+                    try:
+                        ana_cap.release()
+                    except Exception:
+                        pass
+                    ana_cap = None
+                    ana_fails = 0
+                return None
+            ana_fails = 0
+            return f
+
         try:
             while not self.stop_event.is_set():
-                try:
-                    frame = self._frame_q.get(timeout=1.0)
-                except queue.Empty:
+                frame = _next_frame()
+                if frame is None:
                     continue
 
                 now = time.time()
@@ -433,6 +491,11 @@ class _LiveWorker:
                     self.last_error = f"analytics error: {exc}"
                     self.stop_event.wait(0.3)
         finally:
+            if ana_cap is not None:
+                try:
+                    ana_cap.release()
+                except Exception:
+                    pass
             try:
                 from event import finalize_camera_sessions, flush_tracking_data
                 finalize_camera_sessions(self.camera_id, self.config.get("source"))

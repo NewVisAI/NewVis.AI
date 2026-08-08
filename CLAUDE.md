@@ -6,21 +6,58 @@ Re-ID → zones/behaviours → events/alerts.
 
 Repo: `github.com/haronnk/SENTINEL-2.0` · Path: `D:\COLLEGE\Sentinel` = `/mnt/d/COLLEGE/Sentinel`
 
+**Release tiers (decided 2026-07-29):** [FEATURE_STATUS.md](FEATURE_STATUS.md) is the source of
+truth for what we claim works. Deterministic features ship as Production; anything with
+unquantified accuracy ships as **Beta** until labelled footage gives it a number.
+[TEST_PLAN.md](TEST_PLAN.md) is the path to proving it.
+
 ---
 
 ## Environment — read this before running anything
 
-The `.venv` is a **WSL Ubuntu Python 3.13** venv (CPU-only torch). It is **not** a Windows venv —
-`python` from PowerShell will not work. Always go through `wsl`:
+**Primary env is now a NATIVE Windows venv `.venv-win`** (Python 3.13, CPU-only torch), run from
+PowerShell — migrated off WSL on 2026-08-08. The old WSL `.venv` is kept as a fallback (see below).
 
-```bash
-wsl bash -lc 'cd /mnt/d/COLLEGE/Sentinel && ./.venv/bin/python <script>'
+```powershell
+cd D:\COLLEGE\Sentinel
+.\.venv-win\Scripts\python.exe <script>
 ```
 
-The Bash tool here is Git Bash, which mangles `/mnt/d` paths — that's why the `wsl bash -lc '...'`
-wrapper is mandatory rather than stylistic.
+The install manifest is [requirements-windows.txt](requirements-windows.txt) = `requirements.txt`
+minus `tflite-runtime` (no Windows wheel; unused Edge-TPU path). **`torchreid` is intentionally not
+installed** on Windows — it needs a C compiler for its Cython bits, which this box lacks. Re-ID runs
+via `onnxruntime` on `models/osnet_x1_0.onnx` instead (set by `reid_onnx` in `deployment.json`);
+`reid.py` tries the ONNX backend first, so it never touches torchreid. ONNX OSNet has ~0.999999
+cosine parity with the torchreid OSNet — identity behaviour is unchanged. Recreate the env with
+`python -m venv .venv-win; .\.venv-win\Scripts\python -m pip install -r requirements-windows.txt`.
 
-### Start the server
+### Start the server (native)
+
+```powershell
+cd D:\COLLEGE\Sentinel
+$env:DISABLE_AI_ENGINE = "1"
+.\.venv-win\Scripts\python.exe -m uvicorn backend.server:app --host 0.0.0.0 --port 8000
+```
+
+→ http://localhost:8000 · login `developer` / `dev@sentinel` · Video Analytics tab → pick camera →
+**Run live analytics**. No `SENTINEL_DB_PATH` needed — natively the DB defaults to
+`D:\COLLEGE\Sentinel\cctv_logs.db` on NTFS, which has none of the WSL drvfs slowness.
+
+### Still load-bearing
+
+| Thing | Why |
+|---|---|
+| `DISABLE_AI_ENGINE=1` | The multiprocessing pool engine is unsafe (fork on Linux / spawn on Windows) and crash-loops its workers. Use per-camera `live_analytics.py` (thread-based, cross-platform) instead. |
+| Uvicorn runs **without `--reload`** | Code changes need a full restart. Kill natively with `Get-Process python \| Stop-Process` or `taskkill /F /IM python.exe`. |
+
+### Data & DB note
+
+The live SQLite DB is `D:\COLLEGE\Sentinel\cctv_logs.db` (migrated from the WSL
+`/root/sentinel_data/cctv_logs.db` on 2026-08-08; the pre-migration D: copy is
+`cctv_logs.db.pre-native-migration.bak`). On WSL the DB **must not** sit on `/mnt/d` (drvfs = ~3 s
+per connection) — that's why the WSL path used `/root`; irrelevant natively.
+
+### WSL fallback (still works)
 
 ```bash
 wsl bash -lc 'cd /mnt/d/COLLEGE/Sentinel && DISABLE_AI_ENGINE=1 \
@@ -28,30 +65,17 @@ wsl bash -lc 'cd /mnt/d/COLLEGE/Sentinel && DISABLE_AI_ENGINE=1 \
   ./.venv/bin/python -m uvicorn backend.server:app --host 0.0.0.0 --port 8000'
 ```
 
-→ http://localhost:8000 · login `developer` / `dev@sentinel` · Video Analytics tab → pick camera →
-**Run live analytics**.
-
-Preview configs for this exist in [.claude/launch.json](.claude/launch.json) (`sentinel-backend`
-on 8000, `sentinel-backend-preview` on 8010) — but they omit the two env vars above, so prefer the
-command form until that's fixed.
-
-### Both env vars are load-bearing
-
-| Var | Why it is not optional |
-|---|---|
-| `SENTINEL_DB_PATH=/root/sentinel_data/...` | SQLite on `/mnt/d` (WSL drvfs) costs **~3 s per DB connection** → every `/api` call took 3–7 s. Moving the DB to native ext4 made it ~1000× faster. Never point the DB at `/mnt/d`. |
-| `DISABLE_AI_ENGINE=1` | The pool engine is **fork-unsafe** and crash-loops its workers. Use per-camera `live_analytics.py` instead. Fixing this upstream is still open. |
+The Bash tool here is Git Bash (its `/root`, `/tmp` differ from WSL's, and it mangles `/mnt/d`) —
+hence the `wsl bash -lc '...'` wrapper for the WSL venv. Kill with `pkill -9 -f 'uvicorn backend.server'`.
 
 ### Other traps
 
-- Uvicorn runs **without `--reload`** — code changes need a full restart.
-  Kill with `pkill -9 -f 'uvicorn backend.server'`.
-- Backgrounding: a foreground uvicorn started via the Bash tool's `run_in_background` survives.
-  `wsl "... &"` does **not**.
+- **graphify** now runs natively from PowerShell (`graphify update .`, `graphify query "..."`) — it
+  is tied to the native Python, which is why it was "command not found" inside WSL.
 - No GPU on this box (8 cores, CPU-only). Anything needing CUDA — TensorRT export, NVDEC decode,
   real throughput numbers — is deferred to the friend's RTX laptop. This machine proves
   *accuracy parity*; the GPU box proves *speed*.
-- `license.key`, `dev_keys/`, `.venv`, `models/`, `reid_crops/`, `frames/` are gitignored.
+- `license.key`, `dev_keys/`, `.venv`, `.venv-win`, `models/`, `reid_crops/`, `frames/` are gitignored.
 
 ---
 
@@ -122,3 +146,13 @@ wsl bash -lc 'cd /mnt/d/COLLEGE/Sentinel && ./.venv/bin/python -m unittest test_
   heartbeat decode so a person who falls and goes still is never skipped.
 - Per-file design docs live in [docs/](docs/). [.agents/AGENTS.md](.agents/AGENTS.md) is **stale**
   (describes the old single-camera `python app.py` app) — ignore it.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

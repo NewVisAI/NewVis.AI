@@ -102,6 +102,16 @@ def init_alerts_db() -> None:
     conn.close()
 
 
+def clear_alerts_log() -> None:
+    """Wipes alerts/notifications - test teardown counterpart to event.clear_event_logs()."""
+    conn = connect_db(validate_schema=False)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM alerts")
+    cursor.execute("DELETE FROM notifications")
+    conn.commit()
+    conn.close()
+
+
 def _parse_time(value: str) -> Optional[dt_time]:
     try:
         hours, minutes = value.split(":")

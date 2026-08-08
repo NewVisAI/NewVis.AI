@@ -3,6 +3,7 @@ import sys
 import asyncio
 import shutil
 import time
+from datetime import datetime, timezone
 
 # Windows consoles often default to a legacy code page that can't encode the
 # emoji used in log output; a failed print must never crash a request.
@@ -45,6 +46,7 @@ from mode_manager import ModeManager, PERIOD_LABELS
 from query_engine import QueryEngine
 from search_service import SearchService
 from event import register_event_callback, clear_event_logs
+from event_graph import EventGraph
 from zone_manager import get_all_zones, get_camera_zones, overwrite_zones, set_zone_alert_rules
 import line_counter
 from license_validator import (
@@ -698,6 +700,65 @@ def run_natural_language_query(request: NLQueryRequest, http_request: Request = 
         "results_count": len(results),
         "results": results
     }
+
+
+# ---------------------------------------------------------------------------
+# Forensic investigation (EventGraph: multi-hop traces, cascades, recurring actors)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/investigate/trace", dependencies=[Depends(require_roles("principal"))])
+def investigate_trace(global_id: int, before: str = "", window_seconds: float = 7200,
+                       http_request: Request = None,
+                       user: dict = Depends(require_roles("principal"))):
+    """
+    Everywhere `global_id` was seen in the `window_seconds` before `before`
+    (defaults to now), across cameras - reconstructs a person's path leading
+    up to an alert or a given moment.
+    """
+    _require_feature("nl_search")
+    before_ts = before.strip() or datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0).isoformat()
+    trail = EventGraph().trace(global_id=global_id, before=before_ts, window_seconds=window_seconds)
+    record_audit(user["username"], user["role"], "investigate_trace",
+                 target=f"global_id={global_id}", details=f"{len(trail)} sightings",
+                 ip=_client_ip(http_request))
+    return {"global_id": global_id, "before": before_ts, "window_seconds": window_seconds,
+            "count": len(trail), "trail": trail}
+
+
+@app.get("/api/investigate/cascades", dependencies=[Depends(require_roles("principal"))])
+def investigate_cascades(alert_id: int, max_hops: int = 2, window_seconds: float = 600,
+                          http_request: Request = None,
+                          user: dict = Depends(require_roles("principal"))):
+    """
+    Other alerts within `max_hops` camera-hops (via the camera adjacency
+    topology) and `window_seconds` of `alert_id` - surfaces whether an alert
+    is an isolated event or part of a spreading incident.
+    """
+    _require_feature("nl_search")
+    cascades = EventGraph().cascades(alert_id=alert_id, max_hops=max_hops, window_seconds=window_seconds)
+    record_audit(user["username"], user["role"], "investigate_cascades",
+                 target=f"alert_id={alert_id}", details=f"{len(cascades)} linked alerts",
+                 ip=_client_ip(http_request))
+    return {"alert_id": alert_id, "max_hops": max_hops, "window_seconds": window_seconds,
+            "count": len(cascades), "cascades": cascades}
+
+
+@app.get("/api/investigate/recurring-actors", dependencies=[Depends(require_roles("principal"))])
+def investigate_recurring_actors(min_alerts: int = 2, min_span_seconds: float = 86400,
+                                  http_request: Request = None,
+                                  user: dict = Depends(require_roles("principal"))):
+    """
+    Persons linked to >= min_alerts alerts spanning >= min_span_seconds,
+    sorted by span - flags repeat offenders / recurring behavioral patterns
+    rather than a single burst of alerts.
+    """
+    _require_feature("nl_search")
+    actors = EventGraph().recurring_actors(min_alerts=min_alerts, min_span_seconds=min_span_seconds)
+    record_audit(user["username"], user["role"], "investigate_recurring_actors",
+                 target="-", details=f"{len(actors)} recurring actors found",
+                 ip=_client_ip(http_request))
+    return {"min_alerts": min_alerts, "min_span_seconds": min_span_seconds,
+            "count": len(actors), "actors": actors}
 
 
 # ---------------------------------------------------------------------------

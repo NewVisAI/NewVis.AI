@@ -120,6 +120,18 @@ def use_substream() -> bool:
     return bool(_load().get("use_substream", False))
 
 
+def analytics_full_res() -> bool:
+    """When true AND use_substream is on, the live tile keeps the fast SUB-stream but
+    ANALYTICS decodes the full-res MAIN stream in a second capture (split decode). This
+    gives OSNet sharp person crops so one person keeps a single global id across track
+    breaks — low-res sub-stream crops score near the re-ID threshold and fragment one
+    person into GID 1/2/3. Costs a second decode (CPU); off by default, opt-in per node."""
+    v = os.environ.get("ANALYTICS_FULL_RES")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("analytics_full_res", False))
+
+
 def to_substream_url(source, explicit: Optional[str] = None) -> str:
     """Derive the low-res sub-stream URL from a camera's main RTSP source.
 
@@ -164,6 +176,13 @@ def ffmpeg_capture_options() -> str:
     """OPENCV_FFMPEG_CAPTURE_OPTIONS string. Always forces TCP transport + a finite
     read timeout; appends an ``hwaccel`` when decode_backend() selects a hardware
     decoder. Set before the first cv2.VideoCapture; an explicit env override wins."""
+    # rtsp_transport;tcp + a finite stimeout -> a stalled camera can never block a
+    # decode thread. Do NOT add fflags;nobuffer / flags;low_delay here: many camera
+    # SUB-streams are HEVC/H.265 with reference frames, and those flags discard the
+    # refs the decoder needs — measured on the Adiva sub-stream it HALVED the frame
+    # rate (23 -> 9.5 fps) and flooded "Error constructing the frame RPS". Low
+    # latency comes from decoding the light sub-stream (use_substream), not from
+    # starving the decoder.
     base = "rtsp_transport;tcp|stimeout;5000000"
     token = _HWACCEL_TOKEN.get(decode_backend())
     return f"{base}|hwaccel;{token}" if token else base
@@ -276,6 +295,55 @@ def pose_verify_thresh() -> float:
             pass
     cfg = _load().get("pose_verify_thresh")
     return float(cfg) if isinstance(cfg, (int, float)) else 0.5
+
+
+# --- Heuristic altercation/anomaly detector (anomaly_detector.py) tunables ------------- #
+def anomaly_detection() -> bool:
+    """Master switch for the cheap motion-and-proximity altercation heuristic. Default ON.
+    It is not a trained fight classifier; disable per node if a deployment doesn't want it."""
+    v = os.environ.get("ANOMALY_DETECTION")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("anomaly_detection", True))
+
+
+def _anomaly_float(env_var: str, json_key: str, default: float) -> float:
+    override = os.environ.get(env_var)
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get(json_key)
+    return float(cfg) if isinstance(cfg, (int, float)) else default
+
+
+def anomaly_rel_motion_thresh() -> float:
+    """Normalized RELATIVE motion between two people (body-heights/sec) required to count as a
+    scuffle — they must move fast *against each other*, not in unison. Higher = fewer alerts."""
+    return _anomaly_float("ANOMALY_REL_MOTION", "anomaly_rel_motion_thresh", 1.8)
+
+
+def anomaly_move_floor() -> float:
+    """Minimum normalized speed (body-heights/sec) EACH person must show. Excludes the
+    one-person-moving-past-a-still-person false positive."""
+    return _anomaly_float("ANOMALY_MOVE_FLOOR", "anomaly_move_floor", 0.4)
+
+
+def anomaly_proximity_factor() -> float:
+    """Two centres within this many average body-WIDTHS count as 'close'."""
+    return _anomaly_float("ANOMALY_PROXIMITY", "anomaly_proximity_factor", 1.6)
+
+
+def anomaly_streak() -> int:
+    """Consecutive close+engaged checks required before firing (sustained proximity — a brief
+    path-crossing never reaches it). Higher = fewer alerts."""
+    return int(_anomaly_float("ANOMALY_STREAK", "anomaly_streak", 4))
+
+
+def anomaly_cooldown_s() -> float:
+    """Minimum seconds between alerts for the same pair."""
+    return _anomaly_float("ANOMALY_COOLDOWN_S", "anomaly_cooldown_s", 8.0)
 
 
 def motion_window_s() -> float:

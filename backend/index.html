@@ -1223,8 +1223,21 @@ $('grid-stop').onclick = stopCameraGrid;
    VIDEO ANALYTICS — upload · playback · polygon zones
 ===================================================================== */
 LOADERS.analytics = function () {
-  if (State.role === 'principal' && !$('video-shell').style.display.includes('block')) showAnalyticsLiveFeed();
   loadAnalyticsEvents();
+  // Auto-show the live feed the moment the tab opens — the user should never have
+  // to press "Run live analytics" just to see the camera. Starting the worker is
+  // what fills the feed (the reader thread owns the RTSP decode); analytics runs
+  // decoupled in the background, so the live view stays fast regardless.
+  const sel = $('ana-cam-select');
+  const camId = (sel && parseInt(sel.value, 10)) || (State.cameras[0] && State.cameras[0].id);
+  if (camId == null) return;
+  if (AnalyticsLive.camId != null) {
+    showAnalyticsLiveFeed(AnalyticsLive.camId);      // already running — just show it
+  } else if (State.role === 'principal') {
+    showAnalyticsLiveFeed(camId);                    // view-only role: show feed, don't start
+  } else {
+    startLiveAnalytics(camId);                        // start reader (fast feed) + bg analytics
+  }
 };
 
 function showAnalyticsLiveFeed(camId) {
@@ -1290,7 +1303,7 @@ async function refreshAnalyticsStatus() {
 async function startLiveAnalytics(camId) {
   try {
     setAnalyticsBar('wait', 'Starting analytics…');
-    await api(`/api/cameras/${camId}/analytics/start?fps=3`, { method: 'POST' });
+    await api(`/api/cameras/${camId}/analytics/start?fps=8`, { method: 'POST' });  // higher rate = fewer track breaks = fewer duplicate global IDs
     AnalyticsLive.camId = camId;
     showAnalyticsLiveFeed(camId);               // raw, fast feed
     $('ana-analytics-toggle').innerText = '⏹ Stop analytics';
