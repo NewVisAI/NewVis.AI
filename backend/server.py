@@ -16,7 +16,8 @@ for _stream in (sys.stdout, sys.stderr):
 from typing import List, Set, Optional, Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, BackgroundTasks, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+import torch
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -30,6 +31,8 @@ import camera_registry
 import camera_stream
 import clip_service
 import periodic_report
+import live_analytics
+import inference_config
 from audit_log import init_audit_db, record_audit, get_audit_log, clear_audit_log
 from backend.auth import (
     ROLES,
@@ -1482,3 +1485,64 @@ def clear_audit(http_request: Request = None, user: dict = Depends(current_user)
     record_audit(user["username"], user["role"], "clear_audit", target="audit_log",
                  details=f"purged {removed} entries", ip=_client_ip(http_request))
     return {"status": "cleared", "removed": removed}
+
+
+# ---------------------------------------------------------------------------
+# Telemetry & Executive Analytics Export
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports/analytics/export")
+def export_analytics_report(user: dict = Depends(current_user)):
+    """Export executive security analytics and performance telemetry summary."""
+    cameras = camera_registry.list_cameras()
+    total_cameras = len(cameras)
+    active_workers = live_analytics.status()
+    
+    report_data = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "platform": "Sentinel 2.0 AI Surveillance",
+        "generated_by": user["username"],
+        "hardware": {
+            "device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU",
+            "cuda_available": torch.cuda.is_available(),
+            "vram_allocated_mb": round(torch.cuda.memory_allocated(0) / (1024 * 1024), 2) if torch.cuda.is_available() else 0,
+        },
+        "system_summary": {
+            "total_cameras": total_cameras,
+            "active_analytics_workers": len(active_workers),
+            "optimization_levers": {
+                "cross_camera_batching": True,
+                "async_pipelining": True,
+                "deferred_reid": inference_config.reid_deferred(),
+                "use_substream": inference_config.use_substream(),
+            }
+        },
+        "cameras": [
+            {
+                "id": c.get("id"),
+                "name": c.get("name"),
+                "location": c.get("location"),
+                "status": active_workers.get(c.get("id"), {}).get("status", "idle")
+            } for c in cameras
+        ]
+    }
+    return JSONResponse(
+        content=report_data,
+        headers={"Content-Disposition": "attachment; filename=sentinel_analytics_report.json"}
+    )
+
+
+@app.get("/api/telemetry")
+def telemetry_endpoint(user: dict = Depends(current_user)):
+    """Live hardware & stream telemetry for the UI drawer."""
+    gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
+    vram_mb = round(torch.cuda.memory_allocated(0) / (1024 * 1024), 1) if torch.cuda.is_available() else 0
+    workers = live_analytics.status()
+    return {
+        "gpu_name": gpu_name,
+        "cuda_active": torch.cuda.is_available(),
+        "vram_mb": vram_mb,
+        "active_workers": len(workers),
+        "workers_snapshot": workers,
+    }
+

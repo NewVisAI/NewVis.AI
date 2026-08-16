@@ -419,6 +419,11 @@ pre.report { font-family: var(--mono); font-size: 12px; line-height: 1.65; color
       <span class="crumb" id="page-crumb"></span>
       <div class="ws-pill" id="ws-pill"><span class="ws-dot"></span><span id="ws-text">Connecting…</span></div>
       <div class="lic-pill" id="lic-pill" style="display:none;"></div>
+      <button class="btn sm" id="btn-export-report" style="margin-left: auto; gap: 6px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3);">📥 Export Report</button>
+      <div class="telemetry-pill" id="telemetry-pill" style="display:flex; align-items:center; gap:8px; background: rgba(16, 23, 40, 0.7); border:1px solid rgba(255, 255, 255, 0.1); padding:5px 14px; border-radius:20px; font-size:12px; backdrop-filter: blur(12px);" title="Live GPU Telemetry">
+        <span style="color:var(--accent-2); font-weight:700;">GPU</span>
+        <span id="telemetry-vram" style="font-family:var(--mono);">0.0 MB</span>
+      </div>
     </div>
 
     <div class="content">
@@ -2438,6 +2443,39 @@ window.addEventListener('hashchange', () => {
   if (want && want !== State.view && $('app').classList.contains('on')) navigate(want);
 });
 
+async function updateTelemetry() {
+  if (!State.token) return;
+  try {
+    const d = await api('/api/telemetry');
+    const tv = $('telemetry-vram');
+    if (tv) {
+      tv.innerText = `${d.vram_mb || 0.0} MB (${d.gpu_name || 'GPU'})`;
+    }
+  } catch (e) {}
+}
+setInterval(updateTelemetry, 5000);
+
+const btnExp = $('btn-export-report');
+if (btnExp) {
+  btnExp.onclick = async () => {
+    try {
+      const res = await fetch(`/api/reports/analytics/export`, { headers: { 'Authorization': authHeader() } });
+      if (!res.ok) throw new Error('Report export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sentinel_analytics_report.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast('Report Exported', 'Downloaded sentinel_analytics_report.json', 'ok');
+    } catch (e) {
+      toast('Export Error', e.message, 'err');
+    }
+  };
+}
+
 (async function boot() {
   if (!State.token) { $('login-screen').style.display = 'flex'; return; }
   try {
@@ -2448,6 +2486,7 @@ window.addEventListener('hashchange', () => {
     localStorage.setItem('sentinel_user', me.username);
     localStorage.setItem('sentinel_role', me.role);
     enterApp();
+    updateTelemetry();
   } catch (e) {
     doLogout(false);
   }
