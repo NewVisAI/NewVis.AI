@@ -71,4 +71,36 @@ class HumanDetector:
                         cls_id
                     ))
 
-        return detections
+        return detections
+
+    def detect_batch(self, frames):
+        """Batched inference across multiple camera frames simultaneously.
+        Returns a list of detection lists: [[(x1,y1,x2,y2,conf,cls), ...], ...]
+        """
+        if not frames:
+            return []
+
+        results = self.model(frames, device=self.device, verbose=False)
+        batch_detections = []
+
+        for result in results:
+            frame_dets = []
+            boxes = result.boxes
+            for box in boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                conf = float(box.conf[0])
+                cls_id = int(box.cls[0])
+
+                if cls_id in self.TARGET_CLASSES and conf > 0.45:
+                    frame_dets.append((
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        conf,
+                        cls_id
+                    ))
+            batch_detections.append(frame_dets)
+
+        return batch_detections
+

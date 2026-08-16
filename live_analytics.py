@@ -77,6 +77,71 @@ def _frame_change_ratio(cur_small, ref_small, pixel_tol: int = _DELTA_PIXEL_TOL)
     return float((cv2.absdiff(cur_small, ref_small) > pixel_tol).mean())
 
 
+class BatchInferenceManager:
+    """Cross-camera batching manager (lever #2).
+    Collects frames across active camera threads in a 10-15ms window and runs
+    batched YOLO detection (`model.detect_batch([f1, f2, ...])`) on GPU.
+    """
+    def __init__(self, timeout: float = 0.015, max_batch: int = 8):
+        self.timeout = timeout
+        self.max_batch = max_batch
+        self._queue = queue.Queue()
+        self._lock = threading.Lock()
+        self._batch_thread = None
+
+    def submit(self, detector, frame) -> list:
+        if not hasattr(detector, "detect_batch"):
+            return detector.detect(frame)
+            
+        event = threading.Event()
+        result_container = []
+        self._queue.put((frame, event, result_container))
+        
+        with self._lock:
+            if self._batch_thread is None or not self._batch_thread.is_alive():
+                self._batch_thread = threading.Thread(
+                    target=self._batch_loop,
+                    args=(detector,),
+                    name="batch-inference-loop",
+                    daemon=True
+                )
+                self._batch_thread.start()
+
+        event.wait(timeout=2.0)
+        return result_container[0] if result_container else []
+
+    def _batch_loop(self, detector):
+        while not self._queue.empty():
+            batch_items = []
+            deadline = time.time() + self.timeout
+            while len(batch_items) < self.max_batch:
+                rem = deadline - time.time()
+                if rem <= 0:
+                    break
+                try:
+                    item = self._queue.get(timeout=max(0.001, rem))
+                    batch_items.append(item)
+                except queue.Empty:
+                    break
+
+            if not batch_items:
+                continue
+
+            frames = [item[0] for item in batch_items]
+            try:
+                batch_results = detector.detect_batch(frames)
+            except Exception as exc:
+                print(f"[BatchInferenceManager] Batch detect error: {exc}", flush=True)
+                batch_results = [detector.detect(f) for f in frames]
+
+            for item, dets in zip(batch_items, batch_results):
+                _, event, container = item
+                container.append(dets)
+                event.set()
+
+_batch_manager = BatchInferenceManager()
+
+
 def _get_models():
     """(detector, identity_manager, incident_manager), loaded once, shared."""
     global _models
@@ -474,9 +539,9 @@ class _LiveWorker:
                         proc = cv2.resize(proc, (PROCESS_WIDTH, int(proc.shape[0] * s)))
                     camera_state.cap = FrameInjector(proc)
                     camera_state.finished = False
-                    # draw=False: this tile displays the reader thread's raw frame,
-                    # so annotating the analytics frame here would be wasted CPU (lever #11).
-                    _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "multi", draw=False)
+                    # Batched GPU inference (lever #2) & async pipelining (lever #10)
+                    proc_dets = _batch_manager.submit(detector, proc)
+                    _process_camera_frame(camera_state, detector, identity_manager, incident_manager, "multi", draw=False, pre_detections=proc_dets)
                     self.analytics_frames += 1
                     if self.gate == "active":
                         self.active_frames += 1

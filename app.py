@@ -384,6 +384,7 @@ def _process_camera_frame(
     incident_manager: IncidentManager,
     session_mode: str,
     draw: bool = True,
+    pre_detections=None,
 ) -> None:
     # ``draw`` gates only the cosmetic annotation (trails/boxes/labels + zone
     # overlays) that gets written onto ``camera_state.display_frame``. Detection,
@@ -450,7 +451,10 @@ def _process_camera_frame(
     if is_static and camera_state.last_tracked_objects:
         tracked_objects = camera_state.last_tracked_objects
     else:
-        detections = detector.detect(frame)
+        if pre_detections is not None:
+            detections = pre_detections
+        else:
+            detections = detector.detect(frame)
         tracked_objects = camera_state.tracker.update(frame, detections)
         camera_state.last_tracked_objects = tracked_objects
 
