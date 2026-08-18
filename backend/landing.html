@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NewVis AI — Turn your existing cameras into a 24/7 safety brain</title>
+<meta name="description" content="NewVis AI turns the CCTV cameras you already have into a real-time safety-intelligence system. Detect falls, intrusions, loitering and more — across every camera, on affordable hardware." />
+<style>
+  :root{
+    --bg:#05070f;
+    --bg-2:#080c18;
+    --ink:#e8edf7;
+    --ink-soft:#aab6cc;
+    --ink-mute:#6f7d96;
+    --line:rgba(150,170,205,.14);
+    --line-strong:rgba(150,170,205,.28);
+    --glass:rgba(255,255,255,.045);
+    --glass-2:rgba(255,255,255,.03);
+    --cyan:#37d6f0;
+    --cyan-deep:#1aa9df;
+    --violet:#8b7bff;
+    --violet-deep:#6d5cf0;
+    --safe:#3ddc97;
+    --amber:#f7b955;
+    --red:#f76a6a;
+    --shadow:0 30px 80px -30px rgba(0,0,0,.8);
+    --r:18px;
+    --maxw:1180px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{line-height:1.12;letter-spacing:-.02em;margin:0;font-weight:700}
+  p{margin:0}
+  ::selection{background:var(--cyan);color:#04121a}
+
+  /* ---------- ambient background ---------- */
+  .bg-field{position:fixed;inset:0;z-index:-2;overflow:hidden;background:
+    radial-gradient(1100px 700px at 78% -8%, rgba(109,92,240,.20), transparent 60%),
+    radial-gradient(900px 600px at 8% 8%, rgba(26,169,223,.16), transparent 55%),
+    linear-gradient(180deg,var(--bg),var(--bg-2) 60%,var(--bg));}
+  .bg-grid{position:fixed;inset:-2px;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:64px 64px;
+    -webkit-mask-image:radial-gradient(circle at 50% 30%,#000 0%,transparent 78%);
+    mask-image:radial-gradient(circle at 50% 30%,#000 0%,transparent 78%);}
+  .scanline{position:fixed;left:0;right:0;height:220px;z-index:-1;pointer-events:none;
+    background:linear-gradient(180deg,transparent,rgba(55,214,240,.06) 45%,transparent);
+    animation:sweep 8s linear infinite;}
+  @keyframes sweep{0%{transform:translateY(-30vh)}100%{transform:translateY(120vh)}}
+
+  /* ---------- layout ---------- */
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  section{position:relative;padding:96px 0}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);
+    padding:6px 12px;border:1px solid var(--line-strong);border-radius:999px;background:var(--glass-2)}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+  .lead{color:var(--ink-soft);font-size:clamp(15px,1.6vw,18px);max-width:64ch}
+  .center{text-align:center;margin:0 auto}
+
+  /* ---------- glass card ---------- */
+  .glass{background:var(--glass);border:1px solid var(--line);border-radius:var(--r);
+    backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+
+  /* ---------- buttons ---------- */
+  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15px;
+    padding:13px 22px;border-radius:12px;cursor:pointer;border:1px solid transparent;
+    transition:transform .18s ease,box-shadow .25s ease,background .25s ease;white-space:nowrap}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{color:#04121a;background:linear-gradient(135deg,var(--cyan),var(--violet));
+    box-shadow:0 12px 30px -10px rgba(55,214,240,.6)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 18px 44px -12px rgba(139,123,255,.7)}
+  .btn-ghost{color:var(--ink);background:var(--glass);border:1px solid var(--line-strong)}
+  .btn-ghost:hover{border-color:var(--cyan);color:#fff}
+  .btn svg{width:17px;height:17px}
+
+  /* ---------- nav ---------- */
+  header.nav{position:sticky;top:0;z-index:50;transition:background .3s,border-color .3s}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;gap:18px;
+    padding:14px 24px;max-width:var(--maxw);margin:0 auto}
+  header.nav.stuck{background:rgba(6,9,17,.72);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:-.01em;font-size:18px}
+  .brand .mark{width:30px;height:30px;flex:none}
+  .brand small{display:block;font-size:10.5px;letter-spacing:.22em;font-weight:600;color:var(--ink-mute);text-transform:uppercase}
+  .nav-links{display:flex;gap:26px;align-items:center}
+  .nav-links a{font-size:14.5px;color:var(--ink-soft);font-weight:500;transition:color .2s}
+  .nav-links a:hover{color:#fff}
+  .nav-cta{display:flex;align-items:center;gap:12px}
+  .burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;padding:6px}
+  @media(max-width:900px){.nav-links{display:none}.burger{display:block}}
+
+  /* ---------- hero ---------- */
+  .hero{padding-top:70px;padding-bottom:60px}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+  @media(max-width:960px){.hero-grid{grid-template-columns:1fr;gap:38px}}
+  .hero h1{font-size:clamp(34px,5.2vw,58px);margin:20px 0 18px}
+  .hero h1 .g{background:linear-gradient(120deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero-cta{display:flex;gap:14px;flex-wrap:wrap;margin-top:28px}
+  .trust{display:flex;gap:22px;flex-wrap:wrap;margin-top:30px;color:var(--ink-mute);font-size:13px}
+  .trust span{display:inline-flex;align-items:center;gap:7px}
+  .trust svg{width:15px;height:15px;color:var(--safe)}
+
+  /* ---------- camera mock ---------- */
+  .frame{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line-strong);
+    background:linear-gradient(180deg,#0a0f1d,#070b15);box-shadow:var(--shadow)}
+  .frame-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.02);font-size:12px;color:var(--ink-mute)}
+  .frame-bar .d{width:9px;height:9px;border-radius:50%}
+  .live-badge{margin-left:auto;display:inline-flex;align-items:center;gap:6px;color:var(--red);font-weight:600;letter-spacing:.06em}
+  .live-badge .pulse{width:7px;height:7px;border-radius:50%;background:var(--red);animation:blink 1.4s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  .frame-shot{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}
+  .mock{position:relative;aspect-ratio:16/10;background:
+    radial-gradient(120% 120% at 30% 10%,#12203a,#0a1120 60%);overflow:hidden}
+  .mock svg{position:absolute;inset:0;width:100%;height:100%}
+  .radar{position:absolute;right:14px;bottom:14px;width:64px;height:64px;border-radius:50%;
+    border:1px solid rgba(55,214,240,.4);background:radial-gradient(circle,rgba(55,214,240,.08),transparent 70%)}
+  .radar::after{content:"";position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 0deg,rgba(55,214,240,.55),transparent 70%);animation:spin 3s linear infinite;
+    -webkit-mask:radial-gradient(circle,transparent 30%,#000 31%);mask:radial-gradient(circle,transparent 30%,#000 31%)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .chip-alert{position:absolute;left:14px;top:14px;display:flex;flex-direction:column;gap:8px}
+  .achip{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:10px;font-size:12.5px;font-weight:600;
+    background:rgba(8,12,22,.72);border:1px solid var(--line-strong);backdrop-filter:blur(6px);
+    transform:translateX(-120%);opacity:0;animation:slidein .6s forwards}
+  .achip .i{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none}
+  .achip:nth-child(1){animation-delay:.6s}
+  .achip:nth-child(2){animation-delay:1.5s}
+  .achip:nth-child(3){animation-delay:2.4s}
+  @keyframes slidein{to{transform:none;opacity:1}}
+  .floaty{position:absolute;padding:7px 11px;border-radius:9px;font-size:11px;font-weight:600;
+    background:rgba(8,12,22,.8);border:1px solid var(--line-strong);color:var(--ink-soft);backdrop-filter:blur(6px)}
+
+  /* ---------- stat ribbon ---------- */
+  .ribbon{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:56px}
+  @media(max-width:760px){.ribbon{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--bg-2);padding:26px 22px;text-align:center}
+  .stat b{display:block;font-size:clamp(26px,3.4vw,36px);font-weight:800;letter-spacing:-.03em;
+    background:linear-gradient(120deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat span{font-size:13px;color:var(--ink-mute)}
+
+  /* ---------- section heads ---------- */
+  .head{max-width:720px;margin-bottom:52px}
+  .head.center{margin-left:auto;margin-right:auto}
+  .head h2{font-size:clamp(27px,3.6vw,42px);margin:16px 0 14px}
+
+  /* ---------- problem split ---------- */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:820px){.split{grid-template-columns:1fr}}
+  .prob{padding:30px}
+  .prob h3{font-size:20px;margin-bottom:10px}
+  .prob.bad{border-color:rgba(247,106,106,.28)}
+  .prob.good{border-color:rgba(61,220,151,.30)}
+  .prob ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:11px}
+  .prob li{display:flex;gap:11px;color:var(--ink-soft);font-size:14.5px}
+  .prob li svg{width:18px;height:18px;flex:none;margin-top:2px}
+
+  /* ---------- benefit tiles ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  @media(max-width:980px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.tiles{grid-template-columns:1fr}}
+  .tile{padding:26px;transition:transform .2s,border-color .2s}
+  .tile:hover{transform:translateY(-4px);border-color:var(--line-strong)}
+  .tile .ico{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;margin-bottom:16px;
+    background:linear-gradient(135deg,rgba(55,214,240,.16),rgba(139,123,255,.16));border:1px solid var(--line-strong)}
+  .tile .ico svg{width:23px;height:23px;color:var(--cyan)}
+  .tile h3{font-size:17px;margin-bottom:8px}
+  .tile p{font-size:14px;color:var(--ink-soft)}
+
+  /* ---------- use cases ---------- */
+  .uc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:920px){.uc-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.uc-grid{grid-template-columns:1fr}}
+  .uc{padding:26px;position:relative;overflow:hidden;transition:transform .2s,border-color .2s}
+  .uc:hover{transform:translateY(-4px);border-color:var(--cyan)}
+  .uc.flag{grid-column:span 3;display:grid;grid-template-columns:1.2fr 1fr;gap:28px;align-items:center;
+    border-color:rgba(55,214,240,.35);background:linear-gradient(120deg,rgba(55,214,240,.07),var(--glass))}
+  @media(max-width:920px){.uc.flag{grid-column:span 2}}
+  @media(max-width:600px){.uc.flag{grid-column:span 1;grid-template-columns:1fr}}
+  .uc h3{font-size:18px;display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .uc p{font-size:14px;color:var(--ink-soft)}
+  .uc .uico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;flex:none;
+    background:var(--glass-2);border:1px solid var(--line-strong)}
+  .uc .uico svg{width:21px;height:21px;color:var(--cyan)}
+  .uc ul{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+  .uc li{display:flex;gap:9px;font-size:13.5px;color:var(--ink-soft)}
+  .uc li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--cyan);margin-top:8px;flex:none}
+  .pill-flag{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#04121a;
+    background:var(--cyan);padding:3px 9px;border-radius:999px}
+
+  /* ---------- features ---------- */
+  .feat-groups{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  @media(max-width:820px){.feat-groups{grid-template-columns:1fr}}
+  .fgroup{padding:26px}
+  .fgroup h3{font-size:16px;color:var(--ink);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  .fgroup h3 .gi{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,rgba(55,214,240,.16),rgba(139,123,255,.16));border:1px solid var(--line-strong)}
+  .fgroup h3 .gi svg{width:18px;height:18px;color:var(--cyan)}
+  .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+  .frow span{font-size:14px;color:var(--ink-soft)}
+  .badge{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;flex:none}
+  .badge.prod{color:var(--safe);background:rgba(61,220,151,.12);border:1px solid rgba(61,220,151,.3)}
+  .badge.beta{color:var(--amber);background:rgba(247,185,85,.12);border:1px solid rgba(247,185,85,.3)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:26px;font-size:13px;color:var(--ink-mute)}
+  .legend span{display:inline-flex;align-items:center;gap:8px}
+
+  /* ---------- how it works ---------- */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s}
+  @media(max-width:820px){.steps{grid-template-columns:1fr}}
+  .step{padding:28px;position:relative}
+  .step .n{font-size:13px;font-weight:700;color:var(--cyan);letter-spacing:.1em}
+  .step h3{font-size:18px;margin:12px 0 10px}
+  .step p{font-size:14px;color:var(--ink-soft)}
+  .step .line{position:absolute;top:44px;right:-9px;width:18px;height:1px;background:var(--line-strong)}
+  @media(max-width:820px){.step .line{display:none}}
+
+  /* ---------- why (differentiators) ---------- */
+  .why{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.why{grid-template-columns:1fr}}
+  .wcard{padding:24px}
+  .wcard .ico{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;margin-bottom:14px;
+    background:var(--glass-2);border:1px solid var(--line-strong)}
+  .wcard .ico svg{width:22px;height:22px;color:var(--violet)}
+  .wcard h3{font-size:16px;margin-bottom:8px}
+  .wcard p{font-size:13.5px;color:var(--ink-soft)}
+
+  /* ---------- ROI ---------- */
+  .roi{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:stretch}
+  @media(max-width:860px){.roi{grid-template-columns:1fr}}
+  .roi-main{padding:38px}
+  .roi-main .big{font-size:clamp(46px,7vw,76px);font-weight:800;letter-spacing:-.04em;line-height:1;
+    background:linear-gradient(120deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .roi-list{display:grid;gap:12px;margin-top:22px}
+  .roi-list div{display:flex;justify-content:space-between;gap:14px;padding:13px 16px;border-radius:12px;
+    background:var(--glass-2);border:1px solid var(--line);font-size:14px}
+  .roi-list b{color:#fff}
+  .roi-side{padding:30px;display:flex;flex-direction:column;justify-content:center;gap:14px}
+  .roi-side .metric{display:flex;align-items:baseline;gap:12px}
+  .roi-side .metric b{font-size:30px;font-weight:800;color:var(--cyan);letter-spacing:-.02em;min-width:92px}
+  .roi-side .metric span{font-size:13.5px;color:var(--ink-soft)}
+  .foot-note{font-size:12px;color:var(--ink-mute);margin-top:8px}
+
+  /* ---------- CTA band ---------- */
+  .band{padding:64px;text-align:center;position:relative;overflow:hidden;
+    background:linear-gradient(120deg,rgba(55,214,240,.10),rgba(139,123,255,.12))}
+  .band h2{font-size:clamp(26px,3.6vw,40px);margin-bottom:14px}
+  .band p{color:var(--ink-soft);max-width:56ch;margin:0 auto 26px}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line);padding:46px 0 40px;color:var(--ink-mute)}
+  .foot-grid{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:flex-start}
+  footer a{color:var(--ink-soft)}footer a:hover{color:var(--cyan)}
+  .foot-note-box{max-width:60ch;font-size:12.5px;line-height:1.7}
+  .foot-legal{margin-top:30px;padding-top:22px;border-top:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+
+  /* ---------- reveal ---------- */
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  /* ---------- modal ---------- */
+  .modal-scrim{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:22px;
+    background:rgba(3,5,11,.72);backdrop-filter:blur(8px);opacity:0;transition:opacity .3s}
+  .modal-scrim.open{display:flex;opacity:1}
+  .modal{width:100%;max-width:520px;padding:34px;position:relative;transform:translateY(18px) scale(.98);
+    transition:transform .35s cubic-bezier(.2,.9,.2,1);max-height:92vh;overflow:auto}
+  .modal-scrim.open .modal{transform:none}
+  .modal .close{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);
+    background:var(--glass-2);color:var(--ink-soft);cursor:pointer;display:grid;place-items:center}
+  .modal .close:hover{color:#fff;border-color:var(--line-strong)}
+  .modal h3{font-size:23px;margin-bottom:8px}
+  .modal .sub{color:var(--ink-soft);font-size:14px;margin-bottom:22px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
+  .field label .req{color:var(--cyan)}
+  .field input,.field select,.field textarea{width:100%;padding:12px 14px;border-radius:11px;font-size:14.5px;
+    background:rgba(8,12,22,.6);border:1px solid var(--line-strong);color:var(--ink);font-family:inherit;transition:border-color .2s}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--cyan)}
+  .field textarea{resize:vertical;min-height:72px}
+  .field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2337d6f0' stroke-width='2'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:460px){.two{grid-template-columns:1fr}}
+  .hp{position:absolute;left:-9999px;opacity:0;height:0;width:0;overflow:hidden}
+  .err{color:var(--red);font-size:12.5px;margin-top:8px;display:none}
+  .modal .btn-primary{width:100%;justify-content:center;margin-top:6px}
+  .modal-foot{font-size:11.5px;color:var(--ink-mute);margin-top:14px;text-align:center}
+  .success{text-align:center;padding:14px 0}
+  .success .check{width:64px;height:64px;border-radius:50%;margin:0 auto 18px;display:grid;place-items:center;
+    background:rgba(61,220,151,.14);border:1px solid rgba(61,220,151,.4)}
+  .success .check svg{width:30px;height:30px;color:var(--safe)}
+  .success h3{margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="bg-field"></div>
+<div class="bg-grid"></div>
+<div class="scanline"></div>
+
+<!-- ================= NAV ================= -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#37d6f0"/><stop offset="1" stop-color="#8b7bff"/></linearGradient></defs>
+        <path d="M16 2l11 4v8c0 7-4.7 12.4-11 16C9.7 26.4 5 21 5 14V6l11-4z" stroke="url(#mg)" stroke-width="1.6" fill="rgba(55,214,240,.06)"/>
+        <circle cx="16" cy="14" r="4.3" stroke="url(#mg)" stroke-width="1.6"/>
+        <circle cx="16" cy="14" r="1.5" fill="#37d6f0"/>
+      </svg>
+      <span>NewVis AI<small>Vision Redefined</small></span>
+    </a>
+    <nav class="nav-links">
+      <a href="#what">What it does</a>
+      <a href="#usecases">Use cases</a>
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#why">Why NewVis</a>
+      <a href="#roi">ROI</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-primary js-callback" data-src="nav">Request a callback</a>
+      <button class="burger" id="burger" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div id="top"></div>
+
+<!-- ================= HERO ================= -->
+<section class="hero wrap">
+  <div class="hero-grid">
+    <div class="reveal">
+      <span class="eyebrow"><span class="dot"></span>AI Video Analytics</span>
+      <h1>Any space. Every camera.<br><span class="g">One AI watching for what matters.</span></h1>
+      <p class="lead">NewVis turns the CCTV cameras you <em>already own</em> into a real-time safety brain — spotting a fall, an intruder, a fight or someone in a restricted zone the moment it happens, and putting the evidence one click away. On affordable hardware. No rip-and-replace.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary js-callback" data-src="hero">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+          Request a callback
+        </a>
+        <a class="btn btn-ghost" href="#what">See what it does</a>
+      </div>
+      <div class="trust">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Works with existing RTSP cameras</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Runs on-site — video stays private</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Proven on a 300-camera school</span>
+      </div>
+    </div>
+
+    <!-- camera mock / real screenshot slot -->
+    <div class="reveal">
+      <div class="frame">
+        <div class="frame-bar">
+          <span class="d" style="background:#f76a6a"></span>
+          <span class="d" style="background:#f7b955"></span>
+          <span class="d" style="background:#3ddc97"></span>
+          <span style="margin-left:8px">NewVis — Live Analytics · Camera 07</span>
+          <span class="live-badge"><span class="pulse"></span>LIVE</span>
+        </div>
+        <!-- To use a real dashboard screenshot: drop it at backend/static/marketing/dashboard-hero.png
+             (it auto-replaces the animated mock below). -->
+        <img class="frame-shot" id="heroShot" alt="NewVis dashboard" style="display:none"
+             src="/static/marketing/dashboard-hero.png" onerror="this.remove()"
+             onload="this.style.display='block';var m=document.getElementById('heroMock');if(m)m.style.display='none'">
+        <div class="mock" id="heroMock">
+          <svg viewBox="0 0 400 250" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="70" y="90" width="42" height="96" fill="none" stroke="#3ddc97" stroke-width="2" rx="3"/>
+            <rect x="200" y="70" width="46" height="110" fill="none" stroke="#37d6f0" stroke-width="2" rx="3"/>
+            <rect x="300" y="110" width="40" height="86" fill="none" stroke="#f7b955" stroke-width="2" rx="3">
+              <animate attributeName="stroke" values="#f7b955;#f76a6a;#f7b955" dur="1.6s" repeatCount="indefinite"/>
+            </rect>
+            <line x1="0" y1="200" x2="400" y2="188" stroke="rgba(55,214,240,.35)" stroke-dasharray="5 5"/>
+            <text x="72" y="84" fill="#3ddc97" font-size="9" font-family="monospace">ID·142 · walking</text>
+            <text x="202" y="64" fill="#37d6f0" font-size="9" font-family="monospace">ID·118 · tracked</text>
+            <text x="300" y="104" fill="#f7b955" font-size="9" font-family="monospace">ID·205 · loitering</text>
+          </svg>
+          <div class="radar"></div>
+          <div class="chip-alert">
+            <div class="achip"><span class="i" style="background:rgba(247,106,106,.18)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f76a6a" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+            </span>Restricted-zone entry · Gate B</div>
+            <div class="achip"><span class="i" style="background:rgba(247,185,85,.18)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f7b955" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>Loitering · 24s in Corridor 3</div>
+            <div class="achip"><span class="i" style="background:rgba(61,220,151,.18)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>Snapshot saved · clip ready</div>
+          </div>
+          <div class="floaty" style="right:14px;top:14px">Global ID matched across 3 cams</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- stat ribbon -->
+  <div class="ribbon reveal">
+    <div class="stat"><b>~24%</b><span>Lower 3-year cost of ownership</span></div>
+    <div class="stat"><b>~97%</b><span>Person-recall on low-bandwidth streams*</span></div>
+    <div class="stat"><b>300→6</b><span>Cameras run on ~6 affordable boxes</span></div>
+    <div class="stat"><b>24/7</b><span>Every camera, always watched</span></div>
+  </div>
+</section>
+
+<!-- ================= PROBLEM ================= -->
+<section class="wrap" id="what">
+  <div class="head center reveal">
+    <span class="eyebrow"><span class="dot"></span>The problem</span>
+    <h2>Hundreds of cameras. Nobody who can watch them all.</h2>
+    <p class="lead center">Most incidents are discovered <em>after</em> they happen, by scrubbing hours of footage. And putting live AI on every feed usually means a room full of GPU servers costing crores. NewVis changes both.</p>
+  </div>
+  <div class="split">
+    <div class="prob bad glass reveal">
+      <h3>Without NewVis</h3>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#f76a6a" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>A wall of screens no single guard can truly monitor.</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#f76a6a" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>Falls, fights and intrusions found hours later — or never.</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#f76a6a" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>Hunting through footage manually for one event.</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#f76a6a" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>"AI upgrades" that mean ripping out cameras and buying servers.</li>
+      </ul>
+    </div>
+    <div class="prob good glass reveal">
+      <h3>With NewVis</h3>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Every feed understood in real time — nothing goes unwatched.</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Staff get a plain-English alert the instant something happens.</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Every alert carries a snapshot and a one-click jump to the exact clip.</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Uses the cameras you already have, on affordable on-site hardware.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- benefit tiles -->
+  <div class="tiles" style="margin-top:56px">
+    <div class="tile glass reveal">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
+      <h3>Sees every feed</h3>
+      <p>Detects and tracks people across all your cameras at once — counting, following, understanding.</p>
+    </div>
+    <div class="tile glass reveal">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+      <h3>Alerts instantly</h3>
+      <p>The moment a rule is broken — intrusion, loitering, after-hours — the right person is notified.</p>
+    </div>
+    <div class="tile glass reveal">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+      <h3>Evidence in one click</h3>
+      <p>Each alert saves a snapshot and links straight to the exact moment in the recorded footage.</p>
+    </div>
+    <div class="tile glass reveal">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></div>
+      <h3>Follows across cameras</h3>
+      <p>Recognises the same person from camera to camera as a single anonymous ID — no faces, no names.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= USE CASES ================= -->
+<section class="wrap" id="usecases">
+  <div class="head reveal">
+    <span class="eyebrow"><span class="dot"></span>Built for any space</span>
+    <h2>One platform. Every kind of site.</h2>
+    <p class="lead">NewVis is space-agnostic — anywhere you have cameras, it adds a layer of understanding. It's currently proven in the most demanding environment there is: a live school campus.</p>
+  </div>
+  <div class="uc-grid">
+    <div class="uc flag glass reveal">
+      <div>
+        <h3><span class="uico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5"/></svg></span>
+          Schools &amp; campuses <span class="pill-flag">Flagship</span></h3>
+        <p>The launch deployment — a ~300-camera school. NewVis watches corridors, gates and grounds for the incidents that matter to a school, day and night.</p>
+      </div>
+      <ul>
+        <li>Restricted-zone &amp; after-hours intrusion alerts (with a holiday calendar)</li>
+        <li>Fall &amp; loitering awareness in corridors and stairwells <em>(Beta)</em></li>
+        <li>Headcount, footfall and busiest-hour reports per area</li>
+        <li>One-click evidence for any incident review</li>
+      </ul>
+    </div>
+
+    <div class="uc glass reveal">
+      <h3><span class="uico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5M4 9h16v11H4z"/><path d="M9 20v-6h6v6"/></svg></span>Malls &amp; retail</h3>
+      <p>Turn cameras into footfall analytics and after-hours security in one.</p>
+      <ul><li>Footfall counts &amp; heatmaps by zone</li><li>Loitering &amp; crowd awareness</li><li>After-hours intrusion alerts</li></ul>
+    </div>
+
+    <div class="uc glass reveal">
+      <h3><span class="uico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg></span>Parking lots</h3>
+      <p>Keep an eye on quiet lots and controlled entries around the clock.</p>
+      <ul><li>Line-crossing in/out counts</li><li>Restricted / after-hours entry alerts</li><li>Snapshot + clip on every event</li></ul>
+    </div>
+
+    <div class="uc glass reveal">
+      <h3><span class="uico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V8l6-4 6 4v13"/><path d="M10 21v-5h4v5"/></svg></span>Offices &amp; corporate</h3>
+      <p>Enforce access policy on sensitive areas without staring at screens.</p>
+      <ul><li>Restricted-zone access alerts</li><li>After-hours presence detection</li><li>Role-based access &amp; audit trail</li></ul>
+    </div>
+
+    <div class="uc glass reveal">
+      <h3><span class="uico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6"/></svg></span>Warehouses &amp; industrial</h3>
+      <p>Safety zones and headcount across large, sparsely-staffed floors.</p>
+      <ul><li>Keep-out safety-zone alerts</li><li>Headcount &amp; occupancy by area</li><li>Fall awareness in low-traffic zones <em>(Beta)</em></li></ul>
+    </div>
+
+    <div class="uc glass reveal" style="display:flex;flex-direction:column;justify-content:center;text-align:center;border-style:dashed">
+      <h3 style="justify-content:center">Somewhere else?</h3>
+      <p style="margin-bottom:16px">Hospitals, transit hubs, gated communities — if it has cameras, NewVis fits. Tell us your site and we'll map it out.</p>
+      <a class="btn btn-ghost js-callback" data-src="usecase" style="align-self:center">Discuss your site</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FEATURES ================= -->
+<section class="wrap" id="features">
+  <div class="head center reveal">
+    <span class="eyebrow"><span class="dot"></span>Capabilities</span>
+    <h2>Everything NewVis can do — labelled honestly.</h2>
+    <p class="lead center">We split features into <b style="color:var(--safe)">Production</b> (deterministic, dependable) and <b style="color:var(--amber)">Beta</b> (live, but accuracy still being measured on real footage). We'd rather tell you the truth than oversell.</p>
+  </div>
+  <div class="feat-groups">
+    <div class="fgroup glass reveal">
+      <h3><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>Detection &amp; tracking</h3>
+      <div class="frow"><span>Person detection &amp; live tracking</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Multi-camera live grid (RTSP)</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Fall detection</span><span class="badge beta">Beta</span></div>
+      <div class="frow"><span>Running / sudden-motion detection</span><span class="badge beta">Beta</span></div>
+      <div class="frow"><span>Fight / aggression awareness</span><span class="badge beta">Beta</span></div>
+    </div>
+    <div class="fgroup glass reveal">
+      <h3><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>Zones &amp; alerts</h3>
+      <div class="frow"><span>Draw zones + entry/exit logging</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Restricted-zone / intrusion alerts</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>After-hours + holiday-calendar alerts</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Dwell-time / loitering detection</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Line-crossing in/out counts</span><span class="badge prod">Production</span></div>
+    </div>
+    <div class="fgroup glass reveal">
+      <h3><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>Evidence &amp; reports</h3>
+      <div class="frow"><span>Notification inbox + snapshot evidence</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>One-click jump-to-footage clips</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Dwell / spatial heatmaps</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Headcount charts + periodic reports</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Plain-English AI activity summary</span><span class="badge prod">Production</span></div>
+    </div>
+    <div class="fgroup glass reveal">
+      <h3><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></span>Cross-camera &amp; intelligence</h3>
+      <div class="frow"><span>Role-based access + audit log</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Cryptographic per-feature licensing</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Cross-camera Re-ID (Global ID)</span><span class="badge beta">Beta</span></div>
+      <div class="frow"><span>Natural-language search of events</span><span class="badge beta">Beta</span></div>
+      <div class="frow"><span>Investigation graph &amp; risk scoring</span><span class="badge beta">Beta</span></div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="badge prod">Production</span> Deterministic &amp; dependable today.</span>
+    <span><span class="badge beta">Beta</span> Live, advisory, accuracy being validated on real footage.</span>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section class="wrap" id="how">
+  <div class="head center reveal">
+    <span class="eyebrow"><span class="dot"></span>How it works</span>
+    <h2>Live in three steps — no new cameras.</h2>
+  </div>
+  <div class="steps">
+    <div class="step glass reveal">
+      <div class="line"></div>
+      <div class="n">STEP 01</div>
+      <h3>Connect your cameras</h3>
+      <p>NewVis plugs into your existing RTSP CCTV feeds. Nothing gets ripped out; video stays on your own site.</p>
+    </div>
+    <div class="step glass reveal">
+      <div class="line"></div>
+      <div class="n">STEP 02</div>
+      <h3>NewVis understands them</h3>
+      <p>On-site AI watches every feed — detecting people, tracking movement, applying your zones and rules 24/7.</p>
+    </div>
+    <div class="step glass reveal">
+      <div class="n">STEP 03</div>
+      <h3>Staff get plain-English alerts</h3>
+      <p>The right person is notified the instant something matters — with a snapshot and a one-click jump to the clip.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WHY ================= -->
+<section class="wrap" id="why">
+  <div class="head reveal">
+    <span class="eyebrow"><span class="dot"></span>Why NewVis</span>
+    <h2>Where NewVis is different.</h2>
+  </div>
+  <div class="why">
+    <div class="wcard glass reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><h3>Uses cameras you already own</h3><p>Works with your existing CCTV over standard RTSP. No forklift upgrade, no vendor lock-in on hardware.</p></div>
+    <div class="wcard glass reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3v4M8 3v4M2 11h20"/></svg></div><h3>Affordable &amp; edge-first</h3><p>Runs on modest on-site boxes — even CPU or USB AI accelerators — with no per-camera cloud fees. Raw video never leaves the building.</p></div>
+    <div class="wcard glass reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg></div><h3>True cross-camera identity</h3><p>Follows one person across cameras and floors as a single ID — and respects a real camera map, so no impossible "teleport" matches.</p></div>
+    <div class="wcard glass reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3>Privacy-first by design</h3><p>People are tracked as anonymised IDs — no faces, no names — behind role-based access, licensing and an append-only audit log.</p></div>
+    <div class="wcard glass reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><h3>Plain-English, not raw logs</h3><p>Ask "show falls on camera 3" and read a written summary of activity — built for staff, not data engineers.</p></div>
+    <div class="wcard glass reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></div><h3>Cost-optimised, accuracy-preserving</h3><p>A stack of efficiency levers cuts compute without trading away detection — we don't ship anything that regresses accuracy.</p></div>
+  </div>
+</section>
+
+<!-- ================= ROI ================= -->
+<section class="wrap" id="roi">
+  <div class="head reveal">
+    <span class="eyebrow"><span class="dot"></span>The numbers</span>
+    <h2>More safety. Less cost. No extra staff.</h2>
+    <p class="lead">Figures below are measured in our own benchmarks for the flagship 300-camera school deployment. Your numbers depend on your site — that's exactly what a callback is for.</p>
+  </div>
+  <div class="roi">
+    <div class="roi-main glass reveal">
+      <div class="big">~24%</div>
+      <p style="color:var(--ink-soft);margin-top:10px">lower 3-year total cost of ownership — from an accuracy-neutral efficiency stack (sub-stream analytics, hardware decode, motion gating, batching).</p>
+      <div class="roi-list">
+        <div><span>Compute boxes for 300 cameras</span><b>9 → 6</b></div>
+        <div><span>Analytics bandwidth</span><b>−65%</b></div>
+        <div><span>Power draw</span><b>~−45–50%</b></div>
+        <div><span>Compute on idle cameras</span><b>~−36%</b></div>
+      </div>
+    </div>
+    <div class="roi-side glass reveal">
+      <div class="metric"><b>~97%</b><span>Person-detection recall retained on low-bandwidth sub-streams*</span></div>
+      <div class="metric"><b>0.999999</b><span>Cosine parity of the optimised recognition model — no accuracy lost, ~46% smaller</span></div>
+      <div class="metric"><b>~20–22%</b><span>More cameras per GPU from deferred cross-camera matching</span></div>
+      <p class="foot-note">*Measured 96.97% at 720p in our GPU-laptop validation (passed the ≥95% safety gate). Beta features (fall, running, fight, dress-code, Re-ID) are advisory and not yet given published accuracy numbers.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CTA BAND ================= -->
+<section class="wrap">
+  <div class="band glass reveal">
+    <h2>See NewVis on your own cameras.</h2>
+    <p>Tell us about your site and what you're trying to protect. We'll call you back and map exactly how NewVis would work for you — no obligation.</p>
+    <a class="btn btn-primary js-callback" data-src="band">Request a callback</a>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a href="#top" class="brand" style="margin-bottom:14px">
+          <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 2l11 4v8c0 7-4.7 12.4-11 16C9.7 26.4 5 21 5 14V6l11-4z" stroke="url(#mg)" stroke-width="1.6" fill="rgba(55,214,240,.06)"/>
+            <circle cx="16" cy="14" r="4.3" stroke="url(#mg)" stroke-width="1.6"/><circle cx="16" cy="14" r="1.5" fill="#37d6f0"/>
+          </svg>
+          <span>NewVis AI<small>Vision Redefined</small></span>
+        </a>
+        <p class="foot-note-box">AI video-analytics that turns existing cameras into real-time safety intelligence — for schools, malls, parking, offices, warehouses and beyond.</p>
+        <p style="margin-top:16px;font-size:13.5px">Talk to us: <a href="mailto:newvis.team@gmail.com">newvis.team@gmail.com</a></p>
+      </div>
+      <div class="foot-note-box glass" style="padding:18px 20px;border-radius:14px">
+        <b style="color:var(--ink)">Our honesty policy.</b> Production features are deterministic and dependable today. Beta features run live but are advisory and kept under human review while we validate their accuracy on real footage — we publish measured numbers only, never guesses.
+      </div>
+    </div>
+    <div class="foot-legal">
+      <span>© <span id="yr"></span> NewVis AI. All rights reserved.</span>
+      <span>Built for safety, on the cameras you already have.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ================= LEAD MODAL ================= -->
+<div class="modal-scrim" id="scrim" aria-hidden="true">
+  <div class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="close" id="modalClose" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div id="formView">
+      <span class="eyebrow" style="margin-bottom:14px"><span class="dot"></span>Request a callback</span>
+      <h3 id="modalTitle">Let's talk about your site.</h3>
+      <p class="sub">Leave your details and what you're looking to protect — we'll call you back to understand your requirements. No spam, no obligation.</p>
+      <form id="leadForm" novalidate>
+        <div class="two">
+          <div class="field">
+            <label>Name <span class="req">*</span></label>
+            <input name="name" type="text" autocomplete="name" required maxlength="120" placeholder="Your name" />
+          </div>
+          <div class="field">
+            <label>Phone <span class="req">*</span></label>
+            <input name="phone" type="tel" autocomplete="tel" required maxlength="30" placeholder="+91 …" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Email <span class="req">*</span></label>
+          <input name="email" type="email" autocomplete="email" required maxlength="160" placeholder="you@organisation.com" />
+        </div>
+        <div class="field">
+          <label>Organisation <span style="color:var(--ink-mute)">(optional)</span></label>
+          <input name="org" type="text" autocomplete="organization" maxlength="160" placeholder="School / company / site name" />
+        </div>
+        <div class="field">
+          <label>What are you looking to use NewVis for? <span class="req">*</span></label>
+          <select name="use_case" required>
+            <option value="" disabled selected>Select your kind of site…</option>
+            <option>School / campus</option>
+            <option>Mall / retail</option>
+            <option>Parking lot</option>
+            <option>Office / corporate</option>
+            <option>Warehouse / industrial</option>
+            <option>Hospital / healthcare</option>
+            <option>Residential / gated community</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Anything specific you want to solve? <span style="color:var(--ink-mute)">(optional)</span></label>
+          <textarea name="message" maxlength="1000" placeholder="e.g. how many cameras, key concerns, timeline…"></textarea>
+        </div>
+        <!-- honeypot: bots fill this, humans never see it -->
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <div class="err" id="formErr"></div>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Request my callback</button>
+        <p class="modal-foot">By submitting you agree to be contacted about NewVis. Your details are used only to call you back.</p>
+      </form>
+    </div>
+    <div id="successView" class="success" style="display:none">
+      <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h3>Thanks — we'll be in touch.</h3>
+      <p class="sub" style="margin-bottom:22px">Your request is in. Someone from the NewVis team will call you back shortly to understand exactly what you need.</p>
+      <button class="btn btn-ghost" id="successClose" style="justify-content:center;width:100%">Back to the site</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // sticky nav shadow
+  var nav = document.getElementById('nav');
+  var onScroll = function(){ nav.classList.toggle('stuck', window.scrollY > 12); };
+  onScroll(); window.addEventListener('scroll', onScroll, {passive:true});
+
+  // reveal on scroll
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+
+  // mobile menu -> just open the callback (keeps it simple / single-page)
+  var burger = document.getElementById('burger');
+  if(burger) burger.addEventListener('click', function(){ location.hash = '#usecases'; });
+
+  // ---------- lead modal ----------
+  var scrim = document.getElementById('scrim');
+  var closeBtn = document.getElementById('modalClose');
+  var SHOWN_KEY = 'sentinel_lead_shown';
+  var DONE_KEY = 'sentinel_lead_done';
+  var autoShown = false;
+
+  function openModal(){
+    scrim.classList.add('open'); scrim.setAttribute('aria-hidden','false');
+    document.body.style.overflow = 'hidden';
+    var f = document.querySelector('#leadForm input[name="name"]');
+    if(f) setTimeout(function(){ f.focus(); }, 250);
+  }
+  function closeModal(){
+    scrim.classList.remove('open'); scrim.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+  }
+  function markAutoShown(){ autoShown = true; try{ sessionStorage.setItem(SHOWN_KEY,'1'); }catch(e){} }
+  function autoAllowed(){
+    if(autoShown) return false;
+    try{ return !sessionStorage.getItem(SHOWN_KEY) && !localStorage.getItem(DONE_KEY); }catch(e){ return !autoShown; }
+  }
+
+  // CTA buttons -> always open (even if already shown)
+  document.querySelectorAll('.js-callback').forEach(function(b){
+    b.addEventListener('click', function(e){ e.preventDefault(); markAutoShown(); openModal(); });
+  });
+  closeBtn.addEventListener('click', closeModal);
+  scrim.addEventListener('click', function(e){ if(e.target === scrim) closeModal(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && scrim.classList.contains('open')) closeModal(); });
+
+  // trigger 1: exit intent
+  document.addEventListener('mouseout', function(e){
+    if(!e.relatedTarget && e.clientY <= 0 && autoAllowed()){ markAutoShown(); openModal(); }
+  });
+  // trigger 2: deep scroll (~60%)
+  window.addEventListener('scroll', function(){
+    if(!autoAllowed()) return;
+    var sc = window.scrollY + window.innerHeight;
+    var h = document.documentElement.scrollHeight;
+    if(sc / h > 0.6){ markAutoShown(); openModal(); }
+  }, {passive:true});
+
+  // ---------- submit ----------
+  var form = document.getElementById('leadForm');
+  var errBox = document.getElementById('formErr');
+  var submitBtn = document.getElementById('submitBtn');
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function showErr(m){ errBox.textContent = m; errBox.style.display = 'block'; }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    errBox.style.display = 'none';
+    var d = {
+      name: form.name.value.trim(),
+      email: form.email.value.trim(),
+      phone: form.phone.value.trim(),
+      org: form.org.value.trim(),
+      use_case: form.use_case.value,
+      message: form.message.value.trim(),
+      website: form.website.value  // honeypot
+    };
+    if(!d.name || !d.phone || !d.email || !d.use_case){ showErr('Please fill in name, phone, email and your use case.'); return; }
+    if(!emailRe.test(d.email)){ showErr('That email doesn\'t look right — please check it.'); return; }
+
+    submitBtn.disabled = true; submitBtn.textContent = 'Sending…';
+    fetch('/api/leads', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(d)
+    }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok, j:j}; }); })
+      .then(function(res){
+        if(res.ok && res.j && res.j.ok){
+          try{ localStorage.setItem(DONE_KEY,'1'); sessionStorage.setItem(SHOWN_KEY,'1'); }catch(e){}
+          document.getElementById('formView').style.display = 'none';
+          document.getElementById('successView').style.display = 'block';
+        } else {
+          showErr((res.j && res.j.detail) || 'Something went wrong — please try again, or email newvis.team@gmail.com.');
+          submitBtn.disabled = false; submitBtn.textContent = 'Request my callback';
+        }
+      }).catch(function(){
+        showErr('Network error — please try again, or email newvis.team@gmail.com.');
+        submitBtn.disabled = false; submitBtn.textContent = 'Request my callback';
+      });
+  });
+
+  document.getElementById('successClose').addEventListener('click', closeModal);
+})();
+</script>
+</body>
+</html>
