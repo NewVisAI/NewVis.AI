@@ -43,20 +43,82 @@ LICENSE_ENV_VAR = "SENTINEL_LICENSE"
 
 # Product feature codes gated by the license "features" list.
 ALL_FEATURES = [
-    "core_tracking",      # detection / tracking / re-id / zones
-    "nl_search",          # natural-language search
-    "zone_alerts",        # restricted-area / after-hours / holiday alerts
+    "core_tracking",       # detection / tracking / zones
+    "nl_search",           # natural-language search
+    "zone_alerts",         # restricted-area / after-hours / schedule alerts
     "fall_detection",
     "running_detection",
     "dress_code",
-    "notifications",      # principal notification inbox + snapshots
-    "reports",            # headcount / AI summary reports
-    "api_access",         # REST/WebSocket backend
+    "notifications",       # notification inbox + snapshot evidence
+    "reports",             # headcount / periodic reports
+    "api_access",          # REST/WebSocket backend
+    "loitering",           # dwell / loitering timer
+    "line_crossing",       # in/out counts
+    "occupancy_alerts",    # per-zone density limits
+    "pose_verification",   # event-gated pose confidence for falls
+    "violence_detection",  # altercation / proximity+motion heuristic
+    "ai_summary",          # AI activity summary
+    "cross_camera_reid",   # global person ID across cameras
+    "investigation_graph", # trace / cascades / recurring actors
 ]
 
 # Features available with no license at all (evaluation mode).
 EVALUATION_FEATURES = ["core_tracking", "nl_search"]
 EVALUATION_MAX_CAMERAS = 1
+
+# Product edition bundles used by marketing/pricing. Each bundle is the exact
+# set of feature codes that ship with that edition. Editions are cumulative:
+# Premium contains Basic; Pro contains Premium.
+EDITION_BUNDLES: Dict[str, List[str]] = {
+    "basic": [
+        "core_tracking",
+        "zone_alerts",
+        "notifications",
+        "reports",
+        "api_access",
+    ],
+    "premium": [
+        "core_tracking",
+        "zone_alerts",
+        "notifications",
+        "reports",
+        "api_access",
+        "loitering",
+        "line_crossing",
+        "occupancy_alerts",
+        "running_detection",
+        "fall_detection",
+        "dress_code",
+    ],
+    "pro": [
+        "core_tracking",
+        "zone_alerts",
+        "notifications",
+        "reports",
+        "api_access",
+        "loitering",
+        "line_crossing",
+        "occupancy_alerts",
+        "running_detection",
+        "fall_detection",
+        "dress_code",
+        "pose_verification",
+        "violence_detection",
+        "ai_summary",
+        "nl_search",
+        "cross_camera_reid",
+        "investigation_graph",
+    ],
+}
+
+
+def get_edition_features(edition: str) -> List[str]:
+    """Return the feature-code bundle for a marketing edition name.
+
+    Unknown editions return an empty list so callers fail closed rather than
+    over-granting features.
+    """
+    return list(EDITION_BUNDLES.get(edition.lower(), []))
 
 
 def get_hardware_fingerprint() -> str:

@@ -230,6 +230,23 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .progress-fill { height: 100%; width: 0%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.3s; }
 .progress-meta { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-dim); margin-top: 7px; }
 
+.beta-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  border-radius: 999px;
+  color: #ffb020;
+  background: rgba(255, 176, 32, 0.12);
+  border: 1px solid rgba(255, 176, 32, 0.45);
+  vertical-align: middle;
+  text-transform: uppercase;
+  cursor: help;
+}
+.beta-badge:hover { background: rgba(255, 176, 32, 0.22); }
+
 .video-shell { position: relative; border-radius: 16px; overflow: hidden; background: #000; display: none; border: 1px solid var(--border-strong); box-shadow: 0 20px 50px rgba(0,0,0,0.7); }
 .video-shell video, .video-shell img.feed { width: 100%; display: block; }
 #zone-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; z-index: 5; display: none; }
@@ -505,7 +522,7 @@ pre.report { font-family: var(--mono); font-size: 12px; line-height: 1.65; color
               <video id="video-player" controls preload="auto"></video>
               <canvas id="zone-canvas"></canvas>
               <div class="summary-overlay" id="summary-overlay">
-                <div class="summary-overlay-title">🤖 AI Security Summary</div>
+                <div class="summary-overlay-title">🤖 AI Security Summary <span class="beta-badge" title="This feature is in Beta. Accuracy is being measured against real footage before we commit to a number.">Beta</span></div>
                 <div class="summary-overlay-content" id="summary-overlay-content">No incidents detected yet. Running live analysis...</div>
               </div>
             </div>
@@ -532,16 +549,16 @@ pre.report { font-family: var(--mono); font-size: 12px; line-height: 1.65; color
       <!-- ================= AI SEARCH ================= -->
       <section class="view" id="view-search">
         <div class="card" style="margin-bottom:18px;">
-          <div class="card-h"><h3>🧠 AI Intent Search</h3><span class="sub">natural language → filtered events with one-click clips</span></div>
+          <div class="card-h"><h3>🧠 AI Intent Search <span class="beta-badge" title="This feature is in Beta. Coverage of phrasings is being measured against real usage before we commit to a number.">Beta</span></h3><span class="sub">natural language → filtered events with one-click clips</span></div>
           <div class="search-bar">
             <input id="search-input" placeholder='Try "show me falls", "people running", "GID 12", "camera 1" — or press Enter empty for every event'>
             <button class="btn acc" id="search-btn">Search</button>
           </div>
           <div class="sugg">
             <button class="chip" data-q="">📜 All events</button>
-            <button class="chip" data-q="show me falls">🤕 Falls</button>
-            <button class="chip" data-q="people running">🏃 Running</button>
-            <button class="chip" data-q="uniform violations">👔 Dress code</button>
+            <button class="chip" data-q="show me falls" title="Beta: accuracy under validation on real footage">🤕 Falls <span class="beta-badge">Beta</span></button>
+            <button class="chip" data-q="people running" title="Beta: accuracy under validation on real footage">🏃 Running <span class="beta-badge">Beta</span></button>
+            <button class="chip" data-q="uniform violations" title="Beta: accuracy under validation on real footage">👔 Dress code <span class="beta-badge">Beta</span></button>
             <button class="chip" data-q="cars">🚗 Vehicles</button>
             <button class="chip" id="gid-chip">🆔 Search by GID…</button>
           </div>

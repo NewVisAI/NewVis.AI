@@ -825,7 +825,9 @@ def check_occupancy_alerts(
 
     for zone in pixel_zones:
         zone_id = zone.get("id")
-        limit = zone.get("max_occupancy", 3)
+        limit = zone.get("max_occupancy")
+        if limit is None:
+            continue
         current_count = zone_counts.get(zone_id, 0)
         
         alert_key = (camera_id, zone_id)
