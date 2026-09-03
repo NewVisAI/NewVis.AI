@@ -520,16 +520,125 @@ def license_apply(req: LicenseApplyRequest, http_request: Request = None,
 
 
 # ---------------------------------------------------------------------------
-# Dashboard root
+# Public marketing site (root) + dashboard (/app)
 # ---------------------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    index_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
+def _serve_html(filename: str, fallback: str) -> HTMLResponse:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h3>Sentinel AI CCTV Engine is online. dashboard index.html missing.</h3>")
+    return HTMLResponse(content=fallback)
+
+
+@app.get("/", response_class=HTMLResponse)
+def read_landing():
+    """Public marketing / lead-capture site."""
+    return _serve_html(
+        "landing.html",
+        "<h3>Sentinel AI is online. Marketing page landing.html missing. Dashboard at <a href='/app'>/app</a>.</h3>",
+    )
+
+
+@app.get("/app", response_class=HTMLResponse)
+def read_dashboard():
+    """The operator dashboard (login-gated in-app)."""
+    return _serve_html(
+        "index.html",
+        "<h3>Sentinel AI CCTV Engine is online. dashboard index.html missing.</h3>",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public lead capture (marketing site "Request a callback" form)
+# ---------------------------------------------------------------------------
+
+class LeadRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    org: Optional[str] = ""
+    use_case: Optional[str] = ""
+    message: Optional[str] = ""
+    website: Optional[str] = ""  # honeypot: real users leave this empty
+
+
+def _ensure_leads_table(conn) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            org TEXT,
+            use_case TEXT,
+            message TEXT,
+            source_ip TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+
+@app.post("/api/leads")
+def create_lead(lead: LeadRequest, http_request: Request = None):
+    """Public endpoint — the marketing site posts callback requests here."""
+    # Honeypot: silently accept bot submissions without storing them.
+    if (lead.website or "").strip():
+        return {"ok": True}
+
+    name = (lead.name or "").strip()
+    email = (lead.email or "").strip()
+    phone = (lead.phone or "").strip()
+    if not name or not email or not phone:
+        raise HTTPException(status_code=422, detail="Name, email and phone are required.")
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=422, detail="Please provide a valid email address.")
+
+    import sqlite3
+    from db_schema import get_db_path
+
+    conn = sqlite3.connect(get_db_path())
+    try:
+        _ensure_leads_table(conn)
+        conn.execute(
+            "INSERT INTO leads (name, email, phone, org, use_case, message, source_ip, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                name[:120],
+                email[:160],
+                phone[:30],
+                (lead.org or "").strip()[:160],
+                (lead.use_case or "").strip()[:120],
+                (lead.message or "").strip()[:1000],
+                _client_ip(http_request),
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/leads", dependencies=[Depends(require_roles("principal"))])
+def list_leads():
+    """Authenticated call-list view for the team."""
+    import sqlite3
+    from db_schema import get_db_path
+
+    conn = sqlite3.connect(get_db_path())
+    try:
+        _ensure_leads_table(conn)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, name, email, phone, org, use_case, message, source_ip, created_at "
+            "FROM leads ORDER BY id DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+    return {"count": len(rows), "leads": [dict(r) for r in rows]}
 
 
 # ---------------------------------------------------------------------------

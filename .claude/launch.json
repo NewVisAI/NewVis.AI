@@ -2,6 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "sentinel-native",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile", "-Command",
+        "$env:DISABLE_AI_ENGINE='1'; & '.\\.venv-win\\Scripts\\python.exe' -m uvicorn backend.server:app --host 127.0.0.1 --port 8000"
+      ],
+      "port": 8000
+    },
+    {
       "name": "sentinel-backend",
       "runtimeExecutable": "wsl",
       "runtimeArgs": [

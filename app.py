@@ -585,7 +585,8 @@ def _process_camera_frame(
             camera_id=camera_state.camera_id,
             bbox=(x1, y1, x2, y2),
             video_time=video_time,
-            video_path=camera_state.source
+            video_path=camera_state.source,
+            frame_shape=getattr(frame, "shape", None),
         )
 
         # Run fall detection check (person only); a detected fall goes through

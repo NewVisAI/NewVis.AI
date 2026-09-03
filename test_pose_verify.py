@@ -66,18 +66,55 @@ class PoseConfig(unittest.TestCase):
 
     tearDown = setUp
 
-    def test_off_by_default(self):
-        self.assertFalse(inference_config.pose_verify())
+    def test_on_by_default(self):
+        # Pose is augment-only (never suppresses), so the default is ON — the
+        # recall gain on falls toward/away from camera is worth the ~zero cost
+        # (pose only runs on the crop of an already-triggered fall).
+        self.assertTrue(inference_config.pose_verify())
 
     def test_defaults(self):
         self.assertEqual(inference_config.pose_verify_thresh(), 0.5)
         self.assertEqual(inference_config.pose_verify_weights(), "yolov8n-pose.pt")
 
     def test_env_overrides(self):
-        os.environ["POSE_VERIFY"] = "1"
+        os.environ["POSE_VERIFY"] = "0"
         os.environ["POSE_VERIFY_THRESH"] = "0.7"
-        self.assertTrue(inference_config.pose_verify())
+        inference_config.reload()
+        self.assertFalse(inference_config.pose_verify())
         self.assertEqual(inference_config.pose_verify_thresh(), 0.7)
+
+
+class RaisedArmsGeometry(unittest.TestCase):
+    """Pure geometry for the optional altercation pose augment."""
+
+    def test_arm_raised_when_wrist_above_shoulder(self):
+        k = _kpts({
+            pose_verify.L_SHOULDER: (100, 200, 0.9),
+            pose_verify.L_WRIST: (100, 100, 0.9),  # y smaller = higher in image
+        })
+        raised, reason = pose_verify.raised_arms_from_keypoints(k)
+        self.assertTrue(raised)
+        self.assertIn("left_wrist_above_shoulder", reason)
+
+    def test_arm_down_when_wrist_below_shoulder(self):
+        k = _kpts({
+            pose_verify.L_SHOULDER: (100, 200, 0.9),
+            pose_verify.L_WRIST: (100, 400, 0.9),
+            pose_verify.R_SHOULDER: (150, 200, 0.9),
+            pose_verify.R_WRIST: (150, 400, 0.9),
+        })
+        raised, reason = pose_verify.raised_arms_from_keypoints(k)
+        self.assertFalse(raised)
+        self.assertIn("below", reason)
+
+    def test_low_confidence_wrist_ignored(self):
+        k = _kpts({
+            pose_verify.L_SHOULDER: (100, 200, 0.9),
+            pose_verify.L_WRIST: (100, 100, 0.1),  # below KP_CONF_MIN
+        })
+        raised, reason = pose_verify.raised_arms_from_keypoints(k)
+        self.assertFalse(raised)
+        self.assertIn("insufficient", reason)
 
 
 def _standing_bbox():
