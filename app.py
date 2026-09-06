@@ -13,32 +13,37 @@ for _stream in (sys.stdout, sys.stderr):
         except (ValueError, OSError):
             pass
 
-import cv2
-import numpy as np
-import supervision as sv
-
-from detector import HumanDetector
-from incident_manager import IncidentManager
-from event import (
-    check_occupancy_alerts,
-    clear_event_logs,
-    finalize_camera_sessions,
-    finalize_expired_sessions,
-    flush_tracking_data,
-    init_db,
-    log_tracking_data,
-    reset_runtime_state,
-    update_session_event,
-    check_dress_code,
-    active_uniform_violations,
-)
-from running import check_running, is_currently_running, reset_running_state
-from fall_detector import check_fall, is_currently_fallen, reset_fall_state
-from anomaly_detector import check_anomaly, reset_anomaly_state
-from alerts import init_alerts_db, raise_fall_alert, get_notifications, mark_notifications_read, get_alert_playback_entry
-from school_calendar import configure_holidays_interactive
-from zone_manager import configure_zone_rules_interactive
-from license_validator import verify_license, load_license_key
+# Optional imports - graceful degradation if CV/ML deps not available
+try:
+    import cv2
+    import numpy as np
+    import supervision as sv
+    from detector import HumanDetector
+    from incident_manager import IncidentManager
+    from event import (
+        check_occupancy_alerts,
+        clear_event_logs,
+        finalize_camera_sessions,
+        finalize_expired_sessions,
+        flush_tracking_data,
+        init_db,
+        log_tracking_data,
+        reset_runtime_state,
+        update_session_event,
+        check_dress_code,
+        active_uniform_violations,
+    )
+    from running import check_running, is_currently_running, reset_running_state
+    from fall_detector import check_fall, is_currently_fallen, reset_fall_state
+    from anomaly_detector import check_anomaly, reset_anomaly_state
+    from alerts import init_alerts_db, raise_fall_alert, get_notifications, mark_notifications_read, get_alert_playback_entry
+    from school_calendar import configure_holidays_interactive
+    from zone_manager import configure_zone_rules_interactive
+    from license_validator import verify_license, load_license_key
+    HAS_CV_DEPS = True
+except ImportError as e:
+    print(f"⚠️  CV/ML dependencies not available: {e}")
+    HAS_CV_DEPS = False
 
 def _draw_corner_rect(img, pt1, pt2, color, thickness, r, d):
     x1, y1 = pt1
