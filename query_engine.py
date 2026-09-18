@@ -348,6 +348,159 @@ class QueryEngine:
             
         return trajectory
 
+    def list_investigation_sources(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Returns the set of distinct uploaded videos found in the events
+        table (video_path stored on disk, not an RTSP URL). Used by the
+        Investigate tab's source picker."""
+        sql = """
+            SELECT video_path, camera_id, COUNT(*) AS n,
+                   MIN(entry_time) AS first_ts,
+                   MAX(COALESCE(exit_time, entry_time)) AS last_ts
+            FROM events
+            WHERE video_path IS NOT NULL
+              AND video_path NOT LIKE 'rtsp://%'
+              AND video_path NOT LIKE 'http://%'
+              AND video_path NOT LIKE 'https://%'
+            GROUP BY video_path, camera_id
+            ORDER BY last_ts DESC
+        """
+        uploads: List[Dict[str, Any]] = []
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
+            cursor.execute(adapt_query(sql))
+            for row in cursor.fetchall():
+                uploads.append({
+                    "video_path": row[0],
+                    "camera_id": row[1],
+                    "event_count": row[2],
+                    "first_ts": row[3],
+                    "last_ts": row[4],
+                })
+        return {"uploads": uploads}
+
+    def get_investigation_scope(
+        self,
+        source: str,
+        video_path: Optional[str] = None,
+        camera_id: Optional[int] = None,
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Scoped fetch backing the Investigate tab. `source` is either
+        'upload' (filter by video_path) or 'camera' (filter by camera_id +
+        entry_time between start and end). Returns events, alerts and
+        aggregated persons/zones/cameras derived from them."""
+        events_sql = (
+            "SELECT global_id, camera_id, zone_id, event_type, entry_time, exit_time, "
+            "duration, video_path, frame_start, frame_end, object_type "
+            "FROM events WHERE entry_time IS NOT NULL"
+        )
+        alerts_sql = (
+            "SELECT id, timestamp, alert_type, camera_id, zone_id, zone_name, "
+            "global_id, object_type, message, video_path, snapshot_path "
+            "FROM alerts WHERE 1=1"
+        )
+        e_params: List[Any] = []
+        a_params: List[Any] = []
+        if source == "upload":
+            if not video_path:
+                raise ValueError("video_path is required when source=='upload'")
+            events_sql += " AND video_path = ?"
+            e_params.append(video_path)
+            alerts_sql += " AND video_path = ?"
+            a_params.append(video_path)
+        elif source == "camera":
+            if camera_id is None:
+                raise ValueError("camera_id is required when source=='camera'")
+            if not start or not end:
+                raise ValueError("start and end are required when source=='camera'")
+            events_sql += " AND camera_id = ? AND entry_time BETWEEN ? AND ?"
+            e_params.extend([camera_id, start, end])
+            alerts_sql += " AND camera_id = ? AND timestamp BETWEEN ? AND ?"
+            a_params.extend([camera_id, start, end])
+        else:
+            raise ValueError(f"Unknown investigation source: {source!r}")
+        events_sql += " ORDER BY entry_time ASC"
+        alerts_sql += " ORDER BY timestamp ASC"
+
+        events: List[Dict[str, Any]] = []
+        alerts_list: List[Dict[str, Any]] = []
+        with connect_db(validate_schema=False) as conn:
+            cursor = conn.cursor()
+            cursor.execute(adapt_query(events_sql), tuple(e_params))
+            for row in cursor.fetchall():
+                events.append({
+                    "global_id": row[0],
+                    "camera_id": row[1],
+                    "zone_id": row[2],
+                    "event_type": row[3],
+                    "entry_time": row[4],
+                    "exit_time": row[5],
+                    "duration": row[6],
+                    "video_path": row[7],
+                    "frame_start": row[8],
+                    "frame_end": row[9],
+                    "object_type": row[10],
+                })
+            cursor.execute(adapt_query(alerts_sql), tuple(a_params))
+            for row in cursor.fetchall():
+                # Sanitize RTSP-URL video_path so the frontend clip modal
+                # doesn't try to play a raw stream URL.
+                vp = row[9]
+                if isinstance(vp, str) and vp.startswith(("rtsp://", "http://", "https://")):
+                    vp = None
+                alerts_list.append({
+                    "id": row[0],
+                    "timestamp": row[1],
+                    "alert_type": row[2],
+                    "camera_id": row[3],
+                    "zone_id": row[4],
+                    "zone_name": row[5] or "-",
+                    "global_id": row[6],
+                    "object_type": row[7],
+                    "message": row[8],
+                    "video_path": vp,
+                    "snapshot_path": row[10],
+                })
+
+        # Aggregate persons/zones/cameras from the two lists (in-memory,
+        # cheap for the demo scale of at most a few thousand rows).
+        persons_map: Dict[int, Dict[str, Any]] = {}
+        for e in events + alerts_list:
+            gid = e.get("global_id")
+            if gid is None:
+                continue
+            p = persons_map.setdefault(gid, {"global_id": gid, "event_count": 0, "first_seen": None, "last_seen": None})
+            p["event_count"] += 1
+            ts = e.get("entry_time") or e.get("timestamp")
+            if ts and (p["first_seen"] is None or ts < p["first_seen"]):
+                p["first_seen"] = ts
+            end_ts = e.get("exit_time") or e.get("timestamp") or e.get("entry_time")
+            if end_ts and (p["last_seen"] is None or end_ts > p["last_seen"]):
+                p["last_seen"] = end_ts
+
+        zones_map: Dict[int, Dict[str, Any]] = {}
+        for e in events + alerts_list:
+            zid = e.get("zone_id")
+            if zid is None:
+                continue
+            zones_map.setdefault(zid, {"id": zid, "name": e.get("zone_name") or f"Zone {zid}"})
+
+        cameras_map: Dict[int, Dict[str, Any]] = {}
+        for e in events + alerts_list:
+            cid = e.get("camera_id")
+            if cid is None:
+                continue
+            cameras_map.setdefault(cid, {"id": cid, "name": f"Camera {cid}"})
+
+        return {
+            "events": events,
+            "alerts": alerts_list,
+            "persons": sorted(persons_map.values(), key=lambda p: -p["event_count"]),
+            "zones": sorted(zones_map.values(), key=lambda z: z["id"]),
+            "cameras": sorted(cameras_map.values(), key=lambda c: c["id"]),
+        }
+
     def get_zone_flow_report(self) -> List[Dict[str, Any]]:
         """
         Calculates and returns cumulative traffic metrics for each zone:

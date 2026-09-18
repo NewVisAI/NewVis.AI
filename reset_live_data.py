@@ -29,10 +29,18 @@ def _existing_tables(conn):
     return {r[0] for r in rows}
 
 
-def main():
+def main(assume_yes: bool = False) -> dict:
+    """Wipe detection tables. Returns counts of rows removed per table.
+
+    Called from CLI (pass `--yes` in argv) or programmatically
+    (pass assume_yes=True). Config tables (cameras, zones) and audit_log
+    are preserved.
+    """
     if not os.path.exists(DB):
         print(f"[!] DB not found: {DB}")
-        sys.exit(1)
+        if __name__ == "__main__":
+            sys.exit(1)
+        return {}
 
     conn = sqlite3.connect(DB)
     present = _existing_tables(conn)
@@ -40,14 +48,16 @@ def main():
     print(f"DB: {DB}")
     print("Before:")
     to_clear = [t for t in DATA_TABLES if t in present]
+    before_counts: dict = {}
     for t in to_clear:
         n = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+        before_counts[t] = n
         print(f"  {t:16s} {n} rows")
 
-    if "--yes" not in sys.argv:
+    if not assume_yes and "--yes" not in sys.argv:
         print("\nDry run (pass --yes to actually clear). Nothing changed.")
         conn.close()
-        return
+        return {"dry_run": True, "before": before_counts}
 
     for t in to_clear:
         conn.execute(f"DELETE FROM {t}")
@@ -61,6 +71,7 @@ def main():
         print(f"  {t:16s} {n} rows")
     conn.close()
     print("\n[+] Reset complete. Config (cameras, zones) untouched.")
+    return {"cleared": before_counts}
 
 
 if __name__ == "__main__":
