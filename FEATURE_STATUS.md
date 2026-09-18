@@ -72,13 +72,13 @@ say the word "Beta" out loud in the demo.**
 
 ## ③ Not in the demo
 
-**Built but not wired in — decide before the demo:**
+**Now wired (was Not-in-demo, promoted to Production):**
 
-- **Crowd-density / occupancy alerts.** `check_occupancy_alerts` exists in [event.py](event.py) and
-  compares live per-zone counts to `max_occupancy`, but it is **not called from the live frame
-  path** — [app.py:668](app.py:668) says so explicitly. It's roughly a one-line wiring job on a
-  deterministic feature, which would make it a genuine Production-tier win. Either wire it and
-  test it, or don't put it on the slide.
+- **Crowd-density / occupancy alerts.** `check_occupancy_alerts` is now called from the live frame
+  path in [app.py](app.py). It is **opt-in per zone** — a zone with no `max_occupancy` field
+  configured is skipped entirely, so schools and other domains where zones are routinely crowded do
+  not get spurious alerts. Deployers turn it on by setting `max_occupancy` on the zones they care
+  about.
 
 **Infra / cost work — keep off, don't demo:**
 
@@ -126,7 +126,31 @@ promotion. We do not ship an automated response to a heuristic.
 1. **A real `BETA` badge in the dashboard.** Right now the tiering lives only in this file, which
    means in a live demo it depends on us remembering to say it. Put the badge next to Beta features
    in the nav and on their result cards.
+   → **Done:** [backend/index.html](backend/index.html) now renders a `Beta` badge next to the AI
+   Security Summary, AI Intent Search, and the Falls / Running / Dress-code search chips, with a
+   tooltip explaining that accuracy is under validation.
 2. **Reuse license feature codes as the tier switch.** [license_validator.py:45](license_validator.py:45)
    already gates `fall_detection`, `running_detection`, `dress_code`, etc. per client. That's
    exactly the right hook to ship a client "Production-only" license and enable Beta features
    per-site once they're validated — no code fork.
+   → **Done:** [license_validator.py](license_validator.py) now exposes `EDITION_BUNDLES`
+   (`basic` / `premium` / `pro`) and a `get_edition_features(edition)` helper. Licenses issued for
+   an edition include exactly that bundle's feature codes.
+
+---
+
+## Marketing editions ↔ features
+
+The customer-facing edition matrix and Basic/Premium/Pro breakdown live in
+[PRICING_TIERS.md](PRICING_TIERS.md). The bundles it references are machine-defined in
+`license_validator.EDITION_BUNDLES`:
+
+| Edition | Feature codes | Status of contents |
+|---|---|---|
+| **Basic** | `core_tracking`, `zone_alerts`, `notifications`, `reports`, `api_access` | All Production. |
+| **Premium** | Basic + `loitering`, `line_crossing`, `occupancy_alerts`, `running_detection`, `fall_detection`, `dress_code` | Loitering, line-crossing, occupancy are Production; running / fall / dress-code are Beta. |
+| **Pro** | Premium + `pose_verification`, `violence_detection`, `ai_summary`, `nl_search`, `cross_camera_reid`, `investigation_graph` | All Pro-tier additions are Beta today. |
+
+`occupancy_alerts` was promoted from Not-in-demo → Production on the same commit that wired it
+into the live frame path; its safety property is that a zone without an explicit `max_occupancy`
+is silent.
