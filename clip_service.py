@@ -84,6 +84,39 @@ def build_clip(event: Dict[str, Any], video_url_base: str = "/api/clip/video") -
     video_path = event.get("video_path")
     fps = _fps_for(video_path)
 
+    # Post-event alert clip: the entire recorded file IS the event window. Its
+    # frame_number in the DB refers to the ORIGINAL source stream (millions of
+    # frames in), NOT to the short clip file — so anchoring by frame_number
+    # would seek past the end of the file. Force the anchor to 0 for these.
+    _vp_str = str(video_path or "")
+    _is_alert_clip = ("alert_clips" in _vp_str) or _vp_str.replace("\\", "/").startswith("alert_clips/")
+    if _is_alert_clip:
+        clip_start = 0.0
+        clip_end = 8.0  # short clip length written by alert_clip_recorder.py
+        clip_duration = round(clip_end - clip_start, 2)
+        logged_at = event.get("timestamp") or event.get("entry_time")
+        from urllib.parse import quote
+        video_url = f"{video_url_base}?path={quote(str(video_path))}#t={clip_start},{clip_end}" if video_path else None
+        return {
+            "why_logged": why_logged(event),
+            "event_type": event.get("event_type") or event.get("alert_type"),
+            "logged_at": logged_at,
+            "clip_start_seconds": clip_start,
+            "clip_end_seconds": clip_end,
+            "clip_duration_seconds": clip_duration,
+            "event_start_seconds": clip_start,
+            "event_end_seconds": clip_end,
+            "duration_seconds": None,
+            "stayed": False,
+            "source_fps": round(fps, 2),
+            "details": (f"GID {event.get('global_id')}" if event.get("global_id") not in (None, -1) else "-"),
+            "camera_id": event.get("camera_id"),
+            "zone_id": event.get("zone_id"),
+            "global_id": event.get("global_id"),
+            "video_path": video_path,
+            "video_url": video_url,
+        }
+
     frame_start = event.get("frame_start")
     frame_end = event.get("frame_end")
     frame_number = event.get("frame_number")

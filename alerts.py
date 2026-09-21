@@ -21,6 +21,25 @@ import cv2
 import school_calendar
 from db_schema import adapt_query, connect_db, get_db_type
 
+
+def _sanitize_video_path(vp):
+    """Return a playable video_path or None. Nulls out:
+      • RTSP/HTTP URLs (older rows stored the camera source URL here; the
+        <video> element can't play a stream URL and the clip modal hangs).
+      • Paths whose file no longer exists on disk (uploads or alert_clips
+        wiped by Reset test data). Same hang symptom in the browser.
+    On None the frontend falls back to snapshot-only playback."""
+    if not isinstance(vp, str) or not vp:
+        return vp
+    if vp.startswith(("rtsp://", "http://", "https://")):
+        return None
+    try:
+        if not os.path.exists(vp):
+            return None
+    except OSError:
+        return None
+    return vp
+
 SNAPSHOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_snapshots")
 
 RESTRICTED_ZONE_ENTRY = "restricted_zone_entry"
@@ -257,12 +276,60 @@ def record_alert(alert: Dict, frame=None, bbox=None) -> int:
 
         conn.commit()
 
+    # Detect whether this alert came from OFFLINE reprocess of an already-
+    # recorded video (upload / saved clip): its video_path points at a real
+    # file on disk (not an rtsp:// / http:// URL). We suppress the
+    # Notifications-inbox row AND the live WebSocket broadcast in that
+    # case — offline events belong to their own "Events from this footage"
+    # panel in the Upload tab, not the operator's real-time inbox.
+    camera_id = alert.get("camera_id")
+    existing_vp = alert.get("video_path") or ""
+    is_recorded_file = bool(existing_vp) and not existing_vp.startswith(("rtsp://", "http://", "https://"))
+
     # Console output today; real push/email/SMS delivery replaces this sink later.
     _safe_print(f"🚨 ALERT [{alert['alert_type']}]: {alert['message']}")
     if snapshot_path:
         _safe_print(f"   📸 Snapshot saved: {snapshot_path}")
-    _record_notification(alert, alert_id)
-    _dispatch_alert_callbacks(alert, alert_id, snapshot_path)
+    if not is_recorded_file:
+        _record_notification(alert, alert_id)
+        _dispatch_alert_callbacks(alert, alert_id, snapshot_path)
+
+    # Post-event clip recording — fire-and-forget. Reads from the reader's
+    # JPEG buffer (backend_runner.latest_frames) — no new RTSP sessions.
+    # Trigger only for live-camera alerts: video_path is either empty OR an
+    # RTSP/HTTP URL (the camera source itself, not a recorded file). A path
+    # to a real .mp4 already on disk means this is an offline reprocess and
+    # we should NOT overwrite it.
+    if camera_id is not None and not is_recorded_file:
+        # Clear the RTSP source from video_path — otherwise the frontend picks
+        # it up and stalls trying to play the raw stream URL as a video file.
+        # The recorder will write the real clip path once encoding finishes.
+        try:
+            with connect_db(validate_schema=False) as conn3:
+                conn3.execute(
+                    adapt_query("UPDATE alerts SET video_path = NULL WHERE id = ?"),
+                    (alert_id,),
+                )
+                conn3.commit()
+        except Exception:
+            pass
+
+        try:
+            import alert_clip_recorder
+            def _persist_path(path, _aid=alert_id):
+                try:
+                    with connect_db(validate_schema=False) as conn2:
+                        conn2.execute(
+                            adapt_query("UPDATE alerts SET video_path = ? WHERE id = ?"),
+                            (path, _aid),
+                        )
+                        conn2.commit()
+                except Exception as e:
+                    _safe_print(f"[!] alert {_aid}: failed to write video_path: {e}")
+            alert_clip_recorder.start_recording(alert_id, camera_id, on_done=_persist_path)
+        except Exception as exc:
+            _safe_print(f"[!] Post-event clip recorder failed to start for alert {alert_id}: {exc}")
+
     return alert_id
 
 
@@ -351,7 +418,7 @@ def get_notifications(recipient: str = PRINCIPAL_RECIPIENT, unread_only: bool = 
             "global_id": row[9],
             "object_type": row[10],
             "snapshot_path": row[11],
-            "video_path": row[12],
+            "video_path": _sanitize_video_path(row[12]),
         }
         for row in rows
     ]
@@ -461,6 +528,7 @@ def search_alerts(
     alert_type: Optional[str] = None,
     camera_id: Optional[int] = None,
     zone_id: Optional[int] = None,
+    global_id: Optional[int] = None,
     limit: int = 50,
 ) -> List[Dict]:
     conn = connect_db(validate_schema=False)
@@ -480,6 +548,9 @@ def search_alerts(
     if zone_id is not None:
         sql += " AND zone_id = ?"
         params.append(zone_id)
+    if global_id is not None:
+        sql += " AND global_id = ?"
+        params.append(global_id)
     sql += " ORDER BY timestamp DESC LIMIT ?"
     params.append(limit)
 
@@ -492,6 +563,7 @@ def search_alerts(
     for row in rows:
         timestamp = row[1]
         frame_number = row[11]
+        video_path = _sanitize_video_path(row[10])
         results.append({
             "id": row[0],
             "timestamp": timestamp,
@@ -503,7 +575,7 @@ def search_alerts(
             "track_id": row[7],
             "object_type": row[8],
             "message": row[9],
-            "video_path": row[10],
+            "video_path": video_path,
             "frame_number": frame_number,
             "frame_start": frame_number,
             "frame_end": frame_number,
@@ -575,7 +647,7 @@ def get_recent_alerts(limit: int = 50) -> List[Dict]:
             "object_type": row[7],
             "message": row[8],
             "acknowledged": bool(row[9]),
-            "video_path": row[10],
+            "video_path": _sanitize_video_path(row[10]),
             "frame_number": row[11],
             "track_id": row[12],
             "snapshot_path": row[13],

@@ -26,6 +26,7 @@ from pydantic import BaseModel
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import alerts
+import reset_live_data
 import school_calendar
 import camera_registry
 import camera_stream
@@ -523,16 +524,125 @@ def license_apply(req: LicenseApplyRequest, http_request: Request = None,
 
 
 # ---------------------------------------------------------------------------
-# Dashboard root
+# Public marketing site (root) + dashboard (/app)
 # ---------------------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    index_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
+def _serve_html(filename: str, fallback: str) -> HTMLResponse:
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h3>Sentinel AI CCTV Engine is online. dashboard index.html missing.</h3>")
+    return HTMLResponse(content=fallback)
+
+
+@app.get("/", response_class=HTMLResponse)
+def read_landing():
+    """Public marketing / lead-capture site."""
+    return _serve_html(
+        "landing.html",
+        "<h3>Sentinel AI is online. Marketing page landing.html missing. Dashboard at <a href='/app'>/app</a>.</h3>",
+    )
+
+
+@app.get("/app", response_class=HTMLResponse)
+def read_dashboard():
+    """The operator dashboard (login-gated in-app)."""
+    return _serve_html(
+        "index.html",
+        "<h3>Sentinel AI CCTV Engine is online. dashboard index.html missing.</h3>",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public lead capture (marketing site "Request a callback" form)
+# ---------------------------------------------------------------------------
+
+class LeadRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    org: Optional[str] = ""
+    use_case: Optional[str] = ""
+    message: Optional[str] = ""
+    website: Optional[str] = ""  # honeypot: real users leave this empty
+
+
+def _ensure_leads_table(conn) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            org TEXT,
+            use_case TEXT,
+            message TEXT,
+            source_ip TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+
+@app.post("/api/leads")
+def create_lead(lead: LeadRequest, http_request: Request = None):
+    """Public endpoint — the marketing site posts callback requests here."""
+    # Honeypot: silently accept bot submissions without storing them.
+    if (lead.website or "").strip():
+        return {"ok": True}
+
+    name = (lead.name or "").strip()
+    email = (lead.email or "").strip()
+    phone = (lead.phone or "").strip()
+    if not name or not email or not phone:
+        raise HTTPException(status_code=422, detail="Name, email and phone are required.")
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=422, detail="Please provide a valid email address.")
+
+    import sqlite3
+    from db_schema import get_db_path
+
+    conn = sqlite3.connect(get_db_path())
+    try:
+        _ensure_leads_table(conn)
+        conn.execute(
+            "INSERT INTO leads (name, email, phone, org, use_case, message, source_ip, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                name[:120],
+                email[:160],
+                phone[:30],
+                (lead.org or "").strip()[:160],
+                (lead.use_case or "").strip()[:120],
+                (lead.message or "").strip()[:1000],
+                _client_ip(http_request),
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/leads", dependencies=[Depends(require_roles("principal"))])
+def list_leads():
+    """Authenticated call-list view for the team."""
+    import sqlite3
+    from db_schema import get_db_path
+
+    conn = sqlite3.connect(get_db_path())
+    try:
+        _ensure_leads_table(conn)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, name, email, phone, org, use_case, message, source_ip, created_at "
+            "FROM leads ORDER BY id DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+    return {"count": len(rows), "leads": [dict(r) for r in rows]}
 
 
 # ---------------------------------------------------------------------------
@@ -685,9 +795,22 @@ def run_natural_language_query(request: NLQueryRequest, http_request: Request = 
     _require_feature("nl_search")
     q = (request.query or "").strip()
     if not q:
-        # Empty query = show every logged event, in the order it was logged.
-        results = query_engine.run_query(filters={}, session_mode=request.session_mode)
-        results.sort(key=lambda r: (r.get("entry_time") or r.get("timestamp") or ""))
+        # Empty query = show every logged event AND every alert (fall / intrusion /
+        # after-hours / violence live in the alerts table, not events).
+        event_rows = query_engine.run_query(filters={}, session_mode=request.session_mode)
+        alert_rows = alerts.search_alerts()
+        combined = list(event_rows) + list(alert_rows)
+        seen = set()
+        results = []
+        for row in combined:
+            key = (row.get("timestamp") or row.get("entry_time"),
+                   row.get("camera_id"), row.get("global_id"),
+                   row.get("alert_type") or row.get("event_type"))
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append(row)
+        results.sort(key=lambda r: (r.get("entry_time") or r.get("timestamp") or ""), reverse=True)
         intent = {"all_events": True}
     else:
         results = search_service.search(request.query, session_mode=request.session_mode)
@@ -765,6 +888,62 @@ def investigate_recurring_actors(min_alerts: int = 2, min_span_seconds: float = 
 
 
 # ---------------------------------------------------------------------------
+# Scoped investigation — powers the Investigate tab. Never runs
+# automatically; the frontend hits these only when the user clicks "Run
+# investigation". Scope is either a specific uploaded video (by video_path)
+# or a live-camera + time window.
+# ---------------------------------------------------------------------------
+
+class InvestigationScopeRequest(BaseModel):
+    source: str                              # "upload" | "camera"
+    video_path: Optional[str] = None
+    camera_id: Optional[int] = None
+    start: Optional[str] = None
+    end: Optional[str] = None
+
+
+@app.get("/api/investigate/sources", dependencies=[Depends(current_user)])
+def investigate_sources(http_request: Request = None,
+                        user: dict = Depends(current_user)):
+    """List the sources the Investigate tab can scope to: distinct uploaded
+    videos found in the events table, plus every registered camera."""
+    _require_feature("nl_search")
+    sources = query_engine.list_investigation_sources()
+    cameras = [{"id": c["id"], "name": c.get("name") or f"Camera {c['id']}"}
+               for c in camera_registry.list_cameras()]
+    record_audit(user["username"], user["role"], "investigate_sources",
+                 target="-", details=f"{len(sources.get('uploads', []))} uploads",
+                 ip=_client_ip(http_request))
+    return {"uploads": sources.get("uploads", []), "cameras": cameras}
+
+
+@app.post("/api/investigate/scope", dependencies=[Depends(current_user)])
+def investigate_scope(request: InvestigationScopeRequest,
+                      http_request: Request = None,
+                      user: dict = Depends(current_user)):
+    """Return every event + alert inside the given scope, plus aggregated
+    persons/zones/cameras. Powers both the node graph and the timeline
+    table in the Investigate tab."""
+    _require_feature("nl_search")
+    try:
+        scope = query_engine.get_investigation_scope(
+            source=request.source,
+            video_path=request.video_path,
+            camera_id=request.camera_id,
+            start=request.start,
+            end=request.end,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    target = request.video_path if request.source == "upload" else f"camera {request.camera_id}"
+    record_audit(user["username"], user["role"], "investigate_scope",
+                 target=target or "-",
+                 details=f"{len(scope['events'])} events, {len(scope['alerts'])} alerts",
+                 ip=_client_ip(http_request))
+    return scope
+
+
+# ---------------------------------------------------------------------------
 # One-click clip playback (byte-range seekable source video)
 # ---------------------------------------------------------------------------
 
@@ -777,6 +956,9 @@ def _is_allowed_video(path: str) -> bool:
     if norm.startswith(os.path.normcase(os.path.abspath(UPLOAD_DIR))):
         return True
     if norm.startswith(os.path.normcase(os.path.abspath(OUTPUT_DIR))):
+        return True
+    # Post-event clips written by alert_clip_recorder for live-camera alerts.
+    if norm.startswith(os.path.normcase(os.path.abspath("alert_clips"))):
         return True
     for cam in camera_registry.list_cameras():
         src = camera_registry.get_camera(cam["id"]).get("source")
@@ -1267,6 +1449,44 @@ def stop_camera_analytics(camera_id: int, http_request: Request = None,
     return result
 
 
+class FlipRequest(BaseModel):
+    flip_180: bool
+
+
+@app.post("/api/cameras/{camera_id}/flip",
+          dependencies=[Depends(require_roles("tech"))])
+def set_camera_flip_endpoint(camera_id: int, request: FlipRequest,
+                             http_request: Request = None,
+                             user: dict = Depends(current_user)):
+    """Toggle 180° rotation for a camera (upside-down mount correction).
+    Persists to cameras.json AND applies to a running analytics session so
+    the operator doesn't have to restart the pipeline."""
+    ok = camera_registry.set_camera_flip(camera_id, request.flip_180)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Camera not found.")
+    import live_analytics
+    live_state = live_analytics.set_flip(camera_id, request.flip_180)
+    record_audit(user["username"], user["role"], "camera_flip",
+                 target=f"camera {camera_id}",
+                 details=f"flip_180={request.flip_180}", ip=_client_ip(http_request))
+    return {"ok": True, "flip_180": request.flip_180, **live_state}
+
+
+@app.post("/api/cameras/{camera_id}/analytics/reload-zones",
+          dependencies=[Depends(require_roles("tech"))])
+def reload_camera_zones(camera_id: int, http_request: Request = None,
+                        user: dict = Depends(current_user)):
+    """Tell a running per-camera analytics session to re-read zones.json.
+    No-op (200 OK) if the session isn't running — the caller doesn't have
+    to check first."""
+    import live_analytics
+    result = live_analytics.reload_zones(camera_id)
+    record_audit(user["username"], user["role"], "reload_zones",
+                 target=f"camera {camera_id}",
+                 details=str(result), ip=_client_ip(http_request))
+    return result
+
+
 @app.get("/api/cameras/analytics/status", dependencies=[Depends(current_user)])
 def camera_analytics_status():
     import live_analytics
@@ -1487,6 +1707,45 @@ def clear_audit(http_request: Request = None, user: dict = Depends(current_user)
     return {"status": "cleared", "removed": removed}
 
 
+@app.post("/api/dev/reset-test-data", dependencies=[Depends(require_roles())])
+def reset_test_data(http_request: Request = None, user: dict = Depends(current_user)):
+    """Wipe accumulated detection data for a clean test run. Developer only.
+
+    Clears: alerts, events, tracking_data, intrusion_logs, line_crossings,
+    notifications, person_logs, plus the alert_snapshots/ directory.
+    Preserves: cameras, zones, users, active_tokens, leads, audit_log.
+    """
+    result = reset_live_data.main(assume_yes=True)
+    cleared = result.get("cleared", {}) if isinstance(result, dict) else {}
+
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def _wipe_dir(dirname: str) -> int:
+        target = os.path.join(project_root, dirname)
+        removed = 0
+        if os.path.isdir(target):
+            for name in os.listdir(target):
+                path = os.path.join(target, name)
+                try:
+                    if os.path.isfile(path):
+                        os.remove(path)
+                        removed += 1
+                except OSError:
+                    pass
+        return removed
+
+    snapshots_removed = _wipe_dir("alert_snapshots")
+    clips_removed = _wipe_dir("alert_clips")
+
+    total_rows = sum(cleared.values()) if cleared else 0
+    record_audit(user["username"], user["role"], "reset_test_data",
+                 target="live_data",
+                 details=f"cleared {total_rows} rows + {snapshots_removed} snapshots + {clips_removed} clips",
+                 ip=_client_ip(http_request))
+    return {"status": "cleared", "rows": cleared, "snapshots_removed": snapshots_removed,
+            "clips_removed": clips_removed}
+
+
 # ---------------------------------------------------------------------------
 # Telemetry & Executive Analytics Export
 # ---------------------------------------------------------------------------
@@ -1497,7 +1756,7 @@ def export_analytics_report(user: dict = Depends(current_user)):
     cameras = camera_registry.list_cameras()
     total_cameras = len(cameras)
     active_workers = live_analytics.status()
-    
+
     report_data = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "platform": "Sentinel 2.0 AI Surveillance",
@@ -1545,4 +1804,3 @@ def telemetry_endpoint(user: dict = Depends(current_user)):
         "active_workers": len(workers),
         "workers_snapshot": workers,
     }
-

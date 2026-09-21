@@ -22,7 +22,9 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import inference_config
 
 # COCO-17 keypoint indices used for the torso-orientation test.
-NOSE, L_SHOULDER, R_SHOULDER, L_HIP, R_HIP, L_ANKLE, R_ANKLE = 0, 5, 6, 11, 12, 15, 16
+NOSE, L_SHOULDER, R_SHOULDER, L_ELBOW, R_ELBOW, L_WRIST, R_WRIST, L_HIP, R_HIP, L_ANKLE, R_ANKLE = (
+    0, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16
+)
 KP_CONF_MIN = 0.3   # ignore keypoints the pose model isn't confident about
 
 _model = None
@@ -69,6 +71,37 @@ def fallen_confidence_from_keypoints(kpts: Sequence[Sequence[float]]) -> Tuple[f
 
     horizontal_ratio = dx / (dx + dy)   # 1.0 = lying flat, 0.0 = fully upright
     return horizontal_ratio, f"torso_horizontal_ratio={horizontal_ratio:.2f}"
+
+
+def raised_arms_from_keypoints(kpts: Sequence[Sequence[float]]) -> Tuple[bool, str]:
+    """Pure geometry: return (raised, reason) — True when at least one wrist is
+    ABOVE the same-side shoulder (smaller y in image coordinates).
+
+    Used by the anomaly detector's optional pose augment on triggered altercations
+    to attach a 'raised_arms' flag to the alert. Never mutates or suppresses the
+    alert. Confidence-gated on KP_CONF_MIN so a low-confidence wrist doesn't fake
+    a raised arm.
+    """
+    def pt(i: int) -> Optional[Tuple[float, float]]:
+        x, y, c = kpts[i][0], kpts[i][1], kpts[i][2]
+        return (float(x), float(y)) if float(c) >= KP_CONF_MIN else None
+
+    l_wrist, r_wrist = pt(L_WRIST), pt(R_WRIST)
+    l_shoulder, r_shoulder = pt(L_SHOULDER), pt(R_SHOULDER)
+
+    checked_any = False
+    if l_wrist is not None and l_shoulder is not None:
+        checked_any = True
+        if l_wrist[1] < l_shoulder[1]:
+            return True, "left_wrist_above_shoulder"
+    if r_wrist is not None and r_shoulder is not None:
+        checked_any = True
+        if r_wrist[1] < r_shoulder[1]:
+            return True, "right_wrist_above_shoulder"
+
+    if not checked_any:
+        return False, "insufficient_arm_keypoints"
+    return False, "wrists_below_shoulders"
 
 
 def verify_fall(frame, bbox, thresh: Optional[float] = None) -> Dict:

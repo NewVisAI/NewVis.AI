@@ -25,6 +25,7 @@ Design notes:
     live_analytics.stop(1)
 """
 
+import gc
 import os
 import queue
 import threading
@@ -262,6 +263,8 @@ class _LiveWorker:
         self.analytics_thread = threading.Thread(target=self._analytics_loop, name=f"live-analytics-{self.camera_id}", daemon=True)
 
         self.status = "starting"          # reader/display status
+        self._camera_state = None         # populated by analytics loop; used for hot-reloading zones
+        self.flip_180 = bool(config.get("flip_180", False))  # upside-down camera correction
         self.display_frames = 0
         self.analytics_frames = 0
         self.active_frames = 0            # frames processed at the fast rate
@@ -284,6 +287,29 @@ class _LiveWorker:
 
     def stop(self):
         self.stop_event.set()
+
+    def set_flip(self, flip_180: bool) -> None:
+        """Toggle upside-down correction on the fly. Applies from the next
+        frame the reader thread grabs."""
+        self.flip_180 = bool(flip_180)
+
+    def reload_zones(self) -> dict:
+        """Force the running analytics loop to re-read zones.json for this
+        camera on the next frame. Called after a zone/line is drawn while
+        the pipeline is live, so the operator doesn't have to restart.
+        """
+        cs = self._camera_state
+        if cs is None:
+            return {"reloaded": False, "reason": "not_running"}
+        try:
+            from zone_manager import get_camera_zones
+            fresh = get_camera_zones(self.camera_id)
+            if fresh:
+                cs.zone_defs = fresh
+            cs.pixel_zones = None
+            return {"reloaded": True, "zones": len(cs.zone_defs or [])}
+        except Exception as exc:
+            return {"reloaded": False, "reason": str(exc)}
 
     def snapshot(self) -> dict:
         return {
@@ -311,9 +337,23 @@ class _LiveWorker:
         cap = None
         fails = 0
         open_backoff = 2.0
+        cap_opened_at = 0.0
+        # Recycle the VideoCapture every N seconds to release the accumulated
+        # HEVC/ffmpeg internal buffers, which slowly leak on Windows CPU-only
+        # opencv builds and eventually OOM after a few hours. Pure hygiene —
+        # opening a fresh capture is cheap compared to the leak.
+        _CAP_RECYCLE_S = 900   # 15 min
         try:
             while not self.stop_event.is_set():
                 try:
+                    if cap is not None and cap.isOpened() and (time.time() - cap_opened_at) > _CAP_RECYCLE_S:
+                        try:
+                            cap.release()
+                        except Exception:
+                            pass
+                        cap = None
+                        gc.collect()
+                        self.status = "recycling"
                     if cap is None or not cap.isOpened():
                         self.status = "waiting-for-camera"
                         if not _source_reachable(self.source):
@@ -332,6 +372,7 @@ class _LiveWorker:
                             continue
                         open_backoff = 2.0
                         fails = 0
+                        cap_opened_at = time.time()
                         self.status = "running"
                         # One-time: log whether hardware decode actually engaged, so a
                         # GPU node can confirm NVDEC/QuickSync is on (0 = software).
@@ -360,6 +401,12 @@ class _LiveWorker:
                             self.stop_event.wait(0.05)
                         continue
                     fails = 0
+
+                    # Upside-down camera correction — rotate 180° BEFORE anything
+                    # downstream sees the frame so live tile, analytics, snapshots
+                    # and the alert clip recorder all agree on which way is up.
+                    if self.flip_180:
+                        frame = cv2.rotate(frame, cv2.ROTATE_180)
 
                     # Publish the raw frame (LIVE banner only) — smooth, real-time.
                     disp = frame
@@ -525,6 +572,7 @@ class _LiveWorker:
                 try:
                     if camera_state is None:
                         camera_state = _create_camera_runtime(self.config)
+                        self._camera_state = camera_state
                         if camera_state is None:
                             continue
                         try:
@@ -592,6 +640,28 @@ def stop(camera_id: int) -> dict:
             return {"stopped": False, "reason": "not running"}
         worker.stop()
         return {"stopped": True, "camera_id": camera_id}
+
+
+def set_flip(camera_id: int, flip_180: bool) -> dict:
+    """Update the flip preference on a running per-camera worker, if any.
+    Returns whether a running worker got the update; persistence to
+    cameras.json happens separately (in the API handler)."""
+    with _lock:
+        worker = _workers.get(camera_id)
+    if worker is None:
+        return {"applied_live": False}
+    worker.set_flip(flip_180)
+    return {"applied_live": True}
+
+
+def reload_zones(camera_id: int) -> dict:
+    """Ask a running per-camera analytics session to re-read zones.json.
+    No-op if no session is running for that camera."""
+    with _lock:
+        worker = _workers.get(camera_id)
+    if worker is None:
+        return {"reloaded": False, "reason": "no_session"}
+    return worker.reload_zones()
 
 
 def stop_all():

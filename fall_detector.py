@@ -6,7 +6,9 @@ bounding boxes the existing detector/tracker pipeline already produces.
 
 Detection logic (transition-based, from the verified SCI implementation):
 a fall is a *transition* observed over a short sliding window —
-  1. the person WAS upright (width/height below ASPECT_RATIO_STANDING_MAX),
+  1. the person WAS upright (aspect ratio below ASPECT_RATIO_STANDING_MAX for
+     a majority of the pre-transition half of the window, so a sitting person
+     whose bbox momentarily narrows cannot fake the transition),
   2. is NOW horizontal (width/height above ASPECT_RATIO_FALLEN_MIN),
   3. and their centroid dropped by at least VERTICAL_DROP_RATIO of their
      own body height within that window.
@@ -17,6 +19,14 @@ Robustness additions (from the HackathonPro implementation):
   - EMA smoothing of bbox geometry before it enters the window, so jittery
     low-confidence boxes don't fake a transition.
   - Cooldown measured in video-time seconds (FPS-independent), per identity.
+
+Confidence class (attached to every fired fall):
+  "medium" — bbox transition matched cleanly, no other signal
+  "high"   — bbox transition + pose torso confirms horizontal
+             OR + post-fall stillness confirms person stayed down
+             (both can be checked with stillness_status() after the fact)
+  "low"    — bbox transition marginal (drop ratio only just over threshold)
+Safety rule: confidence never suppresses. A "low" fall still fires.
 
 Usage from app.py's per-track loop:
 
@@ -40,14 +50,21 @@ MIN_HISTORY_FOR_FALL = 5
 ASPECT_RATIO_STANDING_MAX = 0.8   # width/height below this looks upright
 ASPECT_RATIO_FALLEN_MIN = 1.2     # width/height above this looks horizontal
 VERTICAL_DROP_RATIO = 0.5         # centroid must drop at least this many bbox-heights
+STANDING_MAJORITY = 0.6           # fraction of pre-transition samples that must be upright
 ALERT_COOLDOWN_SECONDS = 5.0      # per-identity, FPS-independent
 DISPLAY_WINDOW_SECONDS = 3.0      # how long the "FALLEN" label stays on screen
 EMA_ALPHA = 0.25                  # smoothing for jittery low-quality bounding boxes
 
+# Confidence thresholds — how the bbox drop ratio alone maps to a class
+# before pose/stillness augmentation. Both signals can promote up one step.
+DROP_RATIO_HIGH = 0.9             # very clear fall = start at "high"
+DROP_RATIO_MEDIUM = VERTICAL_DROP_RATIO  # meets threshold = "medium"
+
 _history: Dict[Tuple, "collections.deque"] = {}
 _smoothed: Dict[Tuple, Dict[str, float]] = {}
 _last_fall_time: Dict[int, float] = {}
-_active_falls: Dict[int, float] = {}  # global_id -> video_time it should stop showing
+# global_id -> {"expiry": float, "fall_time": float, "track_key": tuple, "fall_cy": float, "fall_h": float, "confirmed": Optional[bool]}
+_active_falls: Dict[int, Dict[str, object]] = {}
 
 
 def reset_fall_state() -> None:
@@ -63,8 +80,11 @@ def reset_identity(track_key) -> None:
 
 
 def is_currently_fallen(global_id: int, video_time: float) -> bool:
-    expiry = _active_falls.get(global_id)
-    return expiry is not None and video_time <= expiry
+    record = _active_falls.get(global_id)
+    if record is None:
+        return False
+    expiry = record.get("expiry")
+    return isinstance(expiry, (int, float)) and video_time <= float(expiry)
 
 
 def _bbox_metrics(bbox: Tuple[int, int, int, int]) -> Tuple[float, float, float]:
@@ -73,6 +93,11 @@ def _bbox_metrics(bbox: Tuple[int, int, int, int]) -> Tuple[float, float, float]
     height = max(1.0, float(y2 - y1))
     centroid_y = (y1 + y2) / 2.0
     return width / height, centroid_y, height
+
+
+def _confidence_from_drop(drop_ratio: float) -> str:
+    from confidence import classify
+    return classify(drop_ratio, (DROP_RATIO_MEDIUM, DROP_RATIO_HIGH))
 
 
 def check_fall(
@@ -119,7 +144,13 @@ def check_fall(
     earliest = history[0]
     latest = history[-1]
 
-    was_standing = earliest["ratio"] < ASPECT_RATIO_STANDING_MAX
+    # Was-standing gate: majority of the FIRST HALF of the window must be upright.
+    # This kills the "sitting person whose bbox narrows for one frame" false positive
+    # that the old single-sample check could not catch.
+    half = max(1, len(history) // 2)
+    upright_count = sum(1 for s in list(history)[:half] if s["ratio"] < ASPECT_RATIO_STANDING_MAX)
+    was_standing = (upright_count / half) >= STANDING_MAJORITY
+
     now_horizontal = latest["ratio"] > ASPECT_RATIO_FALLEN_MIN
     vertical_drop_ratio = (latest["cy"] - earliest["cy"]) / earliest["h"]
     dropped_significantly = vertical_drop_ratio > VERTICAL_DROP_RATIO
@@ -127,18 +158,31 @@ def check_fall(
     if not (was_standing and now_horizontal and dropped_significantly):
         return None
 
-    _active_falls[global_id] = video_time + DISPLAY_WINDOW_SECONDS
-
     last_fall = _last_fall_time.get(global_id)
     if last_fall is not None and (video_time - last_fall) < ALERT_COOLDOWN_SECONDS:
+        # Cooldown: still note the person is currently fallen (extend display window)
+        # but do not re-fire the alert.
+        record = _active_falls.get(global_id, {})
+        record["expiry"] = video_time + DISPLAY_WINDOW_SECONDS
+        _active_falls[global_id] = record
         return None
 
     _last_fall_time[global_id] = video_time
+    _active_falls[global_id] = {
+        "expiry": video_time + DISPLAY_WINDOW_SECONDS,
+        "fall_time": video_time,
+        "track_key": track_key,
+        "fall_cy": latest["cy"],
+        "fall_h": max(1.0, latest["h"]),
+        "confirmed": None,
+    }
+
     details = {
         "aspect_ratio_before": round(earliest["ratio"], 2),
         "aspect_ratio_after": round(latest["ratio"], 2),
         "vertical_drop_ratio": round(vertical_drop_ratio, 2),
         "window_seconds": round(latest["time"] - earliest["time"], 2),
+        "confidence_class": _confidence_from_drop(vertical_drop_ratio),
     }
 
     # Event-gated pose verification (POSE_VERIFY): only now — on a rare, newly-detected
@@ -150,8 +194,69 @@ def check_fall(
             import inference_config
             if inference_config.pose_verify():
                 import pose_verify
-                details.update(pose_verify.verify_fall(frame, bbox))
+                pose_details = pose_verify.verify_fall(frame, bbox)
+                details.update(pose_details)
+                # Pose torso confirm can promote medium -> high (never demote).
+                if pose_details.get("pose_verified") is True and details["confidence_class"] == "medium":
+                    details["confidence_class"] = "high"
         except Exception:
             pass  # pose is best-effort; the fall alert stands regardless
 
     return details
+
+
+def stillness_status(global_id: int, video_time: float) -> Optional[Dict]:
+    """Post-fall stillness check.
+
+    After a fall has fired for ``global_id``, once ``FALL_STILLNESS_SECONDS`` of
+    video-time have elapsed we compare the most recent smoothed bbox centroid to
+    the centroid at the moment of the fall. If the person stayed within
+    ``fall_stillness_movement_ratio`` body-heights, stillness is confirmed and the
+    fall is upgraded to "high" confidence. If they moved beyond that (got back up,
+    ran off), stillness is refuted and confidence is downgraded to "low".
+
+    Returns ``None`` while the fall is not yet due for evaluation, and returns the
+    same dict again on repeat calls after evaluation (caller can dedup by
+    ``confirmed`` field). The caller wires this from the live per-track loop; it
+    reads only existing state, no new per-track dict.
+    """
+    record = _active_falls.get(global_id)
+    if record is None:
+        return None
+    if record.get("confirmed") is not None:
+        return {
+            "stillness_confirmed": bool(record["confirmed"]),
+            "confidence_class": str(record.get("post_confidence_class", "medium")),
+        }
+
+    import inference_config
+    window = inference_config.fall_stillness_seconds()
+    move_ratio_limit = inference_config.fall_stillness_movement_ratio()
+
+    fall_time = float(record.get("fall_time", video_time))
+    if (video_time - fall_time) < window:
+        return None
+
+    track_key = record.get("track_key")
+    smoothed = _smoothed.get(track_key) if track_key is not None else None
+    if smoothed is None:
+        # Track was lost during the window — treat as unknown; leave the alert as-is.
+        record["confirmed"] = False
+        record["post_confidence_class"] = "medium"
+        return {"stillness_confirmed": False, "confidence_class": "medium"}
+
+    fall_cy = float(record.get("fall_cy", smoothed["cy"]))
+    fall_h = float(record.get("fall_h", max(1.0, smoothed["h"])))
+    movement = abs(smoothed["cy"] - fall_cy) / max(1.0, fall_h)
+
+    still = movement <= move_ratio_limit
+    if still:
+        record["confirmed"] = True
+        record["post_confidence_class"] = "high"
+    else:
+        record["confirmed"] = False
+        record["post_confidence_class"] = "low"
+    return {
+        "stillness_confirmed": still,
+        "confidence_class": record["post_confidence_class"],
+    }

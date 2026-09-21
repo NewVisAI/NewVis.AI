@@ -86,6 +86,7 @@ def _public_view(cam: Dict) -> Dict:
         "floor": cam.get("floor"),
         "location": cam.get("location"),
         "stream_url": f"/api/cameras/{cam.get('id')}/stream",
+        "flip_180": bool(cam.get("flip_180", False)),
         "source_present": (
             bool(cam.get("source")) and (
                 str(cam.get("source")).startswith(("rtsp://", "http://", "https://")) or
@@ -93,6 +94,31 @@ def _public_view(cam: Dict) -> Dict:
             )
         ),
     }
+
+
+def set_camera_flip(camera_id: int, flip_180: bool) -> bool:
+    """Persist the flip preference for a camera to cameras.json. Returns
+    True on success, False if the camera doesn't exist."""
+    with _registry_lock:
+        try:
+            with open(REGISTRY_PATH, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return False
+        found = False
+        for cam in data.get("cameras", []):
+            if int(cam.get("id")) == int(camera_id):
+                cam["flip_180"] = bool(flip_180)
+                found = True
+                break
+        if not found:
+            return False
+        try:
+            with open(REGISTRY_PATH, "w", encoding="utf-8") as handle:
+                json.dump(data, handle, indent=2)
+        except OSError:
+            return False
+    return True
 
 
 def resolve_floor(query: str) -> Optional[str]:

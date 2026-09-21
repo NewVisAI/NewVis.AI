@@ -269,11 +269,95 @@ def pose_verify() -> bool:
     really in a fallen posture. It AUGMENTS the fall alert (pose_verified/pose_confidence)
     and NEVER suppresses it — a safety system must not drop a real fall because pose
     disagreed. Average compute stays ~zero because it fires only on the rare fall event.
-    Off by default; enable per node once validated on that site's footage."""
+
+    Default ON: augment-only, so it can never silence an alert; the recall gain on
+    falls toward/away from the camera (where bbox never flips horizontal) is worth
+    the near-zero cost. Set POSE_VERIFY=0 to disable on a node that lacks the pose
+    weights or wants to skip the one-off model load on the first real fall."""
     v = os.environ.get("POSE_VERIFY")
     if v not in (None, ""):
         return str(v).strip() in ("1", "true", "True")
-    return bool(_load().get("pose_verify", False))
+    return bool(_load().get("pose_verify", True))
+
+
+def fall_stillness_seconds() -> float:
+    """Window (video-time seconds) after a bbox-triggered fall during which the person's
+    subsequent motion is watched. If they stay near-still for the whole window, the fall
+    is CONFIRMED (stillness_confirmed=True, confidence bumps to "high"). If they get up
+    inside it, stillness_confirmed=False and confidence drops. Only augments — never
+    suppresses the alert. Default 3.0s balances confirmation latency against risk of a
+    real fall the person recovers from quickly."""
+    override = os.environ.get("FALL_STILLNESS_SECONDS")
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get("fall_stillness_seconds")
+    return float(cfg) if isinstance(cfg, (int, float)) else 3.0
+
+
+def fall_stillness_movement_ratio() -> float:
+    """Maximum centroid movement (in bbox-heights) during the stillness window still
+    counted as 'still'. Default 1.0 = the person may drift up to their own body-height
+    (a rolled onto side / small squirm) and still confirm as fallen; a get-up jumps
+    well beyond this. Tuned once per site once real footage exists."""
+    override = os.environ.get("FALL_STILLNESS_MOVEMENT_RATIO")
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get("fall_stillness_movement_ratio")
+    return float(cfg) if isinstance(cfg, (int, float)) else 1.0
+
+
+def _running_float(env_var: str, json_key: str, default: float) -> float:
+    override = os.environ.get(env_var)
+    if override not in (None, ""):
+        try:
+            return float(override)
+        except ValueError:
+            pass
+    cfg = _load().get(json_key)
+    return float(cfg) if isinstance(cfg, (int, float)) else default
+
+
+# --- Running detector (running.py) tunables ------------------------------------------- #
+def running_speed_threshold() -> float:
+    """Speed (bbox-heights per second) above which a track is 'running'. Bbox-heights
+    normalisation gives distance invariance (a person near vs far reads the same).
+    Default 2.5 was tuned by inspection on classroom hallway footage — validate per site."""
+    return _running_float("RUNNING_SPEED_THRESHOLD", "running_speed_threshold", 2.5)
+
+
+def running_min_samples() -> int:
+    """Warmup: number of per-track updates before the speed reading is trusted.
+    Kills the false positive from the very first frames where velocity is meaningless."""
+    return int(_running_float("RUNNING_MIN_SAMPLES", "running_min_samples", 6))
+
+
+def running_sustained_samples() -> int:
+    """Consecutive updates in which speed must exceed threshold before firing (a single
+    jittery-bbox spike does NOT count as running). Default 3 = ~0.1s at 30 fps."""
+    return int(_running_float("RUNNING_SUSTAINED_SAMPLES", "running_sustained_samples", 3))
+
+
+def running_direction_check() -> bool:
+    """When true, in addition to sustained speed the smoothed velocity direction must
+    stay coherent across the sustained window (dot product of successive velocity
+    vectors > 0). A real run keeps direction; bbox jitter oscillates. Default on."""
+    v = os.environ.get("RUNNING_DIRECTION_CHECK")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("running_direction_check", True))
+
+
+def running_edge_margin_pct() -> float:
+    """Fraction of the frame width/height near the boundary within which a bbox is
+    considered 'at the edge' and suppressed for running (bbox distortion at edges
+    inflates apparent speed). 0.05 = 5% margin. Set to 0 to disable edge suppression."""
+    return _running_float("RUNNING_EDGE_MARGIN_PCT", "running_edge_margin_pct", 0.05)
 
 
 def pose_verify_weights() -> str:
@@ -344,6 +428,35 @@ def anomaly_streak() -> int:
 def anomaly_cooldown_s() -> float:
     """Minimum seconds between alerts for the same pair."""
     return _anomaly_float("ANOMALY_COOLDOWN_S", "anomaly_cooldown_s", 8.0)
+
+
+def anomaly_min_duration_seconds() -> float:
+    """Minimum wall-clock duration (video-time seconds) the 'engaged' state must be
+    sustained before firing, in addition to the frame-count streak. Makes the trigger
+    FPS-independent — the same real interaction should fire whether the pipeline is
+    running at 10 fps or 30 fps. Default 2.0s. A brief path-crossing is under this;
+    a real scuffle sustains it."""
+    return _anomaly_float("ANOMALY_MIN_DURATION_S", "anomaly_min_duration_seconds", 2.0)
+
+
+def anomaly_oscillation_min_flips() -> int:
+    """Minimum number of relative-velocity direction reversals ('oscillations') within
+    the sustained window. Real shoving reverses direction (jostle back-and-forth); a
+    single fast pass-by does not. 0 disables the check. Default 2 requires the pair
+    to swap direction twice, which cleanly excludes co-directional fast movers."""
+    return int(_anomaly_float("ANOMALY_OSCILLATION_MIN_FLIPS", "anomaly_oscillation_min_flips", 2))
+
+
+def raised_arms_check() -> bool:
+    """When true, on a triggered altercation a pose model runs on the two crops and
+    'raised_arms' (wrist above shoulder) is attached to the alert details. Mirrors the
+    POSE_VERIFY pattern — augment-only, never suppresses. Default OFF: unlike a fall
+    (rare and single-person), altercations require TWO pose invocations and fire more
+    often, so enable per-node once you've measured the cost is acceptable."""
+    v = os.environ.get("RAISED_ARMS_CHECK")
+    if v not in (None, ""):
+        return str(v).strip() in ("1", "true", "True")
+    return bool(_load().get("raised_arms_check", False))
 
 
 def motion_window_s() -> float:

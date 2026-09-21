@@ -32,11 +32,12 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 # Ed25519 PUBLIC verification key (safe to ship — cannot sign licenses).
-# Regenerated locally on 2026-07-03 for this dev/test machine (the original
-# team signing key was not present here); the matching private key lives in
-# dev_keys/license_signing_key.pem. To hand off to real deployments, restore
-# the team's public key here and re-issue licenses from the team's private key.
-_PUBLIC_KEY_HEX = "fc1b893e9b92c984f340647283d129e1fc049ee30fbb8356d1c5d490b82391e8"
+# Re-synced 2026-08-18 to match the private signing key currently in
+# dev_keys/license_signing_key.pem (the prior embedded key belonged to a signing
+# key no longer present, so all locally-minted licenses failed to verify). To
+# hand off to real deployments, restore the team's public key here and re-issue
+# licenses from the team's private key.
+_PUBLIC_KEY_HEX = "1ea5e9cf6b1f35cf0bc627484d2599327977151e6f0ee792c29ec99dc024a929"
 
 LICENSE_FILE = "license.key"
 LICENSE_ENV_VAR = "SENTINEL_LICENSE"
