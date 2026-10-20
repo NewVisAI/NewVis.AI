@@ -22,17 +22,25 @@ Per-camera config lives in the camera's `deterrence` block in cameras.json:
     }
 
 Drivers:
-  "log"   — no hardware; logs + audits the intended action. SAFE DEFAULT until the
-            camera's capabilities are confirmed by a live probe.
+  "whitelight" — blink the camera's OWN built-in white-light LED as a strobe via the
+            Xiongmai/XMeye Sofia DVRIP protocol (port 34567). No external hardware.
+            VERIFIED on the Cam 1 Xiongmai (IPC_GK7205V500). The LED is NIGHT-ONLY
+            (schedule + dark-scene gated), so the strobe shows after dark.
+  "log"   — no hardware; logs + audits the intended action. Safe fallback.
   "isapi" — Hikvision-family built-in white-light STROBE + two-way-audio SPEAKER
-            (HTTP ISAPI + digest auth; needs an -S/-U or /SL SKU).
+            (HTTP ISAPI + digest auth; needs an -S/-U or /SL SKU). UNVERIFIED.
   "onvif" — external strobe/siren wired to the camera/NVR ALARM-OUT relay, switched
-            via ONVIF SetRelayOutputState (needs onvif-zeep + a relay output).
+            via ONVIF SetRelayOutputState (raw SOAP). Relay verified on Cam 1
+            (RELAY_OUTPUT_000, port 8899); needs an external siren wired to use.
 
-NOTE: the isapi/onvif paths are firmware/SKU-dependent and were written while the
-camera was offline, so they are UNVERIFIED against real hardware. They fail safe
-(log on any error) and must be validated with a live probe + a dry-run before use.
+NOTE: the isapi path is firmware/SKU-dependent and UNVERIFIED. Every driver fails
+safe (logs on any error) and restores camera state after firing.
 """
+import copy
+import hashlib
+import json
+import socket
+import struct
 import threading
 import time
 from typing import Dict, Optional
@@ -170,7 +178,114 @@ def _drive_onvif(camera_id, cfg: Dict, payload: Dict) -> None:
         _log(f"camera {camera_id}: ONVIF relay failed: {e}")
 
 
-_DRIVERS = {"log": _drive_log, "isapi": _drive_isapi, "onvif": _drive_onvif}
+# --- Xiongmai/Sofia white-light control (DVRIP, port 34567) ----------------- #
+def _sofia_hash(password: str = "") -> str:
+    md5 = hashlib.md5((password or "").encode()).digest()
+    chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    return "".join(chars[(md5[2 * i] + md5[2 * i + 1]) % 62] for i in range(8))
+
+
+class _DvripLight:
+    """Tiny Xiongmai DVRIP (Sofia) client — just enough to blink Camera.WhiteLight."""
+
+    def __init__(self, host, port, user, pwd):
+        self.user, self.pwd = user, pwd
+        self.session, self.seq = 0, 0
+        self.sock = socket.create_connection((host, port), timeout=6)
+
+    def _recvn(self, n):
+        buf = b""
+        while len(buf) < n:
+            c = self.sock.recv(n - len(buf))
+            if not c:
+                break
+            buf += c
+        return buf
+
+    def _cmd(self, msgid, data):
+        p = json.dumps(data).encode() + b"\x00"
+        self.sock.sendall(
+            struct.pack("<BB2xII2xHI", 255, 0, self.session, self.seq, msgid, len(p)) + p)
+        self.seq += 1
+        h = self._recvn(20)
+        if len(h) < 20:
+            return {}
+        _msgid, length = struct.unpack_from("<HI", h, 14)
+        body = self._recvn(length) if length else b""
+        try:
+            return json.loads(body.rstrip(b"\x00").decode("utf-8", "ignore") or "{}")
+        except Exception:
+            return {}
+
+    def login(self):
+        r = self._cmd(1000, {"EncryptType": "MD5", "LoginType": "DVRIP-Web",
+                             "PassWord": _sofia_hash(self.pwd), "UserName": self.user})
+        sid = r.get("SessionID")
+        self.session = int(sid, 16) if isinstance(sid, str) else (sid or 0)
+        return self.session != 0
+
+    def get_whitelight(self):
+        return self._cmd(1042, {"Name": "Camera.WhiteLight",
+                                "SessionID": "0x%08X" % self.session}).get("Camera.WhiteLight")
+
+    def set_workmode(self, base_obj, mode):
+        o = copy.deepcopy(base_obj)
+        o["WorkMode"] = mode
+        return self._cmd(1040, {"Name": "Camera.WhiteLight",
+                                "SessionID": "0x%08X" % self.session,
+                                "Camera.WhiteLight": o}).get("Ret")
+
+    def close(self):
+        try:
+            self.sock.close()
+        except Exception:
+            pass
+
+
+def _drive_whitelight(camera_id, cfg: Dict, payload: Dict) -> None:
+    """Blink the camera's built-in white-light LED as a strobe, over Xiongmai DVRIP
+    (port 34567) by toggling Camera.WhiteLight WorkMode Open/Close. The original
+    WorkMode is restored afterwards.
+
+    NOTE: these full-color white lights are NIGHT-ONLY — gated to a schedule AND to
+    an actually-dark scene — so the strobe is visible after dark, which is exactly
+    when after-hours intrusions occur. In daylight the command succeeds but the LED
+    stays off by firmware design."""
+    host = cfg.get("host")
+    if not host:
+        _log(f"camera {camera_id}: whitelight driver needs 'host'; skipping.")
+        return
+    port = int(cfg.get("dvrip_port", 34567))
+    secs = int(cfg.get("strobe_seconds", DEFAULT_STROBE_S))
+    half = max(0.15, float(cfg.get("blink_half_period", 0.4)))
+    client = None
+    try:
+        client = _DvripLight(host, port, cfg.get("username", "admin"), cfg.get("password", ""))
+        if not client.login():
+            _log(f"camera {camera_id}: whitelight DVRIP login failed")
+            return
+        orig = client.get_whitelight()
+        if not isinstance(orig, dict):
+            _log(f"camera {camera_id}: no Camera.WhiteLight config — this SKU has no white light")
+            return
+        was = orig.get("WorkMode", "Auto")
+        _log(f"camera {camera_id}: white-light STROBE for {secs}s (was WorkMode={was})")
+        end = time.time() + secs
+        while time.time() < end:
+            client.set_workmode(orig, "Open")
+            time.sleep(half)
+            client.set_workmode(orig, "Close")
+            time.sleep(half)
+        client.set_workmode(orig, was)  # restore the camera's normal behaviour
+    except Exception as e:
+        _log(f"camera {camera_id}: whitelight strobe failed: {e}")
+    finally:
+        if client:
+            client.close()
+
+
+_DRIVERS = {"log": _drive_log, "isapi": _drive_isapi, "onvif": _drive_onvif,
+            "whitelight": _drive_whitelight}
 
 
 def _cfg_for(camera_id) -> Dict:
