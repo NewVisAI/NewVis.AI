@@ -149,8 +149,11 @@ def _get_models():
     with _models_lock:
         if _models is None:
             from app import HumanDetector, GlobalIdentityManager, IncidentManager
+            # Config-driven: deployment.json `detector_weights` lets a GPU node
+            # swap models without code changes; defaults to yolov8n.pt on CPU.
             _models = (
-                HumanDetector(model_type="yolo", weights="yolov8n.pt"),
+                HumanDetector(model_type="yolo",
+                              weights=inference_config.get_detector_weights() or "yolov8n.pt"),
                 GlobalIdentityManager(),
                 IncidentManager(),
             )

@@ -43,7 +43,10 @@ def _get_detector():
     global _detector
     if _detector is None:
         # It will automatically detect .pt, .onnx, or .tflite weights and select NPU/TPU/CPU backend
-        _detector = HumanDetector(model_type="yolo", weights="yolov8n.pt")
+        # Config-driven: a GPU node can set detector_weights in deployment.json
+        # (e.g. yolo11n.pt or a TensorRT engine); defaults to yolov8n.pt on CPU.
+        _detector = HumanDetector(model_type="yolo",
+                                  weights=inference_config.get_detector_weights() or "yolov8n.pt")
     return _detector
 
 

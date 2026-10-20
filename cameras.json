@@ -1,12 +1,53 @@
 {
   "_comment": "LIVE-ONLY registry. The 9 downloaded-video demo cameras were moved to cameras.sample.json so only real live camera(s) are analyzed. Add more live cameras by copying the cam 1 block with the camera's RTSP URL. Restore the full demo set with: cp cameras.sample.json cameras.json",
   "floors": [
-    { "id": "first",  "label": "First Floor",  "aliases": ["first floor", "1st floor", "floor 1", "1", "level 1"] },
-    { "id": "second", "label": "Second Floor", "aliases": ["second floor", "2nd floor", "floor 2", "2", "level 2"] }
+    {
+      "id": "first",
+      "label": "First Floor",
+      "aliases": [
+        "first floor",
+        "1st floor",
+        "floor 1",
+        "1",
+        "level 1"
+      ]
+    },
+    {
+      "id": "second",
+      "label": "Second Floor",
+      "aliases": [
+        "second floor",
+        "2nd floor",
+        "floor 2",
+        "2",
+        "level 2"
+      ]
+    }
   ],
   "cameras": [
-    { "id": 1,  "name": "Cam 1 - Lobby",         "floor": "first",  "location": "First Floor Lobby",         "source": "rtsp://admin:@192.168.1.20:554/h264/ch1/main/av_stream", "start_offset_seconds": 0 }
+    {
+      "id": 1,
+      "name": "Cam 1 - Lobby",
+      "floor": "first",
+      "location": "First Floor Lobby",
+      "source": "rtsp://admin:@192.168.1.20:554/h264/ch1/main/av_stream",
+      "start_offset_seconds": 0,
+      "flip_180": true,
+      "_deterrence_comment": "After-hours intrusion -> physical deterrence. driver 'log' only logs (safe default); switch to 'isapi' (Hikvision-OEM built-in strobe+speaker) or 'onvif' (external siren on alarm-out relay) AFTER a live capability probe of the camera (scripts/probe_camera.py). See deterrence.py.",
+      "deterrence": {
+        "enabled": true,
+        "driver": "log",
+        "host": "192.168.1.20",
+        "username": "admin",
+        "password": "",
+        "strobe_seconds": 10,
+        "audio": true,
+        "relay_token": "AlarmOut_0",
+        "onvif_port": 80,
+        "cooldown_seconds": 30
+      }
+    }
   ],
-  "_topology_comment": "Single live camera — no cross-camera topology yet. Add edges here when more live cameras are connected.",
+  "_topology_comment": "Single live camera \u2014 no cross-camera topology yet. Add edges here when more live cameras are connected.",
   "topology": []
 }

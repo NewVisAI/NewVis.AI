@@ -295,6 +295,15 @@ def on_new_alert(alert_data: dict):
 register_event_callback(on_new_event)
 alerts.register_alert_callback(on_new_alert)
 
+# After-hours active deterrence (strobe light + audio warning / external siren).
+# Fires only on live `after_hours_entry` alerts; per-camera config in cameras.json.
+# Default driver is "log" (no hardware) until a camera's capabilities are probed.
+try:
+    import deterrence
+    deterrence.install()
+except Exception as _det_exc:
+    print(f"[DETERRENCE] install skipped: {_det_exc}")
+
 
 async def broadcast_alert(message: dict):
     if not active_websockets:

@@ -80,6 +80,19 @@ def get_detector_weights() -> Optional[str]:
     return _resolve("detector_weights", "DETECTOR_WEIGHTS", None)
 
 
+def get_detector_imgsz() -> int:
+    """Detector input size in px (PyTorch path only; .onnx/.tflite are fixed at
+    export). 640 is the YOLO default and the fastest; raising to 960/1280 lifts
+    recall on small/distant people (AP50 0.465->0.575 at 1280 in our eval) at a
+    latency cost. Set per node via DETECTOR_IMGSZ env or `detector_imgsz` in
+    deployment.json — e.g. 640 on a CPU box, 960/1280 on a GPU box."""
+    raw = _resolve("detector_imgsz", "DETECTOR_IMGSZ", 640)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 640
+
+
 def get_reid_tflite_path() -> str:
     return str(_resolve("reid_tflite", "REID_MODEL_TFLITE", "") or "")
 
@@ -485,6 +498,25 @@ def idle_decode_fps() -> float:
             pass
     cfg = _load().get("idle_decode_fps")
     return float(cfg) if isinstance(cfg, (int, float)) else 2.0
+
+
+def reid_active_exclusion_seconds() -> float:
+    """Same-camera mutual-exclusion window for Global-ID matching (seconds).
+
+    A new track may not take a global identity that was observed in the SAME
+    camera within this window - that person is still visibly held by another
+    live track, so the two cannot be the same individual. 0 disables the
+    constraint (the original behaviour). Env REID_ACTIVE_EXCLUSION_S >
+    deployment.json "reid_active_exclusion_s" > 0.0.
+    """
+    override = os.environ.get("REID_ACTIVE_EXCLUSION_S")
+    if override not in (None, ""):
+        try:
+            return max(0.0, float(override))
+        except ValueError:
+            pass
+    cfg = _load().get("reid_active_exclusion_s")
+    return max(0.0, float(cfg)) if isinstance(cfg, (int, float)) else 0.0
 
 
 def get_reid_similarity_threshold(backend: str) -> float:

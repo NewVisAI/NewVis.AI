@@ -38,6 +38,16 @@ class HumanDetector:
             # Ultralytics natively loads .tflite and .onnx using the same YOLO() call!
             self.model = YOLO(model_weights)
 
+        # Input resolution — higher lifts recall on small/distant people at a
+        # latency cost (configurable; 640 is the YOLO default). Only applied on the
+        # PyTorch path; .onnx/.tflite models run at their fixed exported size.
+        self.imgsz = inference_config.get_detector_imgsz()
+        self._infer_kwargs = {"device": self.device, "verbose": False}
+        if not (self.is_onnx or self.is_tpu):
+            self._infer_kwargs["imgsz"] = self.imgsz
+        print(f"[HumanDetector] Input size (imgsz): {self.imgsz}"
+              + ("" if "imgsz" in self._infer_kwargs else " (fixed by exported model)"))
+
         # Target classes (COCO dataset)
         self.TARGET_CLASSES = [0, 1, 2, 3, 5, 7]
         # 0 = person
@@ -48,8 +58,8 @@ class HumanDetector:
         # 7 = truck
 
     def detect(self, frame):
-        # Run inference specifying the detected device
-        results = self.model(frame, device=self.device, verbose=False)
+        # Run inference (device + configurable input size)
+        results = self.model(frame, **self._infer_kwargs)
 
         detections = []
 
@@ -80,7 +90,7 @@ class HumanDetector:
         if not frames:
             return []
 
-        results = self.model(frames, device=self.device, verbose=False)
+        results = self.model(frames, **self._infer_kwargs)
         batch_detections = []
 
         for result in results:

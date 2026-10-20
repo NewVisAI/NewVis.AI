@@ -120,7 +120,23 @@ scattering `os.getenv` through the pipeline.
 Notable existing flags: `REID_DEFERRED=1` (skip live OSNet, do cross-camera matching on-demand at
 search time — 39 ms → 0.2 ms per Re-ID, but live Global-IDs become unreliable; this is a
 **product decision**, not just an optimization), `SENTINEL_TIER`, `DETECTOR_WEIGHTS`,
-`REID_SIMILARITY_THRESHOLD`.
+`REID_SIMILARITY_THRESHOLD`, `DETECTOR_IMGSZ` (detector input size, default 640; raise to
+960/1280 for recall on small/distant people at a latency cost — PyTorch path only).
+
+### Session changes (2026-10-20)
+- **NL search is rules-first now** (`intent_manager.set_intent`): the rule parser runs first
+  (~1.7 ms, and higher accuracy on our NLQ eval); the Groq LLM (~700 ms) is only called when rules
+  find no structured signal, and its result is cached. ~400× faster text search.
+- **Detector is config-driven on both live paths** (`camera_stream.py`, `live_analytics.py` now use
+  `get_detector_weights() or "yolov8n.pt"`): a GPU node sets `detector_weights` in `deployment.json`;
+  CPU stays on v8n. Measured on this CPU box: yolo11n is NOT faster than v8n (65 vs 58 ms) — its
+  speed win is GPU/ONNX-only; resolution (`DETECTOR_IMGSZ`) is the real recall lever.
+- **After-hours active deterrence** (`deterrence.py`, installed in `backend/server.py`): fires a
+  strobe/speaker (or external siren) on live `after_hours_entry` alerts via a pluggable per-camera
+  driver (`log`|`isapi`|`onvif`) set in each camera's `deterrence` block in cameras.json. Default
+  `log` is safe (logs intent). Driver selection needs a live camera probe — run
+  `scripts/probe_camera.py` (camera at 192.168.1.20 was OFFLINE at build time, so isapi/onvif are
+  UNVERIFIED). `test_deterrence.py` covers the gating/cooldown.
 
 ---
 
