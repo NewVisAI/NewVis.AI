@@ -1,4 +1,4 @@
-"""Read-only camera capability probe (ISAPI / Hikvision-OEM + basic ONVIF hints).
+r"""Read-only camera capability probe (ISAPI / Hikvision-OEM + basic ONVIF hints).
 
 Determines, for an IP camera, whether it exposes a white-light STROBE, a SPEAKER
 (two-way audio), and an alarm-out RELAY — the capabilities the after-hours

@@ -99,29 +99,73 @@ def _drive_isapi(camera_id, cfg: Dict, payload: Dict) -> None:
             _log(f"camera {camera_id}: ISAPI two-way audio failed: {e}")
 
 
+_ONVIF_DEV_NS = "http://www.onvif.org/ver10/device/wsdl"
+
+
+def _onvif_soap(host, port, body: str, user: str, pwd: str):
+    """POST one ONVIF SOAP action to the device service. Includes a
+    WS-UsernameToken (PasswordDigest) for cameras that require auth; cameras that
+    don't (many budget units) simply ignore it. No onvif-zeep dependency."""
+    import base64
+    import datetime
+    import hashlib
+    import os as _os
+    import requests
+    created = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    nonce_b = _os.urandom(16)
+    digest = base64.b64encode(
+        hashlib.sha1(nonce_b + created.encode() + (pwd or "").encode()).digest()).decode()
+    wsse = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+    wsu = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+    header = (
+        f'<s:Header><Security s:mustUnderstand="1" xmlns="{wsse}">'
+        f'<UsernameToken><Username>{user}</Username>'
+        f'<Password Type="http://docs.oasis-open.org/wss/2004/01/'
+        f'oasis-200401-wss-username-token-profile-1.0#PasswordDigest">{digest}</Password>'
+        f'<Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/'
+        f'oasis-200401-wss-soap-message-security-1.0#Base64Binary">'
+        f'{base64.b64encode(nonce_b).decode()}</Nonce>'
+        f'<Created xmlns="{wsu}">{created}</Created>'
+        f'</UsernameToken></Security></s:Header>')
+    env = (f'<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">'
+           f'{header}<s:Body>{body}</s:Body></s:Envelope>')
+    url = f"http://{host}:{port}/onvif/device_service"
+    r = requests.post(url, data=env.encode(),
+                      headers={"Content-Type": "application/soap+xml"}, timeout=6)
+    return r.status_code, r.text
+
+
 def _drive_onvif(camera_id, cfg: Dict, payload: Dict) -> None:
-    """External strobe/siren on the alarm-out relay via ONVIF SetRelayOutputState."""
+    """External strobe/siren on the alarm-out relay via ONVIF SetRelayOutputState
+    (raw SOAP — no onvif-zeep needed). Monostable relays auto-reset after the
+    camera's DelayTime, so we only pulse 'active'; bistable relays are reset
+    explicitly after strobe_seconds."""
     host = cfg.get("host")
     if not host:
         _log(f"camera {camera_id}: onvif driver needs 'host'; skipping.")
         return
+    port = int(cfg.get("onvif_port", 8899))
+    token = cfg.get("relay_token", "RELAY_OUTPUT_000")
+    mode = str(cfg.get("relay_mode", "monostable")).lower()
+    user, pwd = cfg.get("username", "admin"), cfg.get("password", "")
+
+    def _set(state: str):
+        body = (f'<SetRelayOutputState xmlns="{_ONVIF_DEV_NS}">'
+                f'<RelayOutputToken>{token}</RelayOutputToken>'
+                f'<LogicalState>{state}</LogicalState></SetRelayOutputState>')
+        return _onvif_soap(host, port, body, user, pwd)
+
     try:
-        from onvif import ONVIFCamera
-    except Exception as e:
-        _log(f"camera {camera_id}: onvif-zeep not installed ({e}); "
-             f"run `pip install onvif-zeep`.")
-        return
-    token = cfg.get("relay_token", "AlarmOut_0")
-    secs = min(int(cfg.get("strobe_seconds", DEFAULT_STROBE_S)), 30)
-    try:
-        cam = ONVIFCamera(host, int(cfg.get("onvif_port", 80)),
-                          cfg.get("username", "admin"), cfg.get("password", ""))
-        dev = cam.create_devicemgmt_service()
-        dev.SetRelayOutputState({"RelayOutputToken": token, "LogicalState": "active"})
-        _log(f"camera {camera_id}: ONVIF relay {token} -> active")
-        time.sleep(secs)
-        dev.SetRelayOutputState({"RelayOutputToken": token, "LogicalState": "inactive"})
-        _log(f"camera {camera_id}: ONVIF relay {token} -> inactive")
+        code, text = _set("active")
+        _log(f"camera {camera_id}: ONVIF relay {token} -> active (HTTP {code})")
+        if "Fault" in text:
+            _log(f"camera {camera_id}: relay fault: {' '.join(text.split())[:200]}")
+            return
+        if mode == "bistable":
+            time.sleep(min(int(cfg.get("strobe_seconds", DEFAULT_STROBE_S)), 30))
+            _set("inactive")
+            _log(f"camera {camera_id}: ONVIF relay {token} -> inactive")
+        # monostable: the camera auto-resets after its DelayTime; no 'inactive'.
     except Exception as e:
         _log(f"camera {camera_id}: ONVIF relay failed: {e}")
 
