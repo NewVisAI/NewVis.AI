@@ -12,7 +12,8 @@ website/
   privacy.html    privacy notice (DPDP Act 2023), linked from the form and the footer
   404.html
   server.py       FastAPI: pages, /api/leads, security headers, rate limit
-  static/         favicon, robots.txt, sitemap.xml, marketing/ (optional hero screenshot)
+  static/         favicon, robots.txt, sitemap.xml, showcase/ (product-tour frames,
+                  faces blurred), marketing/ (optional hero screenshot)
 deploy/
   docker-compose.yml   site + Caddy (automatic HTTPS)
   Caddyfile            gensolve.in, www → apex redirect, HSTS
