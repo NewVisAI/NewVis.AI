@@ -12,8 +12,9 @@ website/
   privacy.html    privacy notice (DPDP Act 2023), linked from the form and the footer
   404.html
   server.py       FastAPI: pages, /api/leads, security headers, rate limit
-  static/         favicon, robots.txt, sitemap.xml, showcase/ (product-tour frames,
-                  faces blurred), marketing/ (optional hero screenshot)
+  static/         favicon, robots.txt, sitemap.xml, marketing/ (optional hero screenshot)
+    showcase/     tracking.jpg (pipeline frame) + dashboard/*.webp (product-tour screenshots)
+  tools/capture_dashboard.py   retakes the dashboard screenshots from a running NewVis server
 deploy/
   docker-compose.yml   site + Caddy (automatic HTTPS)
   Caddyfile            gensolve.in, www → apex redirect, HSTS
@@ -113,6 +114,27 @@ docker compose cp site:/data/leads.db ./leads-backup.db
 - [ ] **Search Console.** Verify `gensolve.in` in Google Search Console and submit
       `https://gensolve.in/sitemap.xml`.
 - [ ] **Uptime ping** on `https://gensolve.in/healthz` (UptimeRobot free tier).
+
+## Refreshing the product-tour screenshots
+
+The tour uses real screenshots of the NewVis dashboard in `website/static/showcase/dashboard/`.
+The current set was taken from a demo instance running on test footage, with a sample day of
+events. To replace them with your live system, start the engine as usual (see the main
+`CLAUDE.md`), then run this from the repo root on the same machine:
+
+```powershell
+.\.venv-win\Scripts\python.exe -m pip install playwright
+.\.venv-win\Scripts\python.exe -m playwright install chromium
+.\.venv-win\Scripts\python.exe website\tools\capture_dashboard.py --base http://localhost:8000 --user developer --password "<password>"
+```
+
+It logs in, opens each module, and overwrites the nine `.webp` files with the same names, so the
+page needs no edits. Two things to do every time:
+
+- **Look at every image before you push.** Real camera frames show real people, so blur faces
+  (or pick a moment with nobody close to the camera).
+- **Pick a search that your data answers well** with `--search "..."`. AI Search is Beta and
+  currently ignores time ranges.
 
 ## What is deliberately *not* public
 

@@ -345,57 +345,14 @@
   .tour-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .src{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;
     color:var(--cyan);background:rgba(55,214,240,.1);border:1px solid rgba(55,214,240,.28)}
-  .src.ill{color:var(--ink-mute);background:var(--glass-2);border-color:var(--line)}
   .screen{background:#070a14}
   .screen img{display:block;width:100%;height:auto}
-  /* live grid */
-  .cgrid{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:#000}
-  .cgrid .cell{position:relative}
-  .cgrid .cell img{aspect-ratio:16/9;object-fit:cover}
-  .ccount{position:absolute;right:8px;bottom:8px;font:600 11px/1 ui-monospace,monospace;color:#04121a;background:var(--safe);padding:5px 7px;border-radius:6px}
-  /* alerts inbox */
-  .inbox{display:grid;grid-template-columns:200px 1fr;min-height:100%}
-  @media(max-width:600px){.inbox{grid-template-columns:1fr}}
-  .inbox-list{border-right:1px solid var(--line);padding:8px;display:grid;gap:6px;align-content:start}
-  .ialert{font:inherit;text-align:left;color:var(--ink-soft);background:transparent;border:1px solid transparent;border-radius:10px;padding:9px 10px;cursor:pointer;font-size:12.5px;line-height:1.35}
-  .ialert b{display:block;color:var(--ink);font-size:13px;margin-bottom:2px}
-  .ialert .t{font-family:ui-monospace,monospace;font-size:11px;color:var(--ink-mute)}
-  .ialert.on{background:rgba(247,106,106,.08);border-color:rgba(247,106,106,.35)}
-  .ialert .sev{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:6px}
-  .inbox-view{position:relative}
-  .inbox-view .cap{position:absolute;left:10px;bottom:10px;right:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-  .pill{font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:8px;background:rgba(5,7,15,.82);border:1px solid var(--line-strong);color:var(--ink)}
-  /* zones */
-  .zonewrap{position:relative}
-  .zonewrap svg{position:absolute;inset:0;width:100%;height:100%}
-  .rulecard{position:absolute;right:12px;top:12px;width:min(230px,55%);padding:12px 13px;border-radius:12px;background:rgba(5,7,15,.88);border:1px solid var(--line-strong);font-size:12px;color:var(--ink-soft)}
-  .rulecard b{color:var(--ink);display:block;font-size:13px;margin-bottom:6px}
-  .rulecard div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-top:1px dashed var(--line)}
-  .rulecard div span:last-child{color:var(--ink)}
-  /* search */
-  .search-ui{padding:18px;display:grid;gap:12px;min-height:330px;align-content:start}
-  .qbox{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;border:1px solid var(--line-strong);background:rgba(8,12,22,.7);font-size:14px;min-height:46px}
-  .qbox svg{width:17px;height:17px;color:var(--cyan);flex:none}
-  .caret{display:inline-block;width:2px;height:16px;background:var(--cyan);margin-left:1px;vertical-align:-3px;animation:blink 1s infinite}
-  .qresults{display:grid;gap:8px}
-  .qrow{display:grid;grid-template-columns:96px 1fr auto;gap:12px;align-items:center;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--glass-2);font-size:12.5px;color:var(--ink-soft);opacity:0;transform:translateY(6px);transition:all .35s}
-  .qrow.show{opacity:1;transform:none}
-  .qrow img{width:96px;border-radius:6px;aspect-ratio:16/9;object-fit:cover}
-  .qrow b{color:var(--ink);display:block;font-size:13px}
-  .qrow .go{font-size:11.5px;color:var(--cyan);white-space:nowrap}
-  /* reports */
-  .rep{padding:18px;display:grid;gap:14px}
-  .rep-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .rep-kpis div{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--glass-2)}
-  .rep-kpis b{display:block;font-size:20px;color:var(--ink)}
-  .rep-kpis span{font-size:11.5px;color:var(--ink-mute)}
-  .rep-row{display:grid;grid-template-columns:1.2fr 1fr;gap:12px}
-  @media(max-width:600px){.rep-row{grid-template-columns:1fr}}
-  .rep-card{border-radius:10px;border:1px solid var(--line);background:var(--glass-2);padding:10px 12px}
-  .rep-card h4{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--ink-mute);letter-spacing:.04em;text-transform:uppercase}
-  .heat{position:relative;border-radius:8px;overflow:hidden}
-  .heat img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;filter:saturate(.5) brightness(.6)}
-  .heat i{position:absolute;border-radius:50%;filter:blur(14px);mix-blend-mode:screen}
+  .shot-switch{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line);background:rgba(8,12,22,.6)}
+  .shot-switch button{font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-soft);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+  .shot-switch button:hover{color:#fff;border-color:var(--line-strong)}
+  .shot-switch button[aria-pressed="true"]{color:var(--ink);background:var(--glass);border-color:var(--cyan)}
+  .shotview .screen{display:flex;align-items:center;justify-content:center;background:#0b0f1d}
+  .shotview .screen img{width:100%;height:auto}
   .tour-note{margin-top:26px;font-size:13px;color:var(--ink-mute);max-width:80ch}
 
   /* ---------- roles ---------- */
@@ -585,7 +542,7 @@
   <div class="head reveal">
     <span class="eyebrow"><span class="dot"></span>Product tour</span>
     <h2>See what NewVis actually does.</h2>
-    <p class="lead">Six modules of the NewVis console, one at a time. Panels marked <span class="src">Real output</span> are frames produced by the NewVis pipeline itself; panels marked <span class="src ill">Illustrative</span> show the interface with sample data.</p>
+    <p class="lead">Six modules, shown as they really are: screenshots of the NewVis dashboard and frames from the NewVis analytics pipeline. Nothing on this page is a mock-up.</p>
   </div>
 
   <div class="tour-tabs reveal" role="tablist" aria-label="Product tour">
@@ -599,24 +556,19 @@
 
   <!-- 01 live grid -->
   <div class="tour-panel active reveal" role="tabpanel" id="tp-live" aria-labelledby="tt-live">
-    <div class="frame">
-      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span>
-        <span style="margin-left:8px">NewVis · Live Cameras</span><span class="live-badge"><span class="pulse"></span>LIVE</span></div>
-      <div class="cgrid screen">
-        <div class="cell"><img src="/static/showcase/cam1.jpg" alt="Camera 1, lobby, live feed" loading="lazy" width="640" height="360"></div>
-        <div class="cell"><img src="/static/showcase/cam2.jpg" alt="Camera 2, east corridor, live feed" loading="lazy" width="640" height="360"></div>
-        <div class="cell"><img src="/static/showcase/cam3.jpg" alt="Camera 3, west corridor, live feed" loading="lazy" width="640" height="360"></div>
-        <div class="cell"><img src="/static/showcase/cam4.jpg" alt="Camera 4, cafeteria, live feed" loading="lazy" width="640" height="360"></div>
-      </div>
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Live Cameras</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/live-grid.webp" alt="NewVis Live Cameras screen showing four camera feeds in a grid, grouped by floor" loading="lazy" width="1400" height="922"></div>
     </div>
     <div class="tour-copy">
-      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real output</span></div>
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
       <h3>Every camera, on one screen.</h3>
-      <p>Connect existing CCTV over standard RTSP and watch every feed live in one grid, with an on-screen camera name and timestamp on each tile.</p>
+      <p>Connect existing CCTV over standard RTSP and watch every feed live in one grid, filtered by floor, with the camera name and time on every tile.</p>
       <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Works with the IP cameras and NVRs you already have</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Analyses a light sub-stream while the full-resolution stream keeps recording</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Each role only sees the cameras and pages it is allowed to</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Works with the IP cameras and NVRs you already have</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Group and filter cameras by floor or location</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Analyses a light sub-stream while the full-resolution stream keeps recording</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Each role only sees the cameras and pages it is allowed to</span></li>
       </ul>
     </div>
   </div>
@@ -643,28 +595,19 @@
 
   <!-- 03 alerts -->
   <div class="tour-panel reveal" role="tabpanel" id="tp-alerts" aria-labelledby="tt-alerts">
-    <div class="frame">
-      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span>
-        <span style="margin-left:8px">NewVis · Notifications</span></div>
-      <div class="inbox screen">
-        <div class="inbox-list">
-          <button class="ialert on" data-img="/static/showcase/intrusion.jpg" data-zone="Restricted Zone · West half" data-kind="Restricted-zone entry"><b><span class="sev"></span>Restricted-zone entry</b>West half · Cam 1<div class="t">snapshot · clip ready</div></button>
-          <button class="ialert" data-img="/static/showcase/after-hours.jpg" data-zone="Monitored Entrance · East half" data-kind="After-hours entry"><b><span class="sev"></span>After-hours entry</b>Monitored entrance · Cam 1<div class="t">snapshot · clip ready</div></button>
-        </div>
-        <div class="inbox-view">
-          <img id="inboxImg" src="/static/showcase/intrusion.jpg" alt="Alert snapshot with the person who triggered it boxed in red" loading="lazy" width="1280" height="720">
-          <div class="cap"><span class="pill" id="inboxZone">Restricted Zone · West half</span><span class="pill" style="color:var(--cyan)">▶ Jump to footage</span></div>
-        </div>
-      </div>
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Notifications</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/alerts-inbox.webp" alt="NewVis notifications inbox listing loitering, occupancy, restricted-area and after-hours alerts with camera, zone and time" loading="lazy" width="1400" height="778"></div>
+      <div class="shot-switch" role="group" aria-label="Screenshots"><button type="button" aria-pressed="true" data-src="/static/showcase/dashboard/alerts-inbox.webp" data-alt="NewVis notifications inbox listing loitering, occupancy, restricted-area and after-hours alerts with camera, zone and time" data-w="1400" data-h="778">Alert inbox</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/alert-snapshot.webp" data-alt="A restricted-area alert expanded to show its snapshot, with the person who triggered it boxed in red" data-w="1400" data-h="933">Snapshot evidence</button></div>
     </div>
     <div class="tour-copy">
-      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real output</span></div>
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
       <h3>An alert with the evidence attached.</h3>
-      <p>When a rule is broken, the right person gets a notification with a snapshot from that exact frame, with the person boxed, plus a one-click jump to the recorded clip. Pick an alert to switch between them.</p>
+      <p>When a rule is broken, the right person gets a notification saying what happened, where and when, plus a snapshot of that exact frame with the person boxed. Switch between the inbox and a snapshot below the screen.</p>
       <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Restricted-zone, after-hours and loitering alerts</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Snapshot evidence saved for every alert</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Jump straight to the moment in the footage, with no scrubbing</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Restricted-zone, after-hours, loitering and occupancy alerts</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Snapshot evidence saved with every alert</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Jump to the recorded clip of the moment</span></li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Fall, running and altercation alerts <span class="badge beta" style="margin-left:4px;vertical-align:1px">Beta</span></span></li>
       </ul>
     </div>
@@ -672,108 +615,64 @@
 
   <!-- 04 zones -->
   <div class="tour-panel reveal" role="tabpanel" id="tp-zones" aria-labelledby="tt-zones">
-    <div class="frame">
-      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span>
-        <span style="margin-left:8px">NewVis · Zones &amp; Rules · Cam 1</span></div>
-      <div class="zonewrap screen">
-        <img src="/static/showcase/after-hours.jpg" alt="Camera view with a restricted zone and a counting line drawn over it" loading="lazy" width="1280" height="720">
-        <svg viewBox="0 0 1280 720" preserveAspectRatio="none" aria-hidden="true">
-          <polygon points="110,250 600,200 610,430 100,470" fill="rgba(247,106,106,.16)" stroke="#f76a6a" stroke-width="3" stroke-dasharray="10 6"/>
-          <text x="124" y="240" fill="#f76a6a" font-size="24" font-weight="700" font-family="Inter,system-ui,sans-serif">RESTRICTED · Stage</text>
-          <line x1="640" y1="450" x2="1180" y2="400" stroke="#37d6f0" stroke-width="4"/>
-          <text x="900" y="450" fill="#37d6f0" font-size="22" font-weight="700" font-family="Inter,system-ui,sans-serif">IN 14 · OUT 11</text>
-        </svg>
-        <div class="rulecard"><b>Stage: restricted</b>
-          <div><span>Alert on entry</span><span>On</span></div>
-          <div><span>Active hours</span><span>18:00 – 07:00</span></div>
-          <div><span>Holidays</span><span>All day</span></div>
-          <div><span>Loiter after</span><span>15 s</span></div>
-        </div>
-      </div>
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Zones &amp; Rules</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/zones-draw.webp" alt="Drawing a restricted zone polygon directly on a live camera view in the NewVis zone editor" loading="lazy" width="1400" height="958"></div>
+      <div class="shot-switch" role="group" aria-label="Screenshots"><button type="button" aria-pressed="true" data-src="/static/showcase/dashboard/zones-draw.webp" data-alt="Drawing a restricted zone polygon directly on a live camera view in the NewVis zone editor" data-w="1400" data-h="958">Draw a zone</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/zones-rules.webp" data-alt="NewVis zone rules list showing a restricted stage zone with active hours and school days" data-w="1400" data-h="656">Rules</button></div>
     </div>
     <div class="tour-copy">
-      <div class="tour-meta"><span class="badge prod">Production</span><span class="src ill">Illustrative</span></div>
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
       <h3>Draw the rules once. NewVis enforces them 24/7.</h3>
-      <p>Mark restricted areas, entrances and counting lines directly on the camera view, then decide when each rule applies. A holiday calendar means a Sunday is treated like a Sunday.</p>
+      <p>Click out a restricted area or a counting line directly on the live camera view, then set when each rule applies: hours, school days and a holiday calendar.</p>
       <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Draw zones and in/out counting lines on any camera</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Per-zone schedules, after-hours rules and holiday calendar</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Dwell-time and loitering thresholds you control</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Every entry and exit logged for reports</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Draw polygon zones and in/out counting lines on any camera</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Per-zone active hours and school days</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Holiday calendar, so a non-school day is treated as one</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Every entry and exit logged for reports</span></li>
       </ul>
     </div>
   </div>
 
   <!-- 05 search -->
   <div class="tour-panel reveal" role="tabpanel" id="tp-search" aria-labelledby="tt-search">
-    <div class="frame">
-      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span>
-        <span style="margin-left:8px">NewVis · AI Search</span></div>
-      <div class="search-ui screen">
-        <div class="qbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span id="qText"></span><span class="caret"></span></div>
-        <div class="qresults" id="qResults">
-          <div class="qrow"><img src="/static/showcase/after-hours.jpg" alt="" loading="lazy"><div><b>After-hours entry · Monitored entrance</b>Cam 1 · 19:42</div><span class="go">▶ clip</span></div>
-          <div class="qrow"><img src="/static/showcase/intrusion.jpg" alt="" loading="lazy"><div><b>Restricted-zone entry · West half</b>Cam 1 · 20:15</div><span class="go">▶ clip</span></div>
-        </div>
-      </div>
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · AI Search</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/search.webp" alt="NewVis AI Search answering “who entered the restricted zone” with the matching event and a Clip button" loading="lazy" width="1400" height="433"></div>
     </div>
     <div class="tour-copy">
-      <div class="tour-meta"><span class="badge beta">Beta</span><span class="src ill">Illustrative</span></div>
+      <div class="tour-meta"><span class="badge beta">Beta</span><span class="src">Real dashboard</span></div>
       <h3>Ask your footage a question.</h3>
-      <p>Type what you're looking for in plain English. NewVis searches the event log and returns the matching moments, each with its snapshot and clip.</p>
+      <p>Type a question in plain English. NewVis shows how it understood the question, then lists the matching events, each with a one-click clip.</p>
       <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Search by camera, zone, time and type of event</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Results link straight to the evidence</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>A written summary of recent activity for each camera <span class="badge beta" style="margin-left:4px;vertical-align:1px">Beta</span></span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Filter by camera, zone, person ID and type of event</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Shows the parsed intent, so you can see what it searched for</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Results link straight to the clip</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Currently best at camera, zone and event questions; time-of-day questions are still being improved</span></li>
       </ul>
     </div>
   </div>
 
   <!-- 06 reports -->
   <div class="tour-panel reveal" role="tabpanel" id="tp-reports" aria-labelledby="tt-reports">
-    <div class="frame">
-      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span>
-        <span style="margin-left:8px">NewVis · Reports</span></div>
-      <div class="rep screen">
-        <div class="rep-kpis">
-          <div><b>1,284</b><span>Footfall today</span></div>
-          <div><b>11:00</b><span>Busiest hour</span></div>
-          <div><b>3</b><span>Alerts today</span></div>
-        </div>
-        <div class="rep-row">
-          <div class="rep-card"><h4>Headcount by hour</h4>
-            <svg viewBox="0 0 260 120" width="100%" role="img" aria-label="Bar chart of headcount by hour, peaking at 11:00">
-              <g fill="url(#barg)">
-                <rect x="6" y="88" width="18" height="22" rx="3"/><rect x="31" y="66" width="18" height="44" rx="3"/><rect x="56" y="40" width="18" height="70" rx="3"/><rect x="81" y="14" width="18" height="96" rx="3"/><rect x="106" y="34" width="18" height="76" rx="3"/><rect x="131" y="22" width="18" height="88" rx="3"/><rect x="156" y="46" width="18" height="64" rx="3"/><rect x="181" y="58" width="18" height="52" rx="3"/><rect x="206" y="80" width="18" height="30" rx="3"/><rect x="231" y="96" width="18" height="14" rx="3"/>
-              </g>
-              <defs><linearGradient id="barg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#37d6f0"/><stop offset="1" stop-color="#8b7bff"/></linearGradient></defs>
-              <g fill="#6f7d96" font-size="8" font-family="ui-monospace,monospace"><text x="8" y="119">08</text><text x="83" y="119">11</text><text x="158" y="119">14</text><text x="233" y="119">17</text></g>
-            </svg>
-          </div>
-          <div class="rep-card"><h4>Dwell heatmap · Cafeteria</h4>
-            <div class="heat"><img src="/static/showcase/cam4.jpg" alt="" loading="lazy">
-              <i style="left:55%;top:50%;width:34%;height:44%;background:rgba(247,106,106,.85)"></i>
-              <i style="left:28%;top:45%;width:22%;height:36%;background:rgba(247,185,85,.75)"></i>
-              <i style="left:72%;top:58%;width:20%;height:30%;background:rgba(55,214,240,.6)"></i>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Reports &amp; Heatmap</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/heatmap.webp" alt="NewVis spatial heatmap over a cafeteria camera view, showing where people spend the most time" loading="lazy" width="1400" height="913"></div>
+      <div class="shot-switch" role="group" aria-label="Screenshots"><button type="button" aria-pressed="true" data-src="/static/showcase/dashboard/heatmap.webp" data-alt="NewVis spatial heatmap over a cafeteria camera view, showing where people spend the most time" data-w="1400" data-h="913">Heatmap</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/reports-headcount.webp" data-alt="NewVis chart of unique people by hour of day" data-w="840" data-h="300">Headcount</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/reports-zoneflow.webp" data-alt="NewVis chart of entries per zone" data-w="840" data-h="300">Zone flow</button></div>
     </div>
     <div class="tour-copy">
-      <div class="tour-meta"><span class="badge prod">Production</span><span class="src ill">Illustrative</span></div>
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
       <h3>Know how your space is actually used.</h3>
-      <p>The same cameras that watch for incidents also count. Footfall, headcount by hour and dwell heatmaps show which areas are busy, when, and where people linger.</p>
+      <p>The cameras that watch for incidents also count. Headcount by hour, entries per zone and dwell heatmaps show which areas are busy, when, and where people linger.</p>
       <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Headcount and footfall charts per camera and zone</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Dwell heatmaps that show where people spend time</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Scheduled periodic reports and data export</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Append-only audit log of who viewed or changed what</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Headcount by hour and entries per zone</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Spatial heatmaps of where people spend time</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Scheduled periodic reports and data export</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Append-only audit log of who viewed or changed what</span></li>
       </ul>
     </div>
   </div>
 
-  <p class="tour-note reveal">Real-output frames come from NewVis runs on test footage. Faces have been blurred for this website. In the product, people are tracked as anonymous IDs.</p>
+  <p class="tour-note reveal">Screenshots show the NewVis dashboard running on test footage with a sample day of activity. Alert snapshots, heatmaps and charts are produced by NewVis itself. Faces are blurred for this website; in the product, people are tracked as anonymous IDs, not identified.</p>
 </section>
 
 <!-- ================= ROLES ================= -->
@@ -1172,21 +1071,6 @@
 
   // ---------- product tour ----------
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.tour-tab'));
-  var qTimer = null;
-  function runSearchDemo(){
-    var q = 'people in a restricted area after 7 pm on camera 1';
-    var el = document.getElementById('qText'), rows = document.querySelectorAll('#qResults .qrow');
-    clearInterval(qTimer); el.textContent = '';
-    rows.forEach(function(r){ r.classList.remove('show'); });
-    var i = 0;
-    qTimer = setInterval(function(){
-      el.textContent = q.slice(0, ++i);
-      if(i >= q.length){
-        clearInterval(qTimer);
-        rows.forEach(function(r, k){ setTimeout(function(){ r.classList.add('show'); }, 350 + k*250); });
-      }
-    }, 38);
-  }
   function selectTab(t){
     tabs.forEach(function(x){
       var on = x === t;
@@ -1196,7 +1080,6 @@
       p.classList.toggle('active', on);
       if(on) p.classList.add('in');
     });
-    if(t.id === 'tt-search') runSearchDemo();
   }
   tabs.forEach(function(t, i){
     t.addEventListener('click', function(){ selectTab(t); });
@@ -1205,11 +1088,13 @@
       if(d){ e.preventDefault(); var n = tabs[(i + d + tabs.length) % tabs.length]; n.focus(); selectTab(n); }
     });
   });
-  document.querySelectorAll('.ialert').forEach(function(b){
-    b.addEventListener('click', function(){
-      document.querySelectorAll('.ialert').forEach(function(x){ x.classList.toggle('on', x === b); });
-      document.getElementById('inboxImg').src = b.dataset.img;
-      document.getElementById('inboxZone').textContent = b.dataset.zone;
+  document.querySelectorAll('.shot-switch').forEach(function(g){
+    var img = g.parentNode.querySelector('.shot-img');
+    g.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        g.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x === btn ? 'true' : 'false'); });
+        img.src = btn.dataset.src; img.alt = btn.dataset.alt; img.width = +btn.dataset.w; img.height = +btn.dataset.h;
+      });
     });
   });
 
