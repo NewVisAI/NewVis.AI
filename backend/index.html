@@ -3753,15 +3753,6 @@ document.addEventListener('mousemove', (e) => {
   });
 });
 
-/* ===== AMBIENT ANIMATION ===== */
-const auroraShift = setInterval(() => {
-  const body = document.body;
-  if (body) {
-    const blur = Math.sin(Date.now() / 8000) * 5;
-    body.style.filter = `blur(${Math.max(0, blur)}px)`;
-  }
-}, 50);
-
 /* ===== NEW FEATURES: SIDEBAR COLLAPSE, TOOLTIPS, TOASTS, KEYBOARD SHORTCUTS, BREADCRUMBS, DRAG-DROP, OFFLINE ===== */
 
 // 1. SIDEBAR COLLAPSE
@@ -4131,17 +4122,6 @@ function initThemeToggle() {
   };
 }
 
-// 7. REAL-TIME UPDATES (WebSocket mock)
-function initRealtimeUpdates() {
-  // Simulate WebSocket events
-  setInterval(() => {
-    const rand = Math.random();
-    if (rand > 0.9) {
-      ToastContainer.show('🚨 Alert', `Zone ${Math.floor(Math.random() * 5 + 1)} triggered`, 'warn');
-    }
-  }, 8000);
-}
-
 // 8. DATA WITH CONFIDENCE SCORES
 function formatWithConfidence(data, confidence) {
   const level = confidence > 0.8 ? 'high' : confidence > 0.5 ? 'medium' : 'low';
@@ -4170,7 +4150,7 @@ function initAll10Features() {
   initHealthMonitor();
   initCameraGrid();
   initThemeToggle();
-  initRealtimeUpdates();
+  // Real alerts arrive over /ws/alerts (see connectWS); nothing is simulated here.
 
   // Restore settings
   if (localStorage.getItem('accessibility-mode') === 'true') {
