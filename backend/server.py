@@ -538,8 +538,10 @@ def _serve_html(filename: str, fallback: str) -> HTMLResponse:
 @app.get("/", response_class=HTMLResponse)
 def read_landing():
     """Public marketing / lead-capture site."""
+    # The marketing site lives in website/ (served standalone at gensolve.in by
+    # website/server.py); the engine serves the same file locally for convenience.
     return _serve_html(
-        "landing.html",
+        os.path.join("..", "website", "index.html"),
         "<h3>Sentinel AI is online. Marketing page landing.html missing. Dashboard at <a href='/app'>/app</a>.</h3>",
     )
 

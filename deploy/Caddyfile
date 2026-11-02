@@ -1,0 +1,19 @@
+# Caddy fetches and renews Let's Encrypt certificates automatically once the
+# DNS A/AAAA records for gensolve.in and www.gensolve.in point at this server.
+{
+	email newvis.team@gmail.com
+}
+
+www.gensolve.in {
+	redir https://gensolve.in{uri} permanent
+}
+
+gensolve.in {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+	request_body {
+		max_size 64KB
+	}
+	reverse_proxy site:8080
+}

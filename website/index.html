@@ -3,8 +3,23 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NewVis AI — Turn your existing cameras into a 24/7 safety brain</title>
+<title>NewVis AI by Gensolve — Turn your existing cameras into a 24/7 safety brain</title>
 <meta name="description" content="NewVis AI turns the CCTV cameras you already have into a real-time safety-intelligence system. Detect falls, intrusions, loitering and more — across every camera, on affordable hardware." />
+<link rel="canonical" href="https://gensolve.in/" />
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+<meta name="theme-color" content="#05070f" />
+<meta name="author" content="Gensolve" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Gensolve" />
+<meta property="og:url" content="https://gensolve.in/" />
+<meta property="og:title" content="NewVis AI by Gensolve — AI video analytics for the cameras you already own" />
+<meta property="og:description" content="Real-time alerts for intrusions, loitering, falls and more — on your existing CCTV, running on-site." />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="NewVis AI by Gensolve" />
+<meta name="twitter:description" content="Real-time AI safety alerts on the CCTV cameras you already own." />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"Gensolve","url":"https://gensolve.in/","logo":"https://gensolve.in/static/favicon.svg","brand":{"@type":"Brand","name":"NewVis AI"}}
+</script>
 <style>
   :root{
     --bg:#05070f;
@@ -100,6 +115,15 @@
   .nav-cta{display:flex;align-items:center;gap:12px}
   .burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;padding:6px}
   @media(max-width:900px){.nav-links{display:none}.burger{display:block}}
+  .mnav{display:none;position:fixed;top:64px;left:12px;right:12px;z-index:60;padding:10px;border-radius:14px;
+    background:rgba(8,12,24,.97);border:1px solid var(--line-strong);box-shadow:var(--shadow)}
+  .mnav a{display:block;padding:12px 14px;border-radius:10px;color:var(--ink-soft);font-weight:500}
+  .mnav a:hover{background:var(--glass);color:#fff}
+  .mnav.open{display:block}
+  @media(min-width:901px){.mnav.open{display:none}}
+  .brand span{white-space:nowrap}
+  @media(max-width:520px){.nav-cta .btn-primary{padding:9px 14px;font-size:13px}.brand small{display:none}}
+  @media(max-width:380px){.nav-cta .btn-primary{display:none}}
 
   /* ---------- hero ---------- */
   .hero{padding-top:70px;padding-bottom:60px}
@@ -330,13 +354,21 @@
     </nav>
     <div class="nav-cta">
       <a class="btn btn-primary js-callback" data-src="nav">Request a callback</a>
-      <button class="burger" id="burger" aria-label="Menu">
+      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="mnav">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
     </div>
   </div>
 </header>
 
+<nav class="mnav" id="mnav" aria-label="Mobile">
+  <a href="#what">What it does</a>
+  <a href="#usecases">Use cases</a>
+  <a href="#features">Features</a>
+  <a href="#how">How it works</a>
+  <a href="#why">Why NewVis</a>
+  <a href="#roi">ROI</a>
+</nav>
 <div id="top"></div>
 
 <!-- ================= HERO ================= -->
@@ -356,7 +388,7 @@
       <div class="trust">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Works with existing RTSP cameras</span>
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Runs on-site — video stays private</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Proven on a 300-camera school</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Built for 300-camera campuses</span>
       </div>
     </div>
 
@@ -407,7 +439,7 @@
 
   <!-- stat ribbon -->
   <div class="ribbon reveal">
-    <div class="stat"><b>~24%</b><span>Lower 3-year cost of ownership</span></div>
+    <div class="stat"><b>~24%</b><span>Lower 3-year cost of ownership (modelled)</span></div>
     <div class="stat"><b>~97%</b><span>Person-recall on low-bandwidth streams*</span></div>
     <div class="stat"><b>300→6</b><span>Cameras run on ~6 affordable boxes</span></div>
     <div class="stat"><b>24/7</b><span>Every camera, always watched</span></div>
@@ -616,12 +648,12 @@
   <div class="head reveal">
     <span class="eyebrow"><span class="dot"></span>The numbers</span>
     <h2>More safety. Less cost. No extra staff.</h2>
-    <p class="lead">Figures below are measured in our own benchmarks for the flagship 300-camera school deployment. Your numbers depend on your site — that's exactly what a callback is for.</p>
+    <p class="lead">Cost figures below are engineering estimates modelled for the flagship 300-camera school deployment; accuracy figures are measured in our own GPU benchmarks. Your numbers depend on your site — that's exactly what a callback is for.</p>
   </div>
   <div class="roi">
     <div class="roi-main glass reveal">
       <div class="big">~24%</div>
-      <p style="color:var(--ink-soft);margin-top:10px">lower 3-year total cost of ownership — from an accuracy-neutral efficiency stack (sub-stream analytics, hardware decode, motion gating, batching).</p>
+      <p style="color:var(--ink-soft);margin-top:10px">lower 3-year total cost of ownership (engineering estimate) — from an accuracy-neutral efficiency stack (sub-stream analytics, hardware decode, motion gating, batching).</p>
       <div class="roi-list">
         <div><span>Compute boxes for 300 cameras</span><b>9 → 6</b></div>
         <div><span>Analytics bandwidth</span><b>−65%</b></div>
@@ -659,7 +691,7 @@
           </svg>
           <span>NewVis AI<small>Vision Redefined</small></span>
         </a>
-        <p class="foot-note-box">AI video-analytics that turns existing cameras into real-time safety intelligence — for schools, malls, parking, offices, warehouses and beyond.</p>
+        <p class="foot-note-box"><b style="color:var(--ink)">NewVis AI</b> by <b style="color:var(--ink)">Gensolve</b> — AI video-analytics that turns existing cameras into real-time safety intelligence — for schools, malls, parking, offices, warehouses and beyond.</p>
         <p style="margin-top:16px;font-size:13.5px">Talk to us: <a href="mailto:newvis.team@gmail.com">newvis.team@gmail.com</a></p>
       </div>
       <div class="foot-note-box glass" style="padding:18px 20px;border-radius:14px">
@@ -667,7 +699,7 @@
       </div>
     </div>
     <div class="foot-legal">
-      <span>© <span id="yr"></span> NewVis AI. All rights reserved.</span>
+      <span>© <span id="yr"></span> Gensolve. NewVis AI is a product of Gensolve. All rights reserved. · <a href="/privacy" style="text-decoration:underline">Privacy</a></span>
       <span>Built for safety, on the cameras you already have.</span>
     </div>
   </div>
@@ -724,7 +756,7 @@
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
         <div class="err" id="formErr"></div>
         <button type="submit" class="btn btn-primary" id="submitBtn">Request my callback</button>
-        <p class="modal-foot">By submitting you agree to be contacted about NewVis. Your details are used only to call you back.</p>
+        <p class="modal-foot">By submitting you agree to be contacted by Gensolve about NewVis. Your details are used only to call you back — see our <a href="/privacy" target="_blank" style="text-decoration:underline">privacy notice</a>.</p>
       </form>
     </div>
     <div id="successView" class="success" style="display:none">
@@ -751,9 +783,13 @@
   }, {threshold:.12});
   document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
 
-  // mobile menu -> just open the callback (keeps it simple / single-page)
+  // mobile menu
   var burger = document.getElementById('burger');
-  if(burger) burger.addEventListener('click', function(){ location.hash = '#usecases'; });
+  var mnav = document.getElementById('mnav');
+  function setMenu(open){ mnav.classList.toggle('open', open); burger.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  burger.addEventListener('click', function(e){ e.stopPropagation(); setMenu(!mnav.classList.contains('open')); });
+  mnav.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', function(){ setMenu(false); }); });
+  document.addEventListener('click', function(e){ if(!mnav.contains(e.target)) setMenu(false); });
 
   // ---------- lead modal ----------
   var scrim = document.getElementById('scrim');
