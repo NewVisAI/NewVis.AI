@@ -1538,9 +1538,16 @@ def _latest_event_video() -> Optional[str]:
 
 @app.get("/api/heatmap", dependencies=[Depends(current_user)])
 def heatmap(video_path: str = None, grid_w: int = 48, grid_h: int = 27,
-            start_frame: int = None, end_frame: int = None):
+            start_frame: int = None, end_frame: int = None, camera_id: Optional[int] = None):
     """Density grid of person positions (bbox centroids) from tracking_data,
-    binned into a grid_w x grid_h heatmap. Optional start/end frame windows it."""
+    binned into a grid_w x grid_h heatmap. Optional start/end frame windows it.
+    camera_id selects that camera's source server-side, so the browser never
+    has to handle (credential-bearing) RTSP URLs."""
+    if camera_id is not None and not video_path:
+        cam = camera_registry.get_camera(camera_id)
+        if not cam:
+            raise HTTPException(status_code=404, detail="Unknown camera.")
+        video_path = cam.get("source")
     import sqlite3
     import cv2 as _cv2
     from db_schema import get_db_path
@@ -1600,10 +1607,19 @@ def heatmap(video_path: str = None, grid_w: int = 48, grid_h: int = 27,
 
 
 @app.get("/api/heatmap/frame", dependencies=[Depends(current_user)])
-def heatmap_frame(video_path: str = None):
+def heatmap_frame(video_path: str = None, camera_id: Optional[int] = None):
     """A representative (mid) frame of the video, as a JPEG, to sit behind the heatmap."""
     import cv2 as _cv2
     from fastapi.responses import Response
+    if camera_id is not None and not video_path:
+        cam = camera_registry.get_camera(camera_id)
+        if not cam:
+            raise HTTPException(status_code=404, detail="Unknown camera.")
+        # Same safe path as the grid thumbnails: never decodes RTSP in the web process.
+        jpeg = camera_stream.grab_snapshot(cam, width=960)
+        if not jpeg:
+            raise HTTPException(status_code=404, detail="No frame available for this camera.")
+        return Response(content=jpeg, media_type="image/jpeg")
     if not video_path:
         video_path = _latest_event_video()
     if not video_path or not _is_allowed_video(video_path):
@@ -1619,6 +1635,91 @@ def heatmap_frame(video_path: str = None):
     if not ok:
         raise HTTPException(status_code=500, detail="Could not encode frame.")
     return Response(content=buf.tobytes(), media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# Overview panels (incident timeline, camera health, heatmap camera)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/overview")
+def overview_panels(hours: int = 24, user: dict = Depends(current_user)):
+    """Real data for the Overview page's timeline, camera-health and heatmap panels.
+
+    Timezones: alerts.timestamp is written in server-local time (alerts.py) while
+    events.timestamp is naive UTC (event.py), so each table is windowed against
+    its own clock.
+    """
+    import sqlite3
+    from datetime import timedelta
+    from db_schema import get_db_path
+
+    hours = max(1, min(168, int(hours)))
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    start_local = now_local - timedelta(hours=hours)
+    since_local = (datetime.now() - timedelta(hours=24)).isoformat(timespec="seconds")
+    since_utc = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)).isoformat(timespec="seconds")
+    can_see_alerts = user["role"] in ("developer", "principal")
+
+    conn = sqlite3.connect(get_db_path())
+    cur = conn.cursor()
+
+    def rows(sql, params=()):
+        try:
+            return cur.execute(sql, params).fetchall()
+        except sqlite3.OperationalError:  # table not created yet on a fresh install
+            return []
+
+    # 1. Incident timeline: alerts per hour over the window.
+    timeline = None
+    if can_see_alerts:
+        bins = [{"start": (start_local + timedelta(hours=i)).isoformat(timespec="minutes"),
+                 "count": 0, "by_type": {}} for i in range(hours)]
+        for ts, kind in rows("SELECT timestamp, alert_type FROM alerts WHERE timestamp >= ?",
+                             (start_local.isoformat(timespec="seconds"),)):
+            try:
+                idx = int((datetime.fromisoformat(ts) - start_local).total_seconds() // 3600)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= idx < hours:
+                bins[idx]["count"] += 1
+                bins[idx]["by_type"][kind] = bins[idx]["by_type"].get(kind, 0) + 1
+        timeline = {"hours": hours, "bins": bins, "total": sum(b["count"] for b in bins)}
+
+    # 2. Camera health: analytics worker state + last activity per camera.
+    last_event = dict(rows("SELECT camera_id, MAX(timestamp) FROM events GROUP BY camera_id"))
+    events_24h = dict(rows("SELECT camera_id, COUNT(*) FROM events WHERE timestamp >= ? GROUP BY camera_id", (since_utc,)))
+    last_alert, alerts_24h = {}, {}
+    if can_see_alerts:
+        last_alert = dict(rows("SELECT camera_id, MAX(timestamp) FROM alerts GROUP BY camera_id"))
+        alerts_24h = dict(rows("SELECT camera_id, COUNT(*) FROM alerts WHERE timestamp >= ? GROUP BY camera_id", (since_local,)))
+    workers = live_analytics.status()
+    cameras = []
+    for cam in camera_registry.list_cameras():
+        cid = cam.get("id")
+        w = workers.get(cid) or workers.get(str(cid))
+        cameras.append({
+            "id": cid, "name": cam.get("name"), "floor": cam.get("floor"), "location": cam.get("location"),
+            "analytics": ({"status": w.get("status"), "alive": bool(w.get("alive")),
+                           "last_error": w.get("last_error"),
+                           "analytics_frames": w.get("analytics_frames", 0)} if w else None),
+            "last_event_utc": last_event.get(cid),
+            "events_24h": events_24h.get(cid, 0),
+            "last_alert_local": last_alert.get(cid) if can_see_alerts else None,
+            "alerts_24h": alerts_24h.get(cid, 0) if can_see_alerts else None,
+        })
+
+    # 3. Heatmap: the camera with the most recent tracking data.
+    hm = rows("SELECT camera_id FROM tracking_data WHERE camera_id IS NOT NULL ORDER BY id DESC LIMIT 1")
+    conn.close()
+    hm_cam = hm[0][0] if hm else None
+    hm_name = next((c["name"] for c in cameras if c["id"] == hm_cam), None)
+
+    return {
+        "generated_local": datetime.now().isoformat(timespec="seconds"),
+        "timeline": timeline,
+        "cameras": cameras,
+        "heatmap_camera": {"id": hm_cam, "name": hm_name} if hm_cam is not None else None,
+    }
 
 
 @app.get("/api/analytics/headcount-series", dependencies=[Depends(current_user)])

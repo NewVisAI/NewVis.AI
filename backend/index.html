@@ -875,29 +875,29 @@ pre.report { font-family: var(--mono); font-size: 12px; line-height: 1.65; color
 
         <!-- NEW FEATURES: Quick Actions, Timeline, Heatmap, Health, Grid -->
         <div id="quick-actions" style="background: var(--accent-soft); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 18px 0; display: flex; gap: 12px; flex-wrap: wrap;">
-          <button class="quick-btn" onclick="toggleFavorites()" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">⭐ Pinned Cameras</button>
-          <button class="quick-btn" onclick="showFilterPresets()" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">🎯 Alert Filters</button>
-          <button class="quick-btn" onclick="quickExport()" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">📥 Export</button>
+          <button class="quick-btn" onclick="navigate('cameras')" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">📹 Live Cameras</button>
+          <button class="quick-btn" id="ov-qa-alerts" onclick="navigate('notifications')" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">🔔 Alerts</button>
+          <button class="quick-btn" onclick="$('btn-export-report').click()" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">📥 Export Report</button>
           <button class="quick-btn" onclick="toggleAccessibility()" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">♿ Accessibility</button>
         </div>
 
         <div style="margin-top: 24px;">
-          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px; font-weight: 600;">📊 Incident Timeline</h3>
+          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px; font-weight: 600;">📊 Incident Timeline <span class="sub" id="ov-timeline-sub" style="font-weight:400; margin-left:6px;"></span></h3>
           <div id="incident-timeline" style="position: relative; width: 100%; height: 100px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow-x: auto; overflow-y: hidden;">
             <svg id="timeline-svg" style="min-width: 100%; height: 100%;"></svg>
           </div>
         </div>
 
         <div style="margin-top: 24px;">
-          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px; font-weight: 600;">🔥 Zone Heatmap</h3>
-          <div id="heatmap-container" style="position: relative; width: 100%; height: 250px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow: hidden;">
-            <canvas id="heatmap-canvas" style="width: 100%; height: 100%;"></canvas>
+          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px; font-weight: 600;">🔥 Activity Heatmap <span class="sub" id="ov-heat-sub" style="font-weight:400; margin-left:6px;"></span></h3>
+          <div id="heatmap-container" style="position: relative; width: 100%; height: auto; min-height: 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow: hidden;">
+            <canvas id="heatmap-canvas" style="width: 100%; max-width: 620px; height: auto; display: block; margin: 0 auto;"></canvas>
           </div>
         </div>
 
         <div style="margin-top: 24px;">
-          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px; font-weight: 600;">📹 Camera Health</h3>
-          <div id="health-monitor" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;"></div>
+          <h3 style="margin: 0 0 12px; color: var(--text); font-size: 16px; font-weight: 600;">📹 Camera Health <span class="sub" style="font-weight:400; margin-left:6px;">live-analytics state · last activity</span></h3>
+          <div id="health-monitor" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;"></div>
         </div>
 
         <div style="margin-top: 24px;">
@@ -1535,6 +1535,150 @@ function navigate(view) {
   if (LOADERS[view]) LOADERS[view]();
 }
 
+/* ---------- Overview: timeline, heatmap, camera health, camera grid (real data) ---------- */
+function agoText(date) {
+  if (!date || isNaN(date)) return 'no activity yet';
+  const s = Math.max(0, (Date.now() - date.getTime()) / 1000);
+  if (s < 90) return 'just now';
+  if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 172800) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} days ago`;
+}
+// events.timestamp is naive UTC, alerts.timestamp is naive server-local (see /api/overview).
+const parseUtc = (t) => t ? new Date(t.replace(' ', 'T') + 'Z') : null;
+const parseLocal = (t) => t ? new Date(t.replace(' ', 'T')) : null;
+
+async function loadOverviewPanels() {
+  let d;
+  try { d = await api('/api/overview?hours=24'); }
+  catch (e) {
+    ['health-monitor', 'camera-grid'].forEach(id => { if ($(id)) $(id).innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+    return;
+  }
+  const qa = $('ov-qa-alerts');
+  if (qa) qa.style.display = allowed(NAV.find(n => n.id === 'notifications') || {}) ? '' : 'none';
+  renderOverviewTimeline(d.timeline);
+  renderOverviewHealth(d.cameras || []);
+  renderOverviewCameraGrid(d.cameras || []);
+  renderOverviewHeatmap(d.heatmap_camera);
+}
+
+function renderOverviewTimeline(tl) {
+  const svg = $('timeline-svg'); if (!svg) return;
+  svg.innerHTML = '';
+  const sub = $('ov-timeline-sub');
+  if (!tl) {
+    if (sub) sub.innerText = 'alerts are visible to principal accounts';
+    return;
+  }
+  if (sub) sub.innerText = `alerts per hour · last ${tl.hours} h · ${tl.total} total`;
+  const W = 1200, H = 80, base = 62, n = tl.bins.length, bw = W / n;
+  const max = Math.max(1, ...tl.bins.map(b => b.count));
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el; };
+  svg.appendChild(mk('line', { x1: 0, y1: base, x2: W, y2: base, stroke: 'rgba(150,170,205,0.25)', 'stroke-width': 1 }));
+  tl.bins.forEach((b, i) => {
+    const h = b.count ? Math.max(4, (b.count / max) * (base - 6)) : 0;
+    const start = new Date(b.start);
+    if (h) {
+      const r = mk('rect', { x: i * bw + 2, y: base - h, width: bw - 4, height: h, rx: 2,
+        fill: `rgba(239, 68, 68, ${0.45 + 0.55 * b.count / max})`, style: 'cursor:pointer' });
+      const kinds = Object.entries(b.by_type).map(([k, v]) => `${v} × ${k.replace(/_/g, ' ')}`).join('\n');
+      const t = mk('title', {}); t.textContent = `${start.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}\n${kinds}`;
+      r.appendChild(t);
+      r.addEventListener('click', () => navigate('notifications'));
+      svg.appendChild(r);
+    }
+    if (i % 3 === 0) {
+      const lb = mk('text', { x: i * bw + bw / 2, y: H - 4, 'text-anchor': 'middle', fill: 'rgba(170,182,204,0.8)', 'font-size': 11 });
+      lb.textContent = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      svg.appendChild(lb);
+    }
+  });
+  if (!tl.total) {
+    const t = mk('text', { x: W / 2, y: 36, 'text-anchor': 'middle', fill: 'rgba(170,182,204,0.9)', 'font-size': 14 });
+    t.textContent = `No alerts in the last ${tl.hours} hours`;
+    svg.appendChild(t);
+  }
+}
+
+function cameraHealthState(c) {
+  const a = c.analytics;
+  if (!a) return { cls: '', label: 'Not analysed', dot: '#6f7d96' };
+  if (a.status === 'stopped' || !a.alive) return { cls: 'offline', label: 'Stopped', dot: '#EF4444' };
+  // "running" is the video reader; only call it analysing if the model is healthy too.
+  if (a.status === 'running' && a.last_error) return { cls: 'degraded', label: 'Streaming · analytics error', dot: '#F59E0B' };
+  if (a.status === 'running') return { cls: 'live', label: `Analysing · ${(a.analytics_frames || 0).toLocaleString()} frames`, dot: '#10B981' };
+  const map = { 'starting': 'Starting', 'recycling': 'Restarting', 'reconnecting': 'Reconnecting', 'waiting-for-camera': 'Waiting for camera' };
+  return { cls: 'degraded', label: map[a.status] || a.status, dot: '#F59E0B' };
+}
+
+function renderOverviewHealth(cams) {
+  const box = $('health-monitor'); if (!box) return;
+  if (!cams.length) { box.innerHTML = '<div class="empty">No cameras configured yet.</div>'; return; }
+  box.innerHTML = cams.map(c => {
+    const st = cameraHealthState(c);
+    const lastE = parseUtc(c.last_event_utc), lastA = parseLocal(c.last_alert_local);
+    const last = [lastE, lastA].filter(x => x && !isNaN(x)).sort((x, y) => y - x)[0];
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const counts = 'Last 24 h: ' + plural(c.events_24h, 'event') + (c.alerts_24h != null ? ' · ' + plural(c.alerts_24h, 'alert') : '');
+    const err = c.analytics && c.analytics.last_error ? `<div style="font-size:11px;color:#F59E0B;margin-top:4px;" title="${esc(c.analytics.last_error)}">⚠ ${esc(String(c.analytics.last_error).slice(0, 60))}</div>` : '';
+    return `<div class="health-card ${st.cls}" title="${esc(c.location || '')}">
+      <div style="font-weight:600;color:var(--text);font-size:13px;">${esc(c.name || ('Camera ' + c.id))}</div>
+      <div style="margin-top:6px;font-size:12px;"><span class="health-status" style="background:${st.dot}"></span>${esc(st.label)}</div>
+      <div style="margin-top:6px;font-size:11.5px;color:var(--text-dim);">Last activity: ${esc(agoText(last))}</div>
+      <div style="font-size:11.5px;color:var(--text-dim);">${esc(counts)}</div>${err}
+    </div>`;
+  }).join('');
+}
+
+const OV_GRID_MAX = 8;
+function renderOverviewCameraGrid(cams) {
+  const grid = $('camera-grid'); if (!grid) return;
+  if (!cams.length) { grid.innerHTML = '<div class="empty">No cameras configured yet.</div>'; return; }
+  const tok = encodeURIComponent(State.token || '');
+  const tiles = cams.slice(0, OV_GRID_MAX).map(c => `
+    <div class="camera-tile" style="position:relative;" onclick="navigate('cameras')" title="Open Live Cameras">
+      <img loading="lazy" alt="${esc(c.name || '')}" src="/api/cameras/${encodeURIComponent(c.id)}/snapshot?token=${tok}"
+           style="width:100%;height:100%;object-fit:cover;display:block;background:var(--surface);"
+           onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'camera-tile-thumb',textContent:'📹'}))">
+      <div class="camera-tile-label">${esc(c.name || ('Camera ' + c.id))}</div>
+    </div>`);
+  if (cams.length > OV_GRID_MAX) {
+    tiles.push(`<div class="camera-tile" style="position:relative;" onclick="navigate('cameras')">
+      <div class="camera-tile-thumb" style="font-size:14px;font-weight:600;">View all ${cams.length} cameras →</div></div>`);
+  }
+  grid.innerHTML = tiles.join('');
+}
+
+async function renderOverviewHeatmap(hc) {
+  const canvas = $('heatmap-canvas'), sub = $('ov-heat-sub');
+  if (!canvas) return;
+  if (!hc) {
+    canvas.width = canvas.clientWidth || 640; canvas.height = 120;
+    const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(170,182,204,0.9)'; ctx.font = '14px Inter, system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('No tracking data yet: run live analytics or process footage.', canvas.width / 2, 64);
+    if (sub) sub.innerText = '';
+    return;
+  }
+  if (sub) sub.innerText = `where people spent time · ${hc.name || ('Camera ' + hc.id)}`;
+  try {
+    const data = await api(`/api/heatmap?camera_id=${encodeURIComponent(hc.id)}`);
+    let bg = null;
+    try {
+      const res = await fetch(`/api/heatmap/frame?camera_id=${encodeURIComponent(hc.id)}`, { headers: { Authorization: authHeader() } });
+      if (res.ok) {
+        bg = new Image(); bg.src = URL.createObjectURL(await res.blob());
+        await new Promise(r => { bg.onload = r; bg.onerror = r; });
+      }
+    } catch (e) {}
+    drawHeatmap(canvas, data, (bg && bg.naturalWidth) ? bg : null);
+  } catch (e) { if (sub) sub.innerText = e.message; }
+}
+
 /* =====================================================================
    AUTH
 ===================================================================== */
@@ -1644,6 +1788,7 @@ function connectWS() {
    OVERVIEW
 ===================================================================== */
 LOADERS.overview = async function loadOverview() {
+  loadOverviewPanels();
   loadOverviewStats();
   loadOverviewFeed();
   loadZoneFlow();
@@ -4001,100 +4146,7 @@ function initOfflineMode() {
 
 /* ===== 10 NEW FEATURES: FULL IMPLEMENTATIONS ===== */
 
-// 1. INCIDENT HEATMAP - Canvas-based visualization
-function initHeatmap() {
-  const canvas = document.getElementById('heatmap-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width;
-  canvas.height = rect.height;
-
-  // Mock heatmap data (zones with incident density)
-  const zones = [
-    { x: 0.2, y: 0.3, intensity: 0.8, label: 'Entrance' },
-    { x: 0.5, y: 0.5, intensity: 0.6, label: 'Corridor' },
-    { x: 0.8, y: 0.7, intensity: 0.4, label: 'Exit' }
-  ];
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  zones.forEach(zone => {
-    const gradient = ctx.createRadialGradient(zone.x * canvas.width, zone.y * canvas.height, 0, zone.x * canvas.width, zone.y * canvas.height, 80);
-    gradient.addColorStop(0, `rgba(239, 68, 68, ${zone.intensity})`);
-    gradient.addColorStop(0.7, `rgba(217, 70, 239, ${zone.intensity * 0.5})`);
-    gradient.addColorStop(1, 'rgba(217, 70, 239, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  });
-}
-
-// 2. INCIDENT TIMELINE - SVG-based
-function initTimeline() {
-  const svg = document.getElementById('timeline-svg');
-  if (!svg) return;
-  svg.setAttribute('viewBox', '0 0 1200 80');
-
-  // Mock incident spikes
-  const spikes = [10, 5, 8, 15, 12, 6, 18, 9, 7, 20, 14, 11];
-  const maxSpike = 20;
-  const barWidth = 1200 / spikes.length;
-
-  spikes.forEach((count, i) => {
-    const height = (count / maxSpike) * 60;
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', i * barWidth);
-    rect.setAttribute('y', 60 - height);
-    rect.setAttribute('width', barWidth - 2);
-    rect.setAttribute('height', height);
-    rect.setAttribute('fill', `rgba(${239 + count * 2}, 68, 68, ${0.3 + count / maxSpike * 0.7})`);
-    rect.setAttribute('style', 'cursor: pointer; transition: fill 0.2s;');
-    rect.onmouseover = () => rect.setAttribute('fill', 'rgba(255, 100, 100, 0.9)');
-    rect.onmouseout = () => rect.setAttribute('fill', `rgba(${239 + count * 2}, 68, 68, ${0.3 + count / maxSpike * 0.7})`);
-    svg.appendChild(rect);
-  });
-}
-
-// 3. CAMERA HEALTH MONITOR
-function initHealthMonitor() {
-  const monitor = document.getElementById('health-monitor');
-  if (!monitor) return;
-
-  const cameras = [
-    { name: 'CAM-01', status: 'live', uptime: 99.8 },
-    { name: 'CAM-02', status: 'live', uptime: 99.5 },
-    { name: 'CAM-03', status: 'degraded', uptime: 95.2 },
-    { name: 'CAM-04', status: 'offline', uptime: 0 },
-    { name: 'CAM-05', status: 'live', uptime: 99.9 },
-    { name: 'CAM-06', status: 'live', uptime: 99.1 }
-  ];
-
-  monitor.innerHTML = cameras.map(cam => `
-    <div class="health-card ${cam.status}">
-      <span class="health-status ${cam.status}"></span>
-      <div class="health-label">${cam.name}</div>
-      <div class="health-value">${cam.uptime}%</div>
-    </div>
-  `).join('');
-}
-
-// 4. MULTI-CAMERA GRID
-function initCameraGrid() {
-  const grid = document.getElementById('camera-grid');
-  if (!grid) return;
-
-  const cameras = Array.from({length: 9}, (_, i) => `CAM-${String(i+1).padStart(2, '0')}`);
-  grid.innerHTML = cameras.map(name => `
-    <div class="camera-tile" onclick="alert('Opening ${name}')">
-      <div class="camera-tile-thumb">📹</div>
-      <div class="camera-tile-label">${name}</div>
-    </div>
-  `).join('');
-}
-
 // 5. QUICK ACTIONS
-function toggleFavorites() { ToastContainer.show('Favorites', 'Pinned cameras panel opened', 'info'); }
-function showFilterPresets() { ToastContainer.show('Filters', 'Alert filter presets loaded', 'info'); }
-function quickExport() { ToastContainer.show('Export', 'Generating report...', 'ok'); }
 function toggleAccessibility() {
   document.body.classList.toggle('accessibility-mode');
   const isOn = document.body.classList.contains('accessibility-mode');
@@ -4145,10 +4197,8 @@ document.addEventListener('keydown', (e) => {
 
 // Initialize all 10 features on boot
 function initAll10Features() {
-  initHeatmap();
-  initTimeline();
-  initHealthMonitor();
-  initCameraGrid();
+  // Overview timeline / heatmap / camera health / camera grid are loaded with
+  // real data by loadOverviewPanels() (see LOADERS.overview).
   initThemeToggle();
   // Real alerts arrive over /ws/alerts (see connectWS); nothing is simulated here.
 
