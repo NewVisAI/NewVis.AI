@@ -17,7 +17,7 @@ from typing import List, Set, Optional, Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, BackgroundTasks, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 import torch
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -80,6 +80,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Camera credentials never leave the server
+# ---------------------------------------------------------------------------
+# Live analytics stores each camera's source URL (e.g. rtsp://admin:pass@10.0.0.5/...)
+# as events.video_path / tracking_data.video_path, and many endpoints return those
+# rows. Strip the user:password@ part from every stream URL in JSON responses, and
+# map a stripped camera URL coming back as ?video_path=... to the real source so
+# the browser can still use it as a filter key.
+from urllib.parse import parse_qsl, urlencode
+
+from url_redaction import redact_url_credentials, redact_url_credentials_bytes
+
+
+def _unredact_video_path(value: str) -> str:
+    if not value or "://" not in value or "@" in value:
+        return value
+    for cam in camera_registry_list_raw():
+        src = str(cam.get("source") or "")
+        if "@" in src and redact_url_credentials(src) == value:
+            return src
+    return value
+
+
+def camera_registry_list_raw():
+    try:
+        return camera_registry._load().get("cameras", [])
+    except Exception:
+        return []
+
+
+@app.middleware("http")
+async def protect_camera_credentials(request: Request, call_next):
+    qs = request.scope.get("query_string", b"")
+    if b"video_path=" in qs:
+        pairs = parse_qsl(qs.decode("latin-1"), keep_blank_values=True)
+        fixed = [(k, _unredact_video_path(v) if k == "video_path" else v) for k, v in pairs]
+        if fixed != pairs:
+            request.scope["query_string"] = urlencode(fixed).encode("latin-1")
+
+    response = await call_next(request)
+    if not (response.headers.get("content-type") or "").startswith("application/json"):
+        return response
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    clean = redact_url_credentials_bytes(body)
+    headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
+    return Response(content=clean, status_code=response.status_code, headers=headers,
+                    media_type=response.headers.get("content-type"), background=response.background)
 
 # Setup directories for video storage
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -300,10 +349,13 @@ async def broadcast_alert(message: dict):
     if not active_websockets:
         return
     disconnected = set()
+    import json as _json
+    # Same credential scrub as the HTTP middleware: event payloads carry video_path.
+    payload = redact_url_credentials(_json.dumps(message, default=str))
     # Convert to list to avoid 'dictionary/set changed size during iteration' race conditions
     for ws in list(active_websockets):
         try:
-            await ws.send_json(message)
+            await ws.send_text(payload)
         except Exception:
             disconnected.add(ws)
     for ws in disconnected:
@@ -1600,7 +1652,7 @@ def heatmap(video_path: str = None, grid_w: int = 48, grid_h: int = 27,
              for y in range(grid_h) for x in range(grid_w) if grid[y][x] > 0]
     return {
         "grid_w": grid_w, "grid_h": grid_h, "cells": cells, "max": mx,
-        "samples": len(rows), "video_path": video_path,
+        "samples": len(rows),
         "frame_w": int(frame_w), "frame_h": int(frame_h),
         "max_frame": int(db_max_frame),
     }
@@ -1727,11 +1779,11 @@ def headcount_series():
     """Unique people per hour-of-day (00–23) from logged sessions — feeds the
     headcount-over-time chart."""
     import sqlite3
-    from db_schema import get_db_path
+    from db_schema import get_db_path, local_hour_sql
     conn = sqlite3.connect(get_db_path())
     cur = conn.cursor()
     cur.execute(
-        "SELECT substr(entry_time, 12, 2) AS hr, COUNT(DISTINCT global_id) "
+        f"SELECT {local_hour_sql('entry_time', dialect='sqlite')} AS hr, COUNT(DISTINCT global_id) "
         "FROM events WHERE entry_time IS NOT NULL AND object_type='person' GROUP BY hr ORDER BY hr"
     )
     buckets = {f"{h:02d}": 0 for h in range(24)}

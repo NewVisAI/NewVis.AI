@@ -2,7 +2,7 @@ import json
 import re
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
-from db_schema import get_db_path, connect_db, adapt_query
+from db_schema import get_db_path, connect_db, adapt_query, local_hour_sql
 
 
 
@@ -251,17 +251,13 @@ class QueryEngine:
     def _time_range_clause(
         self, start_hour: int, end_hour: int
     ) -> Tuple[str, List[int]]:
+        # events times are naive UTC; the user's "after 6 pm" means local time.
+        hour = local_hour_sql("COALESCE(entry_time, timestamp)")
         if start_hour <= end_hour:
-            clause = (
-                " AND CAST(strftime('%H', COALESCE(entry_time, timestamp)) AS INTEGER)"
-                " BETWEEN ? AND ?"
-            )
+            clause = f" AND CAST({hour} AS INTEGER) BETWEEN ? AND ?"
             return clause, [start_hour, end_hour]
 
-        clause = (
-            " AND (CAST(strftime('%H', COALESCE(entry_time, timestamp)) AS INTEGER) >= ? "
-            "OR CAST(strftime('%H', COALESCE(entry_time, timestamp)) AS INTEGER) <= ?)"
-        )
+        clause = f" AND (CAST({hour} AS INTEGER) >= ? OR CAST({hour} AS INTEGER) <= ?)"
         return clause, [start_hour, end_hour]
 
     def generate_security_report(self) -> str:
@@ -292,7 +288,7 @@ class QueryEngine:
                 report.append(f"• Most Active Zone: Zone {active_zone[0]} ({active_zone[1]} entries recorded)")
                 
             # 3. Peak activity hour
-            cursor.execute("SELECT substr(entry_time, 12, 2) as hr, COUNT(*) as cnt FROM events WHERE entry_time IS NOT NULL GROUP BY hr ORDER BY cnt DESC LIMIT 1")
+            cursor.execute(f"SELECT {local_hour_sql('entry_time')} as hr, COUNT(*) as cnt FROM events WHERE entry_time IS NOT NULL GROUP BY hr ORDER BY cnt DESC LIMIT 1")
             peak_hour = cursor.fetchone()
             if peak_hour and peak_hour[0]:
                 report.append(f"• Peak Activity Hour: {peak_hour[0]}:00 - {peak_hour[0]}:59 ({peak_hour[1]} events)")

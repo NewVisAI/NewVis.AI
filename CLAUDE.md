@@ -76,6 +76,13 @@ hence the `wsl bash -lc '...'` wrapper for the WSL venv. Kill with `pkill -9 -f 
   real throughput numbers — is deferred to the friend's RTX laptop. This machine proves
   *accuracy parity*; the GPU box proves *speed*.
 - `license.key`, `dev_keys/`, `.venv`, `.venv-win`, `models/`, `reid_crops/`, `frames/` are gitignored.
+- **Two clocks in the DB.** `events` / `tracking_data` times are naive **UTC** (`event._utc_now_iso`);
+  `alerts` times are naive **server-local**. Any hour-of-day logic on events must use
+  `db_schema.local_hour_sql(col)`, and "local" means the server's timezone, so a Docker/Linux host
+  needs `TZ` set to the site's zone (e.g. `Asia/Kolkata`) or hours come out in UTC.
+- **Camera URLs carry passwords.** `events.video_path` holds the camera source (`rtsp://user:pass@…`).
+  A middleware in `backend/server.py` strips credentials from every JSON response and the
+  `/ws/alerts` stream (`url_redaction.py`); don't send event rows out any other way.
 
 ---
 
