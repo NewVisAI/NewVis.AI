@@ -69,3 +69,7 @@ reid_crops/
 
 # Graphify generated knowledge graph (regenerate via `graphify extract`)
 graphify-out/
+
+# Website lead store (runtime, contains personal data)
+website/data/
+!.env.example

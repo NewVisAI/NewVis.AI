@@ -182,6 +182,22 @@ def _ensure_column(cursor, table_name: str, column_name: str, definition: str) -
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
 
+def local_hour_sql(column: str, dialect: str = None) -> str:
+    """SQL expression for the server-local hour ('00'..'23') of a naive-UTC column.
+
+    events.timestamp / entry_time / exit_time are written as naive UTC
+    (event._utc_now_iso), while alerts and every hour shown in the UI are
+    server-local. Reading the hour straight off the UTC string shifts it by the
+    UTC offset (5.5 h in India), so hour-of-day logic must go through this.
+    """
+    if (dialect or get_db_type()) == "postgres":
+        from datetime import datetime as _dt
+        offset = int(_dt.now().astimezone().utcoffset().total_seconds())
+        return f"to_char(({column})::timestamp + interval '{offset} seconds', 'HH24')"
+    # SQLite: the 'localtime' modifier treats the input as UTC (DST-aware).
+    return f"strftime('%H', {column}, 'localtime')"
+
+
 def ensure_valid_schema() -> str:
     db_type = get_db_type()
     if db_type == "postgres":

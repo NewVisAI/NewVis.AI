@@ -1,0 +1,32 @@
+# Public website for gensolve.in.  Run from this folder on the server:
+#   cp .env.example .env   # then fill it in
+#   docker compose up -d --build
+services:
+  site:
+    build:
+      context: ..
+      dockerfile: website/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - leads:/data
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2.8.4
+    restart: unless-stopped
+    depends_on: [site]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  leads:
+  caddy_data:
+  caddy_config:

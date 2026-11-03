@@ -19,7 +19,7 @@ function backs the on-demand REST endpoint and the CLI.
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from db_schema import adapt_query, connect_db
+from db_schema import adapt_query, connect_db, local_hour_sql
 
 PERIODS = {
     "daily": timedelta(days=1),
@@ -117,7 +117,7 @@ def generate(period: str = "daily") -> Dict[str, Any]:
 
     # Busiest hour by session entries.
     cur.execute(adapt_query(
-        f"SELECT substr(entry_time,12,2) hr, COUNT(*) c FROM events "
+        f"SELECT {local_hour_sql('entry_time')} hr, COUNT(*) c FROM events "
         f"WHERE entry_time IS NOT NULL AND event_type='leaving'{clause} "
         f"GROUP BY hr ORDER BY c DESC LIMIT 1"), params)
     busiest = cur.fetchone()

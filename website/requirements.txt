@@ -1,0 +1,4 @@
+# Website only — intentionally NOT the engine's requirements.txt (no torch/OpenCV).
+fastapi==0.138.2
+uvicorn==0.49.0
+pydantic==2.13.4

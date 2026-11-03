@@ -3,8 +3,23 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NewVis AI — Turn your existing cameras into a 24/7 safety brain</title>
+<title>NewVis AI by Gensolve — Turn your existing cameras into a 24/7 safety brain</title>
 <meta name="description" content="NewVis AI turns the CCTV cameras you already have into a real-time safety-intelligence system. Detect falls, intrusions, loitering and more — across every camera, on affordable hardware." />
+<link rel="canonical" href="https://gensolve.in/" />
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+<meta name="theme-color" content="#05070f" />
+<meta name="author" content="Gensolve" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Gensolve" />
+<meta property="og:url" content="https://gensolve.in/" />
+<meta property="og:title" content="NewVis AI by Gensolve — AI video analytics for the cameras you already own" />
+<meta property="og:description" content="Real-time alerts for intrusions, loitering, falls and more — on your existing CCTV, running on-site." />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="NewVis AI by Gensolve" />
+<meta name="twitter:description" content="Real-time AI safety alerts on the CCTV cameras you already own." />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"Gensolve","url":"https://gensolve.in/","logo":"https://gensolve.in/static/favicon.svg","brand":{"@type":"Brand","name":"NewVis AI"}}
+</script>
 <style>
   :root{
     --bg:#05070f;
@@ -94,12 +109,21 @@
   .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:-.01em;font-size:18px}
   .brand .mark{width:30px;height:30px;flex:none}
   .brand small{display:block;font-size:10.5px;letter-spacing:.22em;font-weight:600;color:var(--ink-mute);text-transform:uppercase}
-  .nav-links{display:flex;gap:26px;align-items:center}
+  .nav-links{display:flex;gap:22px;align-items:center}
   .nav-links a{font-size:14.5px;color:var(--ink-soft);font-weight:500;transition:color .2s}
   .nav-links a:hover{color:#fff}
   .nav-cta{display:flex;align-items:center;gap:12px}
   .burger{display:none;background:none;border:0;color:var(--ink);cursor:pointer;padding:6px}
-  @media(max-width:900px){.nav-links{display:none}.burger{display:block}}
+  @media(max-width:1060px){.nav-links{display:none}.burger{display:block}}
+  .mnav{display:none;position:fixed;top:64px;left:12px;right:12px;z-index:60;padding:10px;border-radius:14px;
+    background:rgba(8,12,24,.97);border:1px solid var(--line-strong);box-shadow:var(--shadow)}
+  .mnav a{display:block;padding:12px 14px;border-radius:10px;color:var(--ink-soft);font-weight:500}
+  .mnav a:hover{background:var(--glass);color:#fff}
+  .mnav.open{display:block}
+  @media(min-width:1061px){.mnav.open{display:none}}
+  .brand span{white-space:nowrap}
+  @media(max-width:520px){.nav-cta .btn-primary{padding:9px 14px;font-size:13px}.brand small{display:none}}
+  @media(max-width:380px){.nav-cta .btn-primary{display:none}}
 
   /* ---------- hero ---------- */
   .hero{padding-top:70px;padding-bottom:60px}
@@ -301,6 +325,44 @@
     background:rgba(61,220,151,.14);border:1px solid rgba(61,220,151,.4)}
   .success .check svg{width:30px;height:30px;color:var(--safe)}
   .success h3{margin-bottom:8px}
+
+  /* ---------- product tour ---------- */
+  .tour-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+  .tour-tab{font:inherit;font-size:14px;font-weight:600;color:var(--ink-soft);background:var(--glass);border:1px solid var(--line);
+    padding:9px 15px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .2s}
+  .tour-tab:hover{color:#fff;border-color:var(--line-strong)}
+  .tour-tab[aria-selected="true"]{color:#04121a;background:linear-gradient(135deg,var(--cyan),var(--violet));border-color:transparent}
+  .tour-tab .n{font-size:11px;opacity:.7;font-family:ui-monospace,monospace}
+  .tour-panel{display:none;grid-template-columns:1.45fr 1fr;gap:34px;align-items:center}
+  .tour-panel.active{display:grid;animation:tourIn .45s ease}
+  @keyframes tourIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:920px){.tour-panel{grid-template-columns:1fr}}
+  .tour-copy h3{font-size:clamp(22px,2.4vw,28px);margin:12px 0 12px}
+  .tour-copy p{color:var(--ink-soft)}
+  .tour-copy ul{list-style:none;padding:0;margin:18px 0 0;display:grid;gap:10px}
+  .tour-copy li{display:flex;gap:10px;color:var(--ink-soft);font-size:15px}
+  .tour-copy li svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--cyan)}
+  .tour-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .src{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;
+    color:var(--cyan);background:rgba(55,214,240,.1);border:1px solid rgba(55,214,240,.28)}
+  .screen{background:#070a14}
+  .screen img{display:block;width:100%;height:auto}
+  .shot-switch{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line);background:rgba(8,12,22,.6)}
+  .shot-switch button{font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-soft);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+  .shot-switch button:hover{color:#fff;border-color:var(--line-strong)}
+  .shot-switch button[aria-pressed="true"]{color:var(--ink);background:var(--glass);border-color:var(--cyan)}
+  .shotview .screen{display:flex;align-items:center;justify-content:center;background:#0b0f1d}
+  .shotview .screen img{width:100%;height:auto}
+  .tour-note{margin-top:26px;font-size:13px;color:var(--ink-mute);max-width:80ch}
+
+  /* ---------- roles ---------- */
+  .roles{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.roles{grid-template-columns:1fr}}
+  .role{padding:26px}
+  .role .who{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+  .role h3{font-size:20px;margin:10px 0 10px}
+  .role p{color:var(--ink-soft);font-size:15px}
+  .role ul{margin:14px 0 0;padding-left:18px;color:var(--ink-soft);font-size:14px;display:grid;gap:6px}
 </style>
 </head>
 <body>
@@ -321,7 +383,7 @@
       <span>NewVis AI<small>Vision Redefined</small></span>
     </a>
     <nav class="nav-links">
-      <a href="#what">What it does</a>
+      <a href="#what">What it does</a> <a href="#tour">Product tour</a>
       <a href="#usecases">Use cases</a>
       <a href="#features">Features</a>
       <a href="#how">How it works</a>
@@ -330,13 +392,21 @@
     </nav>
     <div class="nav-cta">
       <a class="btn btn-primary js-callback" data-src="nav">Request a callback</a>
-      <button class="burger" id="burger" aria-label="Menu">
+      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="mnav">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
     </div>
   </div>
 </header>
 
+<nav class="mnav" id="mnav" aria-label="Mobile">
+  <a href="#what">What it does</a> <a href="#tour">Product tour</a>
+  <a href="#usecases">Use cases</a>
+  <a href="#features">Features</a>
+  <a href="#how">How it works</a>
+  <a href="#why">Why NewVis</a>
+  <a href="#roi">ROI</a>
+</nav>
 <div id="top"></div>
 
 <!-- ================= HERO ================= -->
@@ -351,12 +421,12 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
           Request a callback
         </a>
-        <a class="btn btn-ghost" href="#what">See what it does</a>
+        <a class="btn btn-ghost" href="#tour">Take the product tour</a>
       </div>
       <div class="trust">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Works with existing RTSP cameras</span>
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Runs on-site — video stays private</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Proven on a 300-camera school</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Built for 300-camera campuses</span>
       </div>
     </div>
 
@@ -407,7 +477,7 @@
 
   <!-- stat ribbon -->
   <div class="ribbon reveal">
-    <div class="stat"><b>~24%</b><span>Lower 3-year cost of ownership</span></div>
+    <div class="stat"><b>~24%</b><span>Lower 3-year cost of ownership (modelled)</span></div>
     <div class="stat"><b>~97%</b><span>Person-recall on low-bandwidth streams*</span></div>
     <div class="stat"><b>300→6</b><span>Cameras run on ~6 affordable boxes</span></div>
     <div class="stat"><b>24/7</b><span>Every camera, always watched</span></div>
@@ -464,6 +534,160 @@
       <h3>Follows across cameras</h3>
       <p>Recognises the same person from camera to camera as a single anonymous ID — no faces, no names.</p>
     </div>
+  </div>
+</section>
+
+<!-- ================= PRODUCT TOUR ================= -->
+<section class="wrap" id="tour">
+  <div class="head reveal">
+    <span class="eyebrow"><span class="dot"></span>Product tour</span>
+    <h2>See what NewVis actually does.</h2>
+    <p class="lead">Six modules, shown as they really are: screenshots of the NewVis dashboard and frames from the NewVis analytics pipeline. Nothing on this page is a mock-up.</p>
+  </div>
+
+  <div class="tour-tabs reveal" role="tablist" aria-label="Product tour">
+    <button class="tour-tab" role="tab" aria-selected="true" aria-controls="tp-live" id="tt-live"><span class="n">01</span>Live grid</button>
+    <button class="tour-tab" role="tab" aria-selected="false" aria-controls="tp-track" id="tt-track"><span class="n">02</span>Detection &amp; tracking</button>
+    <button class="tour-tab" role="tab" aria-selected="false" aria-controls="tp-alerts" id="tt-alerts"><span class="n">03</span>Alerts &amp; evidence</button>
+    <button class="tour-tab" role="tab" aria-selected="false" aria-controls="tp-zones" id="tt-zones"><span class="n">04</span>Zones &amp; rules</button>
+    <button class="tour-tab" role="tab" aria-selected="false" aria-controls="tp-search" id="tt-search"><span class="n">05</span>AI search</button>
+    <button class="tour-tab" role="tab" aria-selected="false" aria-controls="tp-reports" id="tt-reports"><span class="n">06</span>Reports &amp; heatmaps</button>
+  </div>
+
+  <!-- 01 live grid -->
+  <div class="tour-panel active reveal" role="tabpanel" id="tp-live" aria-labelledby="tt-live">
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Live Cameras</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/live-grid.webp" alt="NewVis Live Cameras screen showing four camera feeds in a grid, grouped by floor" loading="lazy" width="1400" height="922"></div>
+    </div>
+    <div class="tour-copy">
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
+      <h3>Every camera, on one screen.</h3>
+      <p>Connect existing CCTV over standard RTSP and watch every feed live in one grid, filtered by floor, with the camera name and time on every tile.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Works with the IP cameras and NVRs you already have</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Group and filter cameras by floor or location</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Analyses a light sub-stream while the full-resolution stream keeps recording</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Each role only sees the cameras and pages it is allowed to</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 02 tracking -->
+  <div class="tour-panel reveal" role="tabpanel" id="tp-track" aria-labelledby="tt-track">
+    <div class="frame">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span>
+        <span style="margin-left:8px">NewVis · Live Video Analytics</span></div>
+      <div class="screen"><img src="/static/showcase/tracking.jpg" alt="NewVis tracking several people in a lecture hall, each with an anonymous ID and a movement trail" loading="lazy" width="1280" height="720"></div>
+    </div>
+    <div class="tour-copy">
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real output</span></div>
+      <h3>Every person found, followed and counted.</h3>
+      <p>NewVis detects each person in frame, gives them an anonymous ID and draws the path they take, so you see movement, not just snapshots.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Person detection and multi-person tracking in real time</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Movement trails and live headcount per camera and per zone</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>The same person recognised across cameras as one ID <span class="badge beta" style="margin-left:4px;vertical-align:1px">Beta</span></span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Anonymous by design: IDs, not names, and no face recognition</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 03 alerts -->
+  <div class="tour-panel reveal" role="tabpanel" id="tp-alerts" aria-labelledby="tt-alerts">
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Notifications</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/alerts-inbox.webp" alt="NewVis notifications inbox listing loitering, occupancy, restricted-area and after-hours alerts with camera, zone and time" loading="lazy" width="1400" height="778"></div>
+      <div class="shot-switch" role="group" aria-label="Screenshots"><button type="button" aria-pressed="true" data-src="/static/showcase/dashboard/alerts-inbox.webp" data-alt="NewVis notifications inbox listing loitering, occupancy, restricted-area and after-hours alerts with camera, zone and time" data-w="1400" data-h="778">Alert inbox</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/alert-snapshot.webp" data-alt="A restricted-area alert expanded to show its snapshot, with the person who triggered it boxed in red" data-w="1400" data-h="933">Snapshot evidence</button></div>
+    </div>
+    <div class="tour-copy">
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
+      <h3>An alert with the evidence attached.</h3>
+      <p>When a rule is broken, the right person gets a notification saying what happened, where and when, plus a snapshot of that exact frame with the person boxed. Switch between the inbox and a snapshot below the screen.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Restricted-zone, after-hours, loitering and occupancy alerts</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Snapshot evidence saved with every alert</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Jump to the recorded clip of the moment</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Fall, running and altercation alerts <span class="badge beta" style="margin-left:4px;vertical-align:1px">Beta</span></span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 04 zones -->
+  <div class="tour-panel reveal" role="tabpanel" id="tp-zones" aria-labelledby="tt-zones">
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Zones &amp; Rules</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/zones-draw.webp" alt="Drawing a restricted zone polygon directly on a live camera view in the NewVis zone editor" loading="lazy" width="1400" height="958"></div>
+      <div class="shot-switch" role="group" aria-label="Screenshots"><button type="button" aria-pressed="true" data-src="/static/showcase/dashboard/zones-draw.webp" data-alt="Drawing a restricted zone polygon directly on a live camera view in the NewVis zone editor" data-w="1400" data-h="958">Draw a zone</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/zones-rules.webp" data-alt="NewVis zone rules list showing a restricted stage zone with active hours and school days" data-w="1400" data-h="656">Rules</button></div>
+    </div>
+    <div class="tour-copy">
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
+      <h3>Draw the rules once. NewVis enforces them 24/7.</h3>
+      <p>Click out a restricted area or a counting line directly on the live camera view, then set when each rule applies: hours, school days and a holiday calendar.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Draw polygon zones and in/out counting lines on any camera</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Per-zone active hours and school days</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Holiday calendar, so a non-school day is treated as one</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Every entry and exit logged for reports</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 05 search -->
+  <div class="tour-panel reveal" role="tabpanel" id="tp-search" aria-labelledby="tt-search">
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · AI Search</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/search.webp" alt="NewVis AI Search answering “who entered the restricted zone” with the matching event and a Clip button" loading="lazy" width="1400" height="433"></div>
+    </div>
+    <div class="tour-copy">
+      <div class="tour-meta"><span class="badge beta">Beta</span><span class="src">Real dashboard</span></div>
+      <h3>Ask your footage a question.</h3>
+      <p>Type a question in plain English. NewVis shows how it understood the question, then lists the matching events, each with a one-click clip.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Filter by camera, zone, person ID and type of event</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Shows the parsed intent, so you can see what it searched for</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Results link straight to the clip</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Currently best at camera, zone and event questions; time-of-day questions are still being improved</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 06 reports -->
+  <div class="tour-panel reveal" role="tabpanel" id="tp-reports" aria-labelledby="tt-reports">
+    <div class="frame shotview">
+      <div class="frame-bar"><span class="d" style="background:#f76a6a"></span><span class="d" style="background:#f7b955"></span><span class="d" style="background:#3ddc97"></span><span style="margin-left:8px">NewVis · Reports &amp; Heatmap</span></div>
+      <div class="screen"><img class="shot-img" src="/static/showcase/dashboard/heatmap.webp" alt="NewVis spatial heatmap over a cafeteria camera view, showing where people spend the most time" loading="lazy" width="1400" height="913"></div>
+      <div class="shot-switch" role="group" aria-label="Screenshots"><button type="button" aria-pressed="true" data-src="/static/showcase/dashboard/heatmap.webp" data-alt="NewVis spatial heatmap over a cafeteria camera view, showing where people spend the most time" data-w="1400" data-h="913">Heatmap</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/reports-headcount.webp" data-alt="NewVis chart of unique people by hour of day" data-w="840" data-h="300">Headcount</button><button type="button" aria-pressed="false" data-src="/static/showcase/dashboard/reports-zoneflow.webp" data-alt="NewVis chart of entries per zone" data-w="840" data-h="300">Zone flow</button></div>
+    </div>
+    <div class="tour-copy">
+      <div class="tour-meta"><span class="badge prod">Production</span><span class="src">Real dashboard</span></div>
+      <h3>Know how your space is actually used.</h3>
+      <p>The cameras that watch for incidents also count. Headcount by hour, entries per zone and dwell heatmaps show which areas are busy, when, and where people linger.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Headcount by hour and entries per zone</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Spatial heatmaps of where people spend time</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Scheduled periodic reports and data export</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Append-only audit log of who viewed or changed what</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="tour-note reveal">Screenshots show the NewVis dashboard running on test footage with a sample day of activity. Alert snapshots, heatmaps and charts are produced by NewVis itself. Faces are blurred for this website; in the product, people are tracked as anonymous IDs, not identified.</p>
+</section>
+
+<!-- ================= ROLES ================= -->
+<section class="wrap" id="roles" style="padding-top:20px">
+  <div class="head center reveal">
+    <span class="eyebrow"><span class="dot"></span>One console, three views</span>
+    <h2>Everyone sees what they need. Nothing more.</h2>
+  </div>
+  <div class="roles">
+    <div class="role glass reveal"><div class="who">Leadership</div><h3>Principal / site head</h3><p>Answers, not footage.</p>
+      <ul><li>Alert inbox with evidence</li><li>Reports, headcount and heatmaps</li><li>Plain-English search <em>(Beta)</em></li><li>Audit log of who did what</li></ul></div>
+    <div class="role glass reveal"><div class="who">Operations</div><h3>Security &amp; tech team</h3><p>Runs the cameras and the rules.</p>
+      <ul><li>Live grid and live analytics</li><li>Draw zones, lines and schedules</li><li>Upload and analyse recorded footage</li><li>Investigate incidents across cameras <em>(Beta)</em></li></ul></div>
+    <div class="role glass reveal"><div class="who">Administration</div><h3>System administrator</h3><p>Controls access and licensing.</p>
+      <ul><li>User and role management</li><li>Per-feature licensing</li><li>Holiday calendar and system settings</li><li>Full audit trail</li></ul></div>
   </div>
 </section>
 
@@ -551,7 +775,7 @@
       <div class="frow"><span>One-click jump-to-footage clips</span><span class="badge prod">Production</span></div>
       <div class="frow"><span>Dwell / spatial heatmaps</span><span class="badge prod">Production</span></div>
       <div class="frow"><span>Headcount charts + periodic reports</span><span class="badge prod">Production</span></div>
-      <div class="frow"><span>Plain-English AI activity summary</span><span class="badge prod">Production</span></div>
+      <div class="frow"><span>Plain-English AI activity summary</span><span class="badge beta">Beta</span></div>
     </div>
     <div class="fgroup glass reveal">
       <h3><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></span>Cross-camera &amp; intelligence</h3>
@@ -616,12 +840,12 @@
   <div class="head reveal">
     <span class="eyebrow"><span class="dot"></span>The numbers</span>
     <h2>More safety. Less cost. No extra staff.</h2>
-    <p class="lead">Figures below are measured in our own benchmarks for the flagship 300-camera school deployment. Your numbers depend on your site — that's exactly what a callback is for.</p>
+    <p class="lead">Cost figures below are engineering estimates modelled for the flagship 300-camera school deployment; accuracy figures are measured in our own GPU benchmarks. Your numbers depend on your site — that's exactly what a callback is for.</p>
   </div>
   <div class="roi">
     <div class="roi-main glass reveal">
       <div class="big">~24%</div>
-      <p style="color:var(--ink-soft);margin-top:10px">lower 3-year total cost of ownership — from an accuracy-neutral efficiency stack (sub-stream analytics, hardware decode, motion gating, batching).</p>
+      <p style="color:var(--ink-soft);margin-top:10px">lower 3-year total cost of ownership (engineering estimate) — from an accuracy-neutral efficiency stack (sub-stream analytics, hardware decode, motion gating, batching).</p>
       <div class="roi-list">
         <div><span>Compute boxes for 300 cameras</span><b>9 → 6</b></div>
         <div><span>Analytics bandwidth</span><b>−65%</b></div>
@@ -659,7 +883,7 @@
           </svg>
           <span>NewVis AI<small>Vision Redefined</small></span>
         </a>
-        <p class="foot-note-box">AI video-analytics that turns existing cameras into real-time safety intelligence — for schools, malls, parking, offices, warehouses and beyond.</p>
+        <p class="foot-note-box"><b style="color:var(--ink)">NewVis AI</b> by <b style="color:var(--ink)">Gensolve</b> — AI video-analytics that turns existing cameras into real-time safety intelligence — for schools, malls, parking, offices, warehouses and beyond.</p>
         <p style="margin-top:16px;font-size:13.5px">Talk to us: <a href="mailto:newvis.team@gmail.com">newvis.team@gmail.com</a></p>
       </div>
       <div class="foot-note-box glass" style="padding:18px 20px;border-radius:14px">
@@ -667,7 +891,7 @@
       </div>
     </div>
     <div class="foot-legal">
-      <span>© <span id="yr"></span> NewVis AI. All rights reserved.</span>
+      <span>© <span id="yr"></span> Gensolve. NewVis AI is a product of Gensolve. All rights reserved. · <a href="/privacy" style="text-decoration:underline">Privacy</a></span>
       <span>Built for safety, on the cameras you already have.</span>
     </div>
   </div>
@@ -724,7 +948,7 @@
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
         <div class="err" id="formErr"></div>
         <button type="submit" class="btn btn-primary" id="submitBtn">Request my callback</button>
-        <p class="modal-foot">By submitting you agree to be contacted about NewVis. Your details are used only to call you back.</p>
+        <p class="modal-foot">By submitting you agree to be contacted by Gensolve about NewVis. Your details are used only to call you back — see our <a href="/privacy" target="_blank" style="text-decoration:underline">privacy notice</a>.</p>
       </form>
     </div>
     <div id="successView" class="success" style="display:none">
@@ -751,9 +975,13 @@
   }, {threshold:.12});
   document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
 
-  // mobile menu -> just open the callback (keeps it simple / single-page)
+  // mobile menu
   var burger = document.getElementById('burger');
-  if(burger) burger.addEventListener('click', function(){ location.hash = '#usecases'; });
+  var mnav = document.getElementById('mnav');
+  function setMenu(open){ mnav.classList.toggle('open', open); burger.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  burger.addEventListener('click', function(e){ e.stopPropagation(); setMenu(!mnav.classList.contains('open')); });
+  mnav.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', function(){ setMenu(false); }); });
+  document.addEventListener('click', function(e){ if(!mnav.contains(e.target)) setMenu(false); });
 
   // ---------- lead modal ----------
   var scrim = document.getElementById('scrim');
@@ -838,6 +1066,36 @@
         showErr('Network error — please try again, or email newvis.team@gmail.com.');
         submitBtn.disabled = false; submitBtn.textContent = 'Request my callback';
       });
+  });
+
+
+  // ---------- product tour ----------
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tour-tab'));
+  function selectTab(t){
+    tabs.forEach(function(x){
+      var on = x === t;
+      x.setAttribute('aria-selected', on ? 'true' : 'false');
+      x.tabIndex = on ? 0 : -1;
+      var p = document.getElementById(x.getAttribute('aria-controls'));
+      p.classList.toggle('active', on);
+      if(on) p.classList.add('in');
+    });
+  }
+  tabs.forEach(function(t, i){
+    t.addEventListener('click', function(){ selectTab(t); });
+    t.addEventListener('keydown', function(e){
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if(d){ e.preventDefault(); var n = tabs[(i + d + tabs.length) % tabs.length]; n.focus(); selectTab(n); }
+    });
+  });
+  document.querySelectorAll('.shot-switch').forEach(function(g){
+    var img = g.parentNode.querySelector('.shot-img');
+    g.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        g.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x === btn ? 'true' : 'false'); });
+        img.src = btn.dataset.src; img.alt = btn.dataset.alt; img.width = +btn.dataset.w; img.height = +btn.dataset.h;
+      });
+    });
   });
 
   document.getElementById('successClose').addEventListener('click', closeModal);

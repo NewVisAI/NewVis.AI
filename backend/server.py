@@ -17,7 +17,7 @@ from typing import List, Set, Optional, Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, BackgroundTasks, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 import torch
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -80,6 +80,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Camera credentials never leave the server
+# ---------------------------------------------------------------------------
+# Live analytics stores each camera's source URL (e.g. rtsp://admin:pass@10.0.0.5/...)
+# as events.video_path / tracking_data.video_path, and many endpoints return those
+# rows. Strip the user:password@ part from every stream URL in JSON responses, and
+# map a stripped camera URL coming back as ?video_path=... to the real source so
+# the browser can still use it as a filter key.
+from urllib.parse import parse_qsl, urlencode
+
+from url_redaction import redact_url_credentials, redact_url_credentials_bytes
+
+
+def _unredact_video_path(value: str) -> str:
+    if not value or "://" not in value or "@" in value:
+        return value
+    for cam in camera_registry_list_raw():
+        src = str(cam.get("source") or "")
+        if "@" in src and redact_url_credentials(src) == value:
+            return src
+    return value
+
+
+def camera_registry_list_raw():
+    try:
+        return camera_registry._load().get("cameras", [])
+    except Exception:
+        return []
+
+
+@app.middleware("http")
+async def protect_camera_credentials(request: Request, call_next):
+    qs = request.scope.get("query_string", b"")
+    if b"video_path=" in qs:
+        pairs = parse_qsl(qs.decode("latin-1"), keep_blank_values=True)
+        fixed = [(k, _unredact_video_path(v) if k == "video_path" else v) for k, v in pairs]
+        if fixed != pairs:
+            request.scope["query_string"] = urlencode(fixed).encode("latin-1")
+
+    response = await call_next(request)
+    if not (response.headers.get("content-type") or "").startswith("application/json"):
+        return response
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    clean = redact_url_credentials_bytes(body)
+    headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
+    return Response(content=clean, status_code=response.status_code, headers=headers,
+                    media_type=response.headers.get("content-type"), background=response.background)
 
 # Setup directories for video storage
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -300,10 +349,13 @@ async def broadcast_alert(message: dict):
     if not active_websockets:
         return
     disconnected = set()
+    import json as _json
+    # Same credential scrub as the HTTP middleware: event payloads carry video_path.
+    payload = redact_url_credentials(_json.dumps(message, default=str))
     # Convert to list to avoid 'dictionary/set changed size during iteration' race conditions
     for ws in list(active_websockets):
         try:
-            await ws.send_json(message)
+            await ws.send_text(payload)
         except Exception:
             disconnected.add(ws)
     for ws in disconnected:
@@ -538,8 +590,10 @@ def _serve_html(filename: str, fallback: str) -> HTMLResponse:
 @app.get("/", response_class=HTMLResponse)
 def read_landing():
     """Public marketing / lead-capture site."""
+    # The marketing site lives in website/ (served standalone at gensolve.in by
+    # website/server.py); the engine serves the same file locally for convenience.
     return _serve_html(
-        "landing.html",
+        os.path.join("..", "website", "index.html"),
         "<h3>Sentinel AI is online. Marketing page landing.html missing. Dashboard at <a href='/app'>/app</a>.</h3>",
     )
 
@@ -1536,9 +1590,16 @@ def _latest_event_video() -> Optional[str]:
 
 @app.get("/api/heatmap", dependencies=[Depends(current_user)])
 def heatmap(video_path: str = None, grid_w: int = 48, grid_h: int = 27,
-            start_frame: int = None, end_frame: int = None):
+            start_frame: int = None, end_frame: int = None, camera_id: Optional[int] = None):
     """Density grid of person positions (bbox centroids) from tracking_data,
-    binned into a grid_w x grid_h heatmap. Optional start/end frame windows it."""
+    binned into a grid_w x grid_h heatmap. Optional start/end frame windows it.
+    camera_id selects that camera's source server-side, so the browser never
+    has to handle (credential-bearing) RTSP URLs."""
+    if camera_id is not None and not video_path:
+        cam = camera_registry.get_camera(camera_id)
+        if not cam:
+            raise HTTPException(status_code=404, detail="Unknown camera.")
+        video_path = cam.get("source")
     import sqlite3
     import cv2 as _cv2
     from db_schema import get_db_path
@@ -1591,17 +1652,26 @@ def heatmap(video_path: str = None, grid_w: int = 48, grid_h: int = 27,
              for y in range(grid_h) for x in range(grid_w) if grid[y][x] > 0]
     return {
         "grid_w": grid_w, "grid_h": grid_h, "cells": cells, "max": mx,
-        "samples": len(rows), "video_path": video_path,
+        "samples": len(rows),
         "frame_w": int(frame_w), "frame_h": int(frame_h),
         "max_frame": int(db_max_frame),
     }
 
 
 @app.get("/api/heatmap/frame", dependencies=[Depends(current_user)])
-def heatmap_frame(video_path: str = None):
+def heatmap_frame(video_path: str = None, camera_id: Optional[int] = None):
     """A representative (mid) frame of the video, as a JPEG, to sit behind the heatmap."""
     import cv2 as _cv2
     from fastapi.responses import Response
+    if camera_id is not None and not video_path:
+        cam = camera_registry.get_camera(camera_id)
+        if not cam:
+            raise HTTPException(status_code=404, detail="Unknown camera.")
+        # Same safe path as the grid thumbnails: never decodes RTSP in the web process.
+        jpeg = camera_stream.grab_snapshot(cam, width=960)
+        if not jpeg:
+            raise HTTPException(status_code=404, detail="No frame available for this camera.")
+        return Response(content=jpeg, media_type="image/jpeg")
     if not video_path:
         video_path = _latest_event_video()
     if not video_path or not _is_allowed_video(video_path):
@@ -1619,16 +1689,101 @@ def heatmap_frame(video_path: str = None):
     return Response(content=buf.tobytes(), media_type="image/jpeg")
 
 
+# ---------------------------------------------------------------------------
+# Overview panels (incident timeline, camera health, heatmap camera)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/overview")
+def overview_panels(hours: int = 24, user: dict = Depends(current_user)):
+    """Real data for the Overview page's timeline, camera-health and heatmap panels.
+
+    Timezones: alerts.timestamp is written in server-local time (alerts.py) while
+    events.timestamp is naive UTC (event.py), so each table is windowed against
+    its own clock.
+    """
+    import sqlite3
+    from datetime import timedelta
+    from db_schema import get_db_path
+
+    hours = max(1, min(168, int(hours)))
+    now_local = datetime.now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    start_local = now_local - timedelta(hours=hours)
+    since_local = (datetime.now() - timedelta(hours=24)).isoformat(timespec="seconds")
+    since_utc = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)).isoformat(timespec="seconds")
+    can_see_alerts = user["role"] in ("developer", "principal")
+
+    conn = sqlite3.connect(get_db_path())
+    cur = conn.cursor()
+
+    def rows(sql, params=()):
+        try:
+            return cur.execute(sql, params).fetchall()
+        except sqlite3.OperationalError:  # table not created yet on a fresh install
+            return []
+
+    # 1. Incident timeline: alerts per hour over the window.
+    timeline = None
+    if can_see_alerts:
+        bins = [{"start": (start_local + timedelta(hours=i)).isoformat(timespec="minutes"),
+                 "count": 0, "by_type": {}} for i in range(hours)]
+        for ts, kind in rows("SELECT timestamp, alert_type FROM alerts WHERE timestamp >= ?",
+                             (start_local.isoformat(timespec="seconds"),)):
+            try:
+                idx = int((datetime.fromisoformat(ts) - start_local).total_seconds() // 3600)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= idx < hours:
+                bins[idx]["count"] += 1
+                bins[idx]["by_type"][kind] = bins[idx]["by_type"].get(kind, 0) + 1
+        timeline = {"hours": hours, "bins": bins, "total": sum(b["count"] for b in bins)}
+
+    # 2. Camera health: analytics worker state + last activity per camera.
+    last_event = dict(rows("SELECT camera_id, MAX(timestamp) FROM events GROUP BY camera_id"))
+    events_24h = dict(rows("SELECT camera_id, COUNT(*) FROM events WHERE timestamp >= ? GROUP BY camera_id", (since_utc,)))
+    last_alert, alerts_24h = {}, {}
+    if can_see_alerts:
+        last_alert = dict(rows("SELECT camera_id, MAX(timestamp) FROM alerts GROUP BY camera_id"))
+        alerts_24h = dict(rows("SELECT camera_id, COUNT(*) FROM alerts WHERE timestamp >= ? GROUP BY camera_id", (since_local,)))
+    workers = live_analytics.status()
+    cameras = []
+    for cam in camera_registry.list_cameras():
+        cid = cam.get("id")
+        w = workers.get(cid) or workers.get(str(cid))
+        cameras.append({
+            "id": cid, "name": cam.get("name"), "floor": cam.get("floor"), "location": cam.get("location"),
+            "analytics": ({"status": w.get("status"), "alive": bool(w.get("alive")),
+                           "last_error": w.get("last_error"),
+                           "analytics_frames": w.get("analytics_frames", 0)} if w else None),
+            "last_event_utc": last_event.get(cid),
+            "events_24h": events_24h.get(cid, 0),
+            "last_alert_local": last_alert.get(cid) if can_see_alerts else None,
+            "alerts_24h": alerts_24h.get(cid, 0) if can_see_alerts else None,
+        })
+
+    # 3. Heatmap: the camera with the most recent tracking data.
+    hm = rows("SELECT camera_id FROM tracking_data WHERE camera_id IS NOT NULL ORDER BY id DESC LIMIT 1")
+    conn.close()
+    hm_cam = hm[0][0] if hm else None
+    hm_name = next((c["name"] for c in cameras if c["id"] == hm_cam), None)
+
+    return {
+        "generated_local": datetime.now().isoformat(timespec="seconds"),
+        "timeline": timeline,
+        "cameras": cameras,
+        "heatmap_camera": {"id": hm_cam, "name": hm_name} if hm_cam is not None else None,
+    }
+
+
 @app.get("/api/analytics/headcount-series", dependencies=[Depends(current_user)])
 def headcount_series():
     """Unique people per hour-of-day (00–23) from logged sessions — feeds the
     headcount-over-time chart."""
     import sqlite3
-    from db_schema import get_db_path
+    from db_schema import get_db_path, local_hour_sql
     conn = sqlite3.connect(get_db_path())
     cur = conn.cursor()
     cur.execute(
-        "SELECT substr(entry_time, 12, 2) AS hr, COUNT(DISTINCT global_id) "
+        f"SELECT {local_hour_sql('entry_time', dialect='sqlite')} AS hr, COUNT(DISTINCT global_id) "
         "FROM events WHERE entry_time IS NOT NULL AND object_type='person' GROUP BY hr ORDER BY hr"
     )
     buckets = {f"{h:02d}": 0 for h in range(24)}
